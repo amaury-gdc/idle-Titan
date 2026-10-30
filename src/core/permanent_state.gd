@@ -15,7 +15,7 @@ extends RefCounted
 ## [/codeblock]
 
 ## Save-format version written by this build.
-const CURRENT_VERSION: int = 1
+const CURRENT_VERSION: int = 3
 
 ## Unspent talent points.
 var talent_points: int = 0
@@ -23,6 +23,13 @@ var talent_points: int = 0
 var talents: Dictionary = {}
 ## Reserved for post-V1 artifacts; stored untouched.
 var artifacts: Array = []
+## Player preference "Défi automatique" (story 004): a kill in farm mode starts the
+## boss by itself when it can be beaten. Off by default; added in version 2. See
+## [FloorManager].
+var auto_challenge: bool = false
+## True once the message of the first failed boss was shown (story 004): it appears
+## only once per player. Added in version 3.
+var boss_hint_shown: bool = false
 
 
 ## JSON-safe payload including the format version.
@@ -32,6 +39,8 @@ func to_dict() -> Dictionary:
 		"talent_points": talent_points,
 		"talents": talents.duplicate(),
 		"artifacts": artifacts.duplicate(),
+		"auto_challenge": auto_challenge,
+		"boss_hint_shown": boss_hint_shown,
 	}
 
 
@@ -51,4 +60,10 @@ static func from_dict(data: Dictionary) -> PermanentState:
 	var a: Variant = data.get("artifacts", [])
 	if a is Array:
 		state.artifacts = a.duplicate()
+	var auto: Variant = data.get("auto_challenge", false)
+	if auto is bool:
+		state.auto_challenge = auto
+	var hint: Variant = data.get("boss_hint_shown", false)
+	if hint is bool:
+		state.boss_hint_shown = hint
 	return state

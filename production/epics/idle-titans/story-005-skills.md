@@ -80,5 +80,5 @@
 
 ## Dependencies
 
-- Depends on: `production/epics/idle-titans/story-004-boss.md`
+- Depends on: `production/epics/idle-titans/story-004b-offline.md`
 - Unlocks: `production/epics/idle-titans/story-006-talents.md`

@@ -8,12 +8,13 @@ Big values (costs, damage, gold) are decimal STRINGS of digits so they stay
 exact beyond int64 and parse with `BigNumber.from_string`. Decimal factors are
 decimal strings such as "1.1" for `BigNumber.multiply_decimal`.
 
-STATUS: both files hold PROVISIONAL balance, calibrated in story 003 against the
-brief's hypotheses; measurements and gaps are in `balance_notes.md`.
+STATUS: all three files hold PROVISIONAL balance, calibrated in stories 003 and 004
+against the brief's hypotheses; measurements and gaps are in `balance_notes.md`.
 `Combat` (`src/core/combat.gd`) reads the curves and builds one `Companion`
 (`src/core/companion.gd`) per roster entry. `Combat.from_data` rejects a file with
 the wrong `schema_version` or an invalid value and the main screen then shows the
-error instead of the game.
+error instead of the game. `BossFight.from_data` (`src/core/boss_fight.gd`) does the
+same for `boss_curves.json`.
 
 ## companions_roster.json
 
@@ -50,7 +51,7 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 | `schema_version` | int | yes | Currently 2 (2 added the combat keys below). `Combat` refuses any other value. |
 | `cost_growth` | decimal string (unitless factor) | only if a companion has no own `cost_growth` | Default per-level cost multiplier (1.08 = +8% per level). Value in file: "1.08". |
 | `enemy_hp_base` | digit string (HP) | yes | HP of the stage-1 enemy. Value in file: "22". |
-| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | yes | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. Value in file: "1.33". |
+| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | yes | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. Value in file: "1.325". |
 | `gold_per_kill_base` | digit string (gold) | yes | Gold for killing the stage-1 enemy. Default in file: "3". |
 | `gold_per_kill_growth` | decimal string (unitless factor) | yes | Per-stage gold multiplier. Gold(stage) = floor(`gold_per_kill_base` * growth^(stage-1)), exact. Value in file: "1.28". |
 | `click_damage_base` | digit string (damage per click) | yes | Click damage before any companion share. Default in file: "1". |
@@ -62,3 +63,42 @@ Growth factors are applied exactly as floor(base * numerator^n / 10^(scale*n)) b
 value at stage N does not depend on the earlier stages' rounding. Companion
 levels are read from `GameState.companion_levels`; ids absent from the roster are
 ignored.
+
+## boss_curves.json
+
+All keys are required. An invalid or missing file stops the game on the main screen
+error, like the two files above.
+
+| Key | Type | Required | Meaning |
+|---|---|---|---|
+| `schema_version` | int | yes | Currently 3 (2 replaced `boss_hp_base` and `boss_hp_growth` by `boss_hp_multiplier`; 3 added `auto_challenge_margin`). `BossFight` refuses any other value. |
+| `boss_every_stages` | integer >= 2 | yes | A stage S is a boss stage when `S % boss_every_stages == 0`. Must be >= 2 so that a fallback can never reach a stage below 1 or another boss stage. Value in file: 10. |
+| `timer_seconds` | number (seconds, > 0) | yes | Length of the countdown of one boss fight; it starts when the fight begins. Value in file: 30. |
+| `boss_hp_multiplier` | decimal string (unitless factor) | yes | Boss HP(S) = floor(enemy HP of stage S * `boss_hp_multiplier`), exact (`multiply_decimal`), never below 1. Value in file: "20". |
+| `boss_gold_base` | digit string (gold) | yes | Base of the boss gold curve. Boss gold(S) = floor(`boss_gold_base` * `boss_gold_growth`^(S-1)), exact. Replaces the normal kill gold on a boss stage. Value in file: "15". |
+| `boss_gold_growth` | decimal string (unitless factor) | yes | Per-stage multiplier of boss gold. Value in file: "1.30". |
+| `auto_challenge_margin` | decimal string (unitless factor >= 1 recommended) | yes | Safety margin of "Défi automatique": the estimated damage must cover boss HP * this factor. Without it, a narrow estimate fails attempt after attempt. Value in file: "1.2". |
+
+Retry rule (story 004, implemented by `FloorManager`): FARM MODE AND CHALLENGE. When
+the countdown runs out the player falls back to the previous stage (boss at stage 10
+-> stage 9) in farm mode: a kill grants gold and respawns an enemy of the same stage,
+with no stage advance, for as long as the player wants. The "Défier le boss" button,
+shown only in farm mode, leaves it and starts the boss of the next stage at full HP
+with a full countdown; failing again returns to farm mode. The "Abandonner le boss"
+button, shown only during a boss fight, counts as a failed fight. With the "Défi automatique"
+setting (off by default) a kill in farm mode does the same by itself, but only when
+the estimated damage covers the boss: (companion damage per second + measured click
+damage per second) * `timer_seconds` >= boss HP * `auto_challenge_margin`. Otherwise
+the player keeps farming.
+
+Saved fields: `farming` (bool, default false) in the game save, kept across a reload
+and cleared by `GameState.reset()`; in the permanent save (version 3), `auto_challenge`
+(bool, default false), a preference that survives run resets, and `boss_hint_shown`
+(bool, default false), set when the message of the first failed boss is shown, so it
+appears only once per player. Older saves load with these at false. If a loaded save says farming but the next stage is not a boss
+stage (the boss data changed), `FloorManager` clears the flag. Nothing about a
+running fight is saved: loading a save on a boss stage starts the boss at full HP with
+a fresh countdown.
+
+A stage counts as reached (`GameState.max_stage_reached`, the score) as soon as its
+fight begins, boss included; a fallback never lowers it.

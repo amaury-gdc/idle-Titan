@@ -2,7 +2,7 @@
 	"schema_version": 2,
 	"cost_growth": "1.08",
 	"enemy_hp_base": "22",
-	"enemy_hp_growth": "1.33",
+	"enemy_hp_growth": "1.325",
 	"gold_per_kill_base": "3",
 	"gold_per_kill_growth": "1.28",
 	"click_damage_base": "1",

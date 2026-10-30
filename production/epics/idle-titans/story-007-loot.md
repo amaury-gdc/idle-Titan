@@ -30,7 +30,7 @@
 
 - [ ] 5 types d'objets existent (Sword, Helmet, Chest, Aura, Slash) ; un seul objet est actif par type.
 - [ ] 3 raretés (Commun, Rare, Légendaire) ; le nombre de bonus secondaires dépend de la rareté (en données).
-- [ ] 9 stats possibles : dégâts du clic, dégâts globaux, dégâts critiques, chance de critique, dégâts des compagnons, dégâts de boss, or global, or des boss, or hors-ligne (cette dernière est définie mais sans effet tant que le hors-ligne n'existe pas).
+- [ ] 9 stats possibles : dégâts du clic, dégâts globaux, dégâts critiques, chance de critique, dégâts des compagnons, dégâts de boss, or global, or des boss, or hors-ligne (cette dernière s'applique au gain hors-ligne de la story 004b).
 - [ ] Les bonus des objets actifs s'appliquent aux formules de jeu.
 - [ ] Le premier objet tombe sur le boss de l'étage 10 ; les boss suivants donnent du butin selon une table en données.
 - [ ] L'inventaire est limité ; quand il est plein, les moins bons objets sont vendus automatiquement (règle de « moins bon » définie et notée).
@@ -50,7 +50,6 @@
 ## Out of Scope
 
 - Artefacts, prestige, familiers.
-- Effet de la stat « or hors-ligne » (hors-ligne hors périmètre V1).
 
 ---
 

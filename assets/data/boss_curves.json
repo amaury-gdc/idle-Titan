@@ -1,0 +1,9 @@
+{
+	"schema_version": 3,
+	"boss_every_stages": 10,
+	"timer_seconds": 30,
+	"boss_hp_multiplier": "20",
+	"boss_gold_base": "15",
+	"boss_gold_growth": "1.30",
+	"auto_challenge_margin": "1.2"
+}

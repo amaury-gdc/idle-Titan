@@ -49,7 +49,7 @@
 ## Out of Scope
 
 - [Story 002]: la boucle de jeu elle-même.
-- Or hors-ligne (hors périmètre V1).
+- [Story 004b]: or hors-ligne.
 
 ---
 

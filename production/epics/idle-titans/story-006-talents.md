@@ -48,7 +48,7 @@
 ## Out of Scope
 
 - [Story 007]: objets.
-- Talents liés au hors-ligne (hors-ligne hors périmètre V1).
+- Talents liés au hors-ligne (non prévus en V1).
 
 ---
 

@@ -16,21 +16,23 @@ Un idle game 2D dans le navigateur où l'on clique pour frapper, où des compagn
 5. 3 compétences actives avec temps de recharge
 6. Arbre de talents (3 branches, environ 15 nœuds)
 7. Objets et butin (5 types, 3 raretés, 9 stats)
+8. Hors-ligne : or gagné d'après la puissance des compagnons, selon l'heure réelle, plafonné à 12 h
 
-Hors périmètre : hors-ligne, prestige, artefacts, familiers, clan, tournois, monnaie premium, publicité, son.
+Hors périmètre : prestige, artefacts, familiers, clan, tournois, monnaie premium, publicité, son.
 
 ## Order
 
-Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la courbe), boss, compétences, talents, objets en dernier.
+Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la courbe), boss, hors-ligne, compétences, talents, objets en dernier.
 
 ## Stories
 
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
-| 001 | Données, état et sauvegarde | Integration | Ready | N/A |
-| 002 | Boucle de base : clic, étages, or | Logic | Ready | N/A |
-| 003 | Compagnons et paliers | Logic | Ready | N/A |
-| 004 | Boss et repli | Logic | Ready | N/A |
+| 001 | Données, état et sauvegarde | Integration | Complete | N/A |
+| 002 | Boucle de base : clic, étages, or | Logic | Complete | N/A |
+| 003 | Compagnons et paliers | Logic | Complete | N/A |
+| 004 | Boss et repli | Logic | In Progress | N/A |
+| 004b | Progression hors-ligne | Logic | Ready | N/A |
 | 005 | Compétences actives | Logic | Ready | N/A |
 | 006 | Arbre de talents | Logic | Ready | N/A |
 | 007 | Objets et butin | Logic | Ready | N/A |

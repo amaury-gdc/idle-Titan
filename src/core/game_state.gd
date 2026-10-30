@@ -12,9 +12,13 @@ extends RefCounted
 
 ## Current stage (floor, the score). Starts at 1.
 var stage: int = 1
-## Highest stage reached this run; never below [member stage] and kept when
-## [member stage] goes back down (story 004 boss retreat).
+## Highest stage reached this run (the score); never below [member stage] and kept
+## when [member stage] goes back down (story 004 boss fallback). A stage counts as
+## reached as soon as its fight begins, boss included (see [FloorManager]).
 var max_stage_reached: int = 1
+## True in farm mode after a failed boss: kills respawn the same stage until the
+## boss is challenged (story 004, see [FloorManager]). Saved, so a reload stays in it.
+var farming: bool = false
 ## Gold on hand.
 var gold: BigNumber = BigNumber.new()
 ## Companion id (String) -> level (int). Absent id means not bought.
@@ -25,6 +29,7 @@ var companion_levels: Dictionary = {}
 func reset() -> void:
 	stage = 1
 	max_stage_reached = 1
+	farming = false
 	gold = BigNumber.new()
 	companion_levels = {}
 
@@ -34,13 +39,15 @@ func to_dict() -> Dictionary:
 	return {
 		"stage": stage,
 		"max_stage_reached": max_stage_reached,
+		"farming": farming,
 		"gold": gold.to_decimal_string(),
 		"companion_levels": companion_levels.duplicate(),
 	}
 
 
 ## Builds a state from a payload; missing or invalid fields fall back to defaults.
-## A save without max_stage_reached (older format) defaults it to the saved stage.
+## A save without max_stage_reached (older format) defaults it to the saved stage;
+## one without farming defaults it to false.
 static func from_dict(data: Dictionary) -> GameState:
 	var state := GameState.new()
 	var s: Variant = data.get("stage", 1)
@@ -50,6 +57,9 @@ static func from_dict(data: Dictionary) -> GameState:
 	var m: Variant = data.get("max_stage_reached", state.stage)
 	if m is float or m is int:
 		state.max_stage_reached = maxi(int(m), state.stage)
+	var f: Variant = data.get("farming", false)
+	if f is bool:
+		state.farming = f
 	var g: Variant = data.get("gold", "0")
 	if g is String:
 		var parsed: BigNumber = BigNumber.from_string(g)

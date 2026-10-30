@@ -1,8 +1,66 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
 [ext_resource type="PackedScene" path="res://src/ui/companion_panel.tscn" id="3_panel"]
+[ext_resource type="PackedScene" path="res://src/ui/boss_timer.tscn" id="4_boss"]
+
+[sub_resource type="StyleBoxFlat" id="auto_off"]
+bg_color = Color(0.25, 0.25, 0.3, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.75, 0.75, 0.8, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="auto_off_hover"]
+bg_color = Color(0.34, 0.34, 0.4, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.9, 0.95, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="auto_on"]
+bg_color = Color(0.13, 0.5, 0.25, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.95, 0.6, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="challenge_normal"]
+bg_color = Color(0.72, 0.16, 0.14, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="challenge_hover"]
+bg_color = Color(0.88, 0.22, 0.18, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="challenge_pressed"]
+bg_color = Color(0.52, 0.11, 0.1, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [node name="MainScreen" type="Control"]
 layout_mode = 3
@@ -150,6 +208,84 @@ text = "DPS : 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="BossHintLabel" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -580.0
+offset_top = 245.0
+offset_right = 20.0
+offset_bottom = 272.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
+theme_override_font_sizes/font_size = 20
+text = "Trop fort ! Farme, renforce tes compagnons, puis défie-le."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BossTimer" parent="." instance=ExtResource("4_boss")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -580.0
+offset_top = -250.0
+offset_right = 20.0
+offset_bottom = -194.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AbandonButton" type="Button" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -620.0
+offset_top = -186.0
+offset_right = -435.0
+offset_bottom = -146.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("auto_off")
+theme_override_styles/hover = SubResource("auto_off_hover")
+theme_override_styles/pressed = SubResource("auto_off_hover")
+text = "Abandonner le boss"
+
+[node name="ChallengeButton" type="Button" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -580.0
+offset_top = -250.0
+offset_right = 20.0
+offset_bottom = -194.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("challenge_normal")
+theme_override_styles/hover = SubResource("challenge_hover")
+theme_override_styles/pressed = SubResource("challenge_pressed")
+text = "Défier le boss"
+
 [node name="ScoreLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
@@ -165,6 +301,24 @@ theme_override_font_sizes/font_size = 36
 text = "Score (étage atteint) : 1"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="AutoChallengeToggle" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -84.0
+offset_right = 400.0
+offset_bottom = -36.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("auto_off")
+theme_override_styles/hover = SubResource("auto_off_hover")
+theme_override_styles/pressed = SubResource("auto_on")
+toggle_mode = true
+text = "Défi automatique : NON"
 
 [node name="CompanionPanel" parent="." instance=ExtResource("3_panel")]
 unique_name_in_owner = true

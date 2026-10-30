@@ -21,9 +21,9 @@
 - 3 compétences actives avec temps de recharge : gros coup, buff de dégâts, bonus d'or.
 - Arbre de talents : 3 branches (Clic, Compagnons, Économie), environ 15 nœuds, 1 point tous les 5 étages, réinitialisation gratuite.
 - Objets et butin : 5 types (Sword, Helmet, Chest, Aura, Slash), 1 actif par type, 3 raretés, 9 stats, premier objet sur le boss de l'étage 10, inventaire limité avec vente automatique des moins bons.
+- Hors-ligne : or gagné d'après la puissance des compagnons et le temps réel écoulé depuis la dernière sauvegarde, plafonné à 12 h.
 
 ## Out of scope — not building this
-- Hors-ligne (or gagné d'après la puissance des compagnons, plafonné à 12 h) : ajouté juste après la sauvegarde.
 - Prestige et artefacts (prévus après la V1, l'architecture doit les accepter sans tout réécrire).
 - Familiers, clan, tournois, monnaie premium, publicité, son.
 
@@ -32,9 +32,10 @@
 2. Compagnons et or, puis mesure de la courbe contre les objectifs de calibrage.
 3. Boss et repli.
 4. Sauvegarde locale.
-5. Compétences actives.
-6. Arbre de talents.
-7. Objets et butin (dernier, coupable si la courbe n'est pas réglée).
+5. Hors-ligne.
+6. Compétences actives.
+7. Arbre de talents.
+8. Objets et butin (dernier, coupable si la courbe n'est pas réglée).
 
 ---
 **Who it's for / what they feel:** Quelques amis testeurs, sessions courtes ; ils sentent la progression et comprennent l'état du jeu d'un coup d'œil.

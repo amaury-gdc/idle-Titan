@@ -1,12 +1,12 @@
 # Story 004: Boss et repli
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-30
 
 ## Context
 
@@ -40,7 +40,7 @@
 
 ## Implementation Notes
 
-- Règle à trancher et noter à l'implémentation : reprise automatique du boss après le repli, ou bouton « retenter ».
+- Règle retenue : après un repli, farm continu de l'étage précédent, bouton « Défier le boss » et réglage « Défi automatique », désactivé par défaut, qui ne défie que si les dégâts estimés suffisent. Règle notée dans `assets/data/data_schema.md`.
 - Valeurs en données (durée du chrono, courbes de boss).
 
 ---
@@ -55,10 +55,12 @@
 ## Files
 
 - `src/core/boss_fight.gd`, `src/core/floor_manager.gd`
-- `src/ui/boss_timer.tscn`
-- `tests/unit/boss/boss_test.gd`
-
----
+- `src/core/game_state.gd`, `src/core/permanent_state.gd`
+- `src/ui/boss_timer.tscn`, `src/ui/boss_timer.gd`
+- `src/ui/enemy_view.gd`, `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
+- `assets/data/boss_curves.json`, `assets/data/core_curves.json`
+- `assets/data/data_schema.md`, `assets/data/balance_notes.md`
+- `tools/simulate_progress.gd`
 
 ## QA Test Cases
 
@@ -80,4 +82,4 @@
 ## Dependencies
 
 - Depends on: `production/epics/idle-titans/story-003-companions.md`
-- Unlocks: `production/epics/idle-titans/story-005-skills.md`
+- Unlocks: `production/epics/idle-titans/story-004b-offline.md`
