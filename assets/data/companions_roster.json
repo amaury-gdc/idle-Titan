@@ -1,0 +1,6 @@
+{
+	"schema_version": 1,
+	"companions": [
+		{ "id": "placeholder_companion", "name": "Placeholder", "base_cost": "10", "base_damage": "1" }
+	]
+}
