@@ -12,6 +12,9 @@ extends RefCounted
 
 ## Current stage (floor, the score). Starts at 1.
 var stage: int = 1
+## Highest stage reached this run; never below [member stage] and kept when
+## [member stage] goes back down (story 004 boss retreat).
+var max_stage_reached: int = 1
 ## Gold on hand.
 var gold: BigNumber = BigNumber.new()
 ## Companion id (String) -> level (int). Absent id means not bought.
@@ -21,6 +24,7 @@ var companion_levels: Dictionary = {}
 ## Returns the state to a fresh run.
 func reset() -> void:
 	stage = 1
+	max_stage_reached = 1
 	gold = BigNumber.new()
 	companion_levels = {}
 
@@ -29,17 +33,23 @@ func reset() -> void:
 func to_dict() -> Dictionary:
 	return {
 		"stage": stage,
+		"max_stage_reached": max_stage_reached,
 		"gold": gold.to_decimal_string(),
 		"companion_levels": companion_levels.duplicate(),
 	}
 
 
 ## Builds a state from a payload; missing or invalid fields fall back to defaults.
+## A save without max_stage_reached (older format) defaults it to the saved stage.
 static func from_dict(data: Dictionary) -> GameState:
 	var state := GameState.new()
 	var s: Variant = data.get("stage", 1)
 	if s is float or s is int:
 		state.stage = maxi(int(s), 1)
+	state.max_stage_reached = state.stage
+	var m: Variant = data.get("max_stage_reached", state.stage)
+	if m is float or m is int:
+		state.max_stage_reached = maxi(int(m), state.stage)
 	var g: Variant = data.get("gold", "0")
 	if g is String:
 		var parsed: BigNumber = BigNumber.from_string(g)

@@ -85,6 +85,20 @@ func test_save_then_load_game_restores_identical_state() -> void:
 	assert_int(loaded.companion_levels.size()).is_equal(2)
 
 
+func test_save_then_load_game_keeps_max_stage_above_current_stage() -> void:
+	# Arrange: the player fell back from stage 12 to stage 9
+	var game: GameState = _make_game(9, "1500")
+	game.max_stage_reached = 12
+	_saves.save(game, _make_permanent(3))
+
+	# Act
+	var loaded: GameState = _saves.load_game()
+
+	# Assert
+	assert_int(loaded.stage).is_equal(9)
+	assert_int(loaded.max_stage_reached).is_equal(12)
+
+
 func test_save_then_load_permanent_restores_identical_state() -> void:
 	# Arrange
 	_saves.save(_make_game(10, "1500"), _make_permanent(3))
@@ -222,6 +236,40 @@ func test_load_game_defaults_invalid_fields_inside_a_valid_object() -> void:
 	assert_int(loaded.stage).is_equal(1)
 	assert_bool(loaded.gold.is_zero()).is_true()
 	assert_int(loaded.companion_levels.size()).is_equal(0)
+
+
+func test_load_game_defaults_max_stage_to_saved_stage_when_field_is_missing() -> void:
+	# Arrange: a save written before max_stage_reached existed
+	_write_raw(GAME_PATH, '{"stage": 14, "gold": "1500", "companion_levels": {}}')
+
+	# Act
+	var loaded: GameState = _saves.load_game()
+
+	# Assert
+	assert_int(loaded.stage).is_equal(14)
+	assert_int(loaded.max_stage_reached).is_equal(14)
+
+
+func test_load_game_defaults_max_stage_to_saved_stage_when_field_is_invalid() -> void:
+	# Arrange
+	_write_raw(GAME_PATH, '{"stage": 14, "max_stage_reached": "high"}')
+
+	# Act
+	var loaded: GameState = _saves.load_game()
+
+	# Assert
+	assert_int(loaded.max_stage_reached).is_equal(14)
+
+
+func test_load_game_raises_max_stage_to_stage_when_saved_value_is_lower() -> void:
+	# Arrange
+	_write_raw(GAME_PATH, '{"stage": 14, "max_stage_reached": 3}')
+
+	# Act
+	var loaded: GameState = _saves.load_game()
+
+	# Assert
+	assert_int(loaded.max_stage_reached).is_equal(14)
 
 
 func test_load_permanent_returns_fresh_state_when_file_is_corrupt() -> void:

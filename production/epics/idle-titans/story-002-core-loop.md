@@ -1,12 +1,12 @@
 # Story 002: Boucle de base : clic, étages, or
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: L
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-30
 
 ## Context
 
@@ -56,11 +56,15 @@
 
 ## Files
 
-- `src/core/combat.gd`, `src/core/floor_manager.gd`
-- `src/ui/main_screen.tscn`, `src/ui/main_screen.gd`
-- `tests/unit/core-loop/core_loop_test.gd`
-
----
+- `src/core/growth_curve.gd`
+- `src/core/combat.gd`
+- `src/core/floor_manager.gd`
+- `src/ui/enemy_view.gd`
+- `src/ui/main_screen.gd`
+- `src/ui/main_screen.tscn`
+- `assets/data/core_curves.json`
+- `assets/data/data_schema.md`
+- `project.godot`
 
 ## QA Test Cases
 
@@ -83,3 +87,12 @@
 
 - Depends on: `production/epics/idle-titans/story-001-data-state-save.md`
 - Unlocks: `production/epics/idle-titans/story-003-companions.md`
+
+---
+
+## Completion Notes
+**Completed**: 2026-10-30
+**Criteria**: 8/8 passing (none deferred). Gameplay and browser criteria (AC-1 to AC-3, AC-5, AC-7) rest on the user's play test of `build/web`; AC-4, AC-6 and AC-8 are covered by the retained screenshot.
+**Deviations**: None blocking. Out of scope but justified: `.gitignore`, `project.yaml`, `export_presets.cfg` (AC-7); `src/core/game_state.gd` and `tests/integration/save/save_roundtrip_test.gd` (`max_stage_reached`, for story 004); `tests/unit/core-loop/core_loop_test.gd`. The score label still shows the current stage; story 004 must read `max_stage_reached`.
+**Test Evidence**: `production/qa/evidence/story-002-core-loop/01-main-screen.png` (desktop run at 1280x720, not the browser, initial state); logic tests waived at qa.level minimal (a unit test file exists anyway: 90/90 pass).
+**Reviewed by**: self, no independent review
