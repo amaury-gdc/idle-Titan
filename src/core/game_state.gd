@@ -23,6 +23,14 @@ var farming: bool = false
 var gold: BigNumber = BigNumber.new()
 ## Companion id (String) -> level (int). Absent id means not bought.
 var companion_levels: Dictionary = {}
+## Real time of the last save, in Unix seconds (story 004b, brief "Hors-ligne"). 0 means
+## unknown: a fresh state or a save written before this field existed, which earns no
+## offline gold. Stamped by [SaveManager] on every save and read by [OfflineIncome].
+var last_saved_unix: int = 0
+
+## Largest saved time accepted: 2^53, the limit of exact integers in a JSON number
+## (a float). Anything above is a corrupt value and is read as "unknown".
+const MAX_SAVED_UNIX: float = 9007199254740992.0
 
 
 ## Returns the state to a fresh run.
@@ -32,6 +40,7 @@ func reset() -> void:
 	farming = false
 	gold = BigNumber.new()
 	companion_levels = {}
+	last_saved_unix = 0
 
 
 ## JSON-safe payload (gold as decimal string).
@@ -42,12 +51,14 @@ func to_dict() -> Dictionary:
 		"farming": farming,
 		"gold": gold.to_decimal_string(),
 		"companion_levels": companion_levels.duplicate(),
+		"last_saved_unix": last_saved_unix,
 	}
 
 
 ## Builds a state from a payload; missing or invalid fields fall back to defaults.
 ## A save without max_stage_reached (older format) defaults it to the saved stage;
-## one without farming defaults it to false.
+## one without farming defaults it to false; one without last_saved_unix (or with a
+## negative, non-numeric or absurd value) defaults it to 0 and stays valid.
 static func from_dict(data: Dictionary) -> GameState:
 	var state := GameState.new()
 	var s: Variant = data.get("stage", 1)
@@ -65,6 +76,9 @@ static func from_dict(data: Dictionary) -> GameState:
 		var parsed: BigNumber = BigNumber.from_string(g)
 		if parsed != null:
 			state.gold = parsed
+	var saved_at: Variant = data.get("last_saved_unix", 0)
+	if (saved_at is float or saved_at is int) and float(saved_at) > 0.0 and float(saved_at) <= MAX_SAVED_UNIX:
+		state.last_saved_unix = int(saved_at)
 	var levels: Variant = data.get("companion_levels", {})
 	if levels is Dictionary:
 		for id: Variant in levels:

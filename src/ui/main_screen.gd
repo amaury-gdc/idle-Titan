@@ -1,18 +1,24 @@
 extends Control
-## Main screen of Idle Titans (stories 002, 003, 004): stage, gold, click damage, the
-## enemy, its HP bar, the boss banner or the "Défier le boss" button of farm mode, the
-## "Défi automatique" toggle, the score (best stage reached, kept after a boss
-## fallback) and the companion panel. Composition root: loads data and saves,
-## builds the [Combat] / [BossFight] / [FloorManager] / [CompanionManager] core,
-## feeds it frame time, forwards clicks to it and redraws on its signals. All rules
-## live in src/core; this script only displays.
+## Main screen of Idle Titans (stories 002, 003, 004, 004b): stage, gold, click damage,
+## the enemy, its HP bar, the boss banner or the "Défier le boss" button of farm mode,
+## the "Défi automatique" toggle, the score (best stage reached, kept after a boss
+## fallback), the companion panel and the message shown on return after an absence.
+## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
+## [FloorManager] / [CompanionManager] / [OfflineIncome] core, feeds it frame time,
+## forwards clicks to it and redraws on its signals. All rules live in src/core; this
+## script only displays.
 ##
 ## Persistence: loads [GameState] and [PermanentState] through [SaveManager]
 ## (default user:// paths) at startup; saves every autosave_interval_seconds
 ## (core_curves.json), on window close request, on focus loss and on tree exit.
-## Web caveat (UNVERIFIED): closing the tab may not deliver a close request, and
-## when user:// writes reach IndexedDB is untested, so autosave and focus loss
-## are the real safety nets there.
+## Offline gold is granted right after the load and before any save: a save stamps the
+## current time, so saving first would erase the absence. The gain is then saved at
+## once. On the web, the same happens when a hidden tab becomes visible again, and the
+## game also saves when the tab becomes hidden.
+## Web caveat (measured in Edge, story 004b): user:// writes reach IndexedDB on the next
+## frame and a hidden tab runs no frames. The save made on hiding therefore stays in
+## memory: it counts if the tab comes back, but a tab closed while hidden reloads the
+## last autosave, at most autosave_interval_seconds old.
 
 const CURVES_PATH: String = "res://assets/data/core_curves.json"
 const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
@@ -22,6 +28,8 @@ const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
 ## Time between two redraws of the DPS line (display setting, not a gameplay value).
 const DPS_REFRESH_SECONDS: float = 0.25
+const SECONDS_PER_MINUTE: int = 60
+const SECONDS_PER_HOUR: int = 3600
 
 var _click_dps: ClickDpsMeter = ClickDpsMeter.new()
 var _dps_refresh_left: float = 0.0
@@ -31,6 +39,10 @@ var _saves: SaveManager
 var _floors: FloorManager
 var _companions: CompanionManager
 var _autosave_timer: Timer
+var _offline: OfflineIncome
+var _document: JavaScriptObject
+# Kept alive here: the browser listener stops working if this object is freed.
+var _tab_visibility_callback: JavaScriptObject
 
 @onready var _stage_label: Label = %StageLabel
 @onready var _gold_label: Label = %GoldLabel
@@ -48,13 +60,21 @@ var _autosave_timer: Timer
 @onready var _abandon_button: Button = %AbandonButton
 @onready var _auto_toggle: Button = %AutoChallengeToggle
 @onready var _boss_hint_label: Label = %BossHintLabel
+@onready var _offline_panel: PanelContainer = %OfflinePanel
+@onready var _offline_message: Label = %OfflineMessage
+@onready var _offline_close_button: Button = %OfflineCloseButton
 
 
 func _ready() -> void:
 	var curves: Variant = DataLoader.load_json(CURVES_PATH)
 	var combat: Combat = Combat.from_data(curves, DataLoader.load_json(ROSTER_PATH))
 	var boss: BossFight = BossFight.from_data(DataLoader.load_json(BOSSES_PATH))
-	var error: String = combat.get_error() if not combat.is_valid() else boss.get_error()
+	_offline = OfflineIncome.from_data(curves, combat)
+	var error: String = combat.get_error()
+	if error.is_empty():
+		error = boss.get_error()
+	if error.is_empty():
+		error = _offline.get_error()
 	if not error.is_empty():
 		push_error("Main screen: " + error)
 		_error_label.text = error
@@ -68,6 +88,7 @@ func _ready() -> void:
 	_saves = SaveManager.new()
 	_game = _saves.load_game()
 	_permanent = _saves.load_permanent()
+	var offline_gain: Dictionary = _grant_offline_gold()
 	_floors = FloorManager.new(_game, combat, boss, _permanent)
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
@@ -88,10 +109,15 @@ func _ready() -> void:
 	_refresh()
 	_refresh_boss()
 	_on_farming_changed(_floors.is_farming())
+	_offline_close_button.pressed.connect(_offline_panel.hide)
+	if not offline_gain.is_empty():
+		_show_offline_gain(offline_gain)
+	_watch_tab_visibility()
 
 
 func _process(delta: float) -> void:
-	if _companions == null:
+	# The game waits behind the return message: a boss countdown must not run out on it.
+	if _companions == null or _offline_panel.visible:
 		return
 	# Damage first, then the boss countdown (see FloorManager: a boss killed this
 	# frame is killed even if this frame's delta would have run the countdown out).
@@ -130,6 +156,54 @@ func _save() -> void:
 	if _saves == null or _game == null:
 		return
 	_saves.save(_game, _permanent)
+
+
+func _grant_offline_gold() -> Dictionary:
+	var gain: Dictionary = _offline.grant(_game, int(Time.get_unix_time_from_system()))
+	_save()
+	return gain
+
+
+func _watch_tab_visibility() -> void:
+	if not OS.has_feature("web"):
+		return
+	_document = JavaScriptBridge.get_interface("document")
+	_tab_visibility_callback = JavaScriptBridge.create_callback(_on_tab_visibility_changed)
+	_document.addEventListener("visibilitychange", _tab_visibility_callback)
+
+
+func _on_tab_visibility_changed(_args: Array) -> void:
+	if _document.hidden:
+		_save()
+		return
+	var gain: Dictionary = _grant_offline_gold()
+	if gain.is_empty():
+		return
+	_refresh()
+	_companion_panel.refresh()
+	_show_offline_gain(gain)
+
+
+func _show_offline_gain(gain: Dictionary) -> void:
+	var duration: String = _format_duration(gain["seconds"])
+	var gold: String = (gain["gold"] as BigNumber).format()
+	if gain["capped"]:
+		_offline_message.text = tr("Absence prise en compte : %s (plafond atteint)\nOr gagné : %s") % [duration, gold]
+	else:
+		_offline_message.text = tr("Absence prise en compte : %s\nOr gagné : %s") % [duration, gold]
+	_offline_panel.visible = true
+	_offline_close_button.grab_focus()
+
+
+@warning_ignore("integer_division")
+func _format_duration(seconds: int) -> String:
+	var hours: int = seconds / SECONDS_PER_HOUR
+	var minutes: int = seconds % SECONDS_PER_HOUR / SECONDS_PER_MINUTE
+	if hours > 0:
+		return tr("%d h %02d min") % [hours, minutes]
+	if minutes > 0:
+		return tr("%d min") % minutes
+	return tr("%d s") % seconds
 
 
 func _on_enemy_clicked() -> void:

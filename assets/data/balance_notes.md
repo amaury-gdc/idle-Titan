@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004)
+# Balance notes (stories 003, 004, 004b)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -9,6 +9,51 @@ The numbers that apply to the game today are in "Bosses".
 Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
+
+## Offline progress (story 004b)
+
+Values in `core_curves.json`: `offline_efficiency` "0.1", `offline_max_hours` 12,
+`offline_min_seconds` 60. Formula in `data_schema.md`: an absence pays 10% of what the
+companions would earn by farming the current stage. The rate is tied to the stage
+because gold per point of damage falls from about 0.136 at stage 1 to about 0.004 at
+stage 100: a flat rate would be too generous early or worthless late.
+
+    <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24 --auto=1 --away=0.5:8,3:8,6:12 --eff=0.1
+
+Three returns during the run (8 h at 0.5 h active, 8 h at 3 h, 12 h at 6 h), 28 h away
+in total. Times are active play, without the time away. 0 is the run without offline gold.
+
+| `offline_efficiency` | Stage 50 | Stage 100 | Stage 110 | Gold of the 12 h return (stage 89) |
+|---|---|---|---|---|
+| 0 | 55.2 min | 8.56 h | 11.84 h | 0 |
+| 0.05 | 46.7 min | 7.70 h (-10%) | 10.98 h | 3.9 T, 32 min of recent active income |
+| 0.1 (kept) | 43.4 min | 7.06 h (-17.5%) | 10.34 h | 8.2 T, 67 min |
+| 0.25 | 35.8 min | 6.02 h (-30%) | 9.09 h | 23.8 T, 195 min |
+| 0.5 | 31.0 min | 6.01 h | 8.52 h | 51 T, 313 min |
+
+Why 0.1: 28 h away saves about 1.5 h of active play, and a 12 h return is worth about
+1 h of active income, against 12 h actually played. Absence helps without replacing
+active play. At 0.25 absences already save 30% of the time to stage 100.
+
+The wall holds. With six returns over 72 h of active play (the three above, then 12 h
+at 12, 24 and 48 h active), the run stays at best stage 110, like the run without
+offline gold: stage 120 is not reached. Each 12 h return at the wall pays 550 T to
+1.1 Qa, about 60 to 100 min of recent active income.
+
+Limits:
+
+- "Recent active income" is the average of the last 10 active minutes. It lags behind
+  an income that keeps growing, so it is underestimated early in a run, while income
+  doubles quickly, and the equivalent in minutes is inflated there: the 118 min of the
+  first return (stage 29, 0.5 h active) overstates its value. Compare the stage times
+  rather than these minutes for early returns.
+- The first return is the strongest in relative terms: stage 50 comes 21% earlier, and
+  the model only spends 30 min before leaving for 8 h.
+- The gold is computed once at the return, from the power and stage at that moment.
+- The model buys at once and clicks non-stop; a real player's return may be worth more
+  against a lower active income. Needs a playtest.
+- Measured with no skills, talents or items (stories 005 to 007), and the stat "or
+  hors-ligne" of items (story 007) is not applied.
 
 ## Bosses (story 004)
 

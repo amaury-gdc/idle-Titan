@@ -10,6 +10,9 @@ extends RefCounted
 ## writes are flushed (closing the tab right after a save may lose it), has not
 ## been tested in a browser.
 ##
+## Each game save stamps [member GameState.last_saved_unix] with the real time (story
+## 004b), read back by [OfflineIncome]. The clock can be injected for tests.
+##
 ## Usage:
 ## [codeblock]
 ## var saves := SaveManager.new()
@@ -20,11 +23,15 @@ extends RefCounted
 
 var _game_path: String
 var _permanent_path: String
+var _clock: Callable
 
 
-func _init(game_path: String = "user://save_game.json", permanent_path: String = "user://save_permanent.json") -> void:
+## [param clock] returns the current Unix time in whole seconds; left empty, the
+## system clock is used.
+func _init(game_path: String = "user://save_game.json", permanent_path: String = "user://save_permanent.json", clock: Callable = Callable()) -> void:
 	_game_path = game_path
 	_permanent_path = permanent_path
+	_clock = clock
 
 
 ## Writes both states (always attempts both). Returns true only if both succeeded.
@@ -34,8 +41,10 @@ func save(game: GameState, permanent: PermanentState) -> bool:
 	return game_ok and permanent_ok
 
 
-## Writes only the game state, keeping the previous valid save as ".bak".
+## Stamps the real time on [param game], then writes only the game state, keeping the
+## previous valid save as ".bak".
 func save_game(game: GameState) -> bool:
+	game.last_saved_unix = _now_unix()
 	return _write(_game_path, game.to_dict())
 
 
@@ -52,6 +61,12 @@ func load_game() -> GameState:
 ## Loads the permanent state; main file, else ".bak", else a fresh state.
 func load_permanent() -> PermanentState:
 	return PermanentState.from_dict(_read_with_backup(_permanent_path))
+
+
+func _now_unix() -> int:
+	if _clock.is_valid():
+		return int(_clock.call())
+	return int(Time.get_unix_time_from_system())
 
 
 func _write(path: String, payload: Dictionary) -> bool:

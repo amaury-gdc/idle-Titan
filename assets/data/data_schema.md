@@ -48,7 +48,7 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 
 | Key | Type | Required | Meaning |
 |---|---|---|---|
-| `schema_version` | int | yes | Currently 2 (2 added the combat keys below). `Combat` refuses any other value. |
+| `schema_version` | int | yes | Currently 3 (2 added the combat keys below; 3 added the `offline_*` keys). `Combat` reads 2 and 3 and refuses any other value, because 3 only added keys it does not read; `OfflineIncome` requires 3, so the game stops on a version 2 file. |
 | `cost_growth` | decimal string (unitless factor) | only if a companion has no own `cost_growth` | Default per-level cost multiplier (1.08 = +8% per level). Value in file: "1.08". |
 | `enemy_hp_base` | digit string (HP) | yes | HP of the stage-1 enemy. Value in file: "22". |
 | `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | yes | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. Value in file: "1.325". |
@@ -57,6 +57,23 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 | `click_damage_base` | digit string (damage per click) | yes | Click damage before any companion share. Default in file: "1". |
 | `click_companion_power_factor` | decimal string (unitless fraction of companion power) | yes | Share of total companion power (damage per second) added to a click: click = base + floor(power * factor). "0.1" = 10%. Companion power is 0 until companions are bought. Value in file: "0.1". |
 | `autosave_interval_seconds` | number (seconds, > 0) | no | Period of the main screen autosave. If missing or not a positive number the code uses 10 (constant `FALLBACK_AUTOSAVE_SECONDS` in `src/ui/main_screen.gd`). Value in file: 5. |
+| `offline_efficiency` | decimal string (unitless fraction) | yes | Share of what the companions would earn by farming the current stage that an absence pays. See the formula below. Value in file: "0.1". |
+| `offline_max_hours` | number (hours, > 0) | yes | Cap of the absence time counted (brief: 12 h). Value in file: 12. |
+| `offline_min_seconds` | number (seconds, >= 0) | yes | An absence shorter than this earns nothing and shows no message, so that reloading the page does not open it each time. Set it to 0 to see the message on any return. Value in file: 60. |
+
+Offline gold (`OfflineIncome`, `src/core/offline_income.gd`), granted once at startup:
+
+- Counted seconds = min(now - `GameState.last_saved_unix`, `offline_max_hours` * 3600).
+- Gold = floor(companion power * counted seconds * Gold(stage) / HP(stage) *
+  `offline_efficiency`), exact. Stage is `GameState.stage`; Gold and HP are those of the
+  normal enemy of that stage, even on a boss stage. Only gold changes.
+- No gain when the saved time is unknown, when the elapsed time is zero or negative
+  (clock moved back), when it is below `offline_min_seconds`, or with no companion.
+
+Saved field: `last_saved_unix` (int, Unix seconds, default 0 = unknown) in the game save,
+stamped by `SaveManager` on every game save and cleared by `GameState.reset()`. The game
+save has no version number: an older save has no such key, loads with 0, stays valid and
+earns nothing on its first return. A negative, non-numeric or absurd value also gives 0.
 
 Growth factors are applied exactly as floor(base * numerator^n / 10^(scale*n)) by
 `GrowthCurve` (`src/core/growth_curve.gd`), not by repeated truncation, so the

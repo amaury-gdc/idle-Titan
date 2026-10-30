@@ -1,5 +1,5 @@
 {
-	"schema_version": 2,
+	"schema_version": 3,
 	"cost_growth": "1.08",
 	"enemy_hp_base": "22",
 	"enemy_hp_growth": "1.325",
@@ -7,5 +7,8 @@
 	"gold_per_kill_growth": "1.28",
 	"click_damage_base": "1",
 	"click_companion_power_factor": "0.1",
-	"autosave_interval_seconds": 5
+	"autosave_interval_seconds": 5,
+	"offline_efficiency": "0.1",
+	"offline_max_hours": 12,
+	"offline_min_seconds": 60
 }

@@ -1,12 +1,12 @@
 # Story 004b: Progression hors-ligne
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-31
 
 ## Context
 
@@ -55,12 +55,12 @@
 
 ## Files
 
-- `src/core/offline_income.gd`
+- `src/core/offline_income.gd`, `src/core/offline_income.gd.uid`
+- `src/core/game_state.gd`, `src/core/save_manager.gd`, `src/core/combat.gd`
 - `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
 - `assets/data/core_curves.json`, `assets/data/data_schema.md`, `assets/data/balance_notes.md`
+- `tools/simulate_progress.gd`
 - `tests/unit/offline/offline_income_test.gd`
-
----
 
 ## QA Test Cases
 
@@ -83,3 +83,12 @@
 
 - Depends on: `production/epics/idle-titans/story-004-boss.md`
 - Unlocks: `production/epics/idle-titans/story-005-skills.md`
+
+---
+
+## Completion Notes
+**Completed**: 2026-10-31
+**Criteria**: 8/8 passing (export web testé dans Edge en headless, un seul navigateur)
+**Deviations**: Advisory : la sauvegarde faite au masquage de l'onglet reste en mémoire (onglet fermé caché : repart du dernier autosave, 5 s perdues au maximum) ; navigation privée sans avertissement, non testée ; un second retour avec le panneau ouvert remplace le message (or crédité) ; pause du jeu derrière le panneau, minimum de 60 s et schéma 2 ou 3 acceptés par `Combat`, ajouts hors critères d'origine. Hors périmètre : la clôture de la story 004 n'est pas encore committée.
+**Test Evidence**: `tests/unit/offline/offline_income_test.gd` (9 tests, suite 102/102) ; captures dans `production/qa/evidence/story-004b-offline/`
+**Reviewed by**: self, no independent review

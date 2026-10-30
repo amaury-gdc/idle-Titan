@@ -1,12 +1,12 @@
 # Story 004: Boss et repli
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-10-30
+> **Last Updated**: 2026-10-31
 
 ## Context
 
@@ -83,3 +83,12 @@
 
 - Depends on: `production/epics/idle-titans/story-003-companions.md`
 - Unlocks: `production/epics/idle-titans/story-004b-offline.md`
+
+---
+
+## Completion Notes
+**Completed**: 2026-10-31
+**Criteria**: 7/7 passing (comportement confirmé par le user en test navigateur ; captures 01-05 conservées)
+**Deviations**: Advisory : captures 01-03 montrent l'ancien interrupteur de défi automatique (05 montre l'actuel) ; contrôle moteur non relancé depuis le défi automatique et l'abandon ; à 3 clics/s le boss 110 n'est pas battu en 72 h (arrêt de plus de 60 h, à juger en équilibrage). Hors `## Files` mais déjà au commit 119be38 : réintégration du hors-ligne (brief, epic, stories 001/004b/005/006/007), DPS de clic, `tools/*` à exclure du preset Web.
+**Test Evidence**: waived at qa.level minimal ; captures dans `production/qa/evidence/story-004-boss/`
+**Reviewed by**: self, no independent review

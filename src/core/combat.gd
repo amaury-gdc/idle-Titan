@@ -32,8 +32,11 @@ extends RefCounted
 ##     push_error(combat.get_error())
 ## [/codeblock]
 
-## Version of core_curves.json this code understands.
-const SUPPORTED_CURVES_SCHEMA: int = 2
+## Current version of core_curves.json.
+const SUPPORTED_CURVES_SCHEMA: int = 3
+## Oldest version of core_curves.json this class can read: version 3 only added the
+## offline keys, read by [OfflineIncome], so a version 2 file still gives valid combat.
+const OLDEST_CURVES_SCHEMA: int = 2
 ## Version of companions_roster.json this code understands.
 const SUPPORTED_ROSTER_SCHEMA: int = 2
 
@@ -120,9 +123,9 @@ func _load(curves: Variant, roster: Variant) -> void:
 		return
 	var c: Dictionary = curves
 	var r: Dictionary = roster
-	if not _schema_ok(c, SUPPORTED_CURVES_SCHEMA, "core_curves.json"):
+	if not _schema_ok(c, OLDEST_CURVES_SCHEMA, SUPPORTED_CURVES_SCHEMA, "core_curves.json"):
 		return
-	if not _schema_ok(r, SUPPORTED_ROSTER_SCHEMA, "companions_roster.json"):
+	if not _schema_ok(r, SUPPORTED_ROSTER_SCHEMA, SUPPORTED_ROSTER_SCHEMA, "companions_roster.json"):
 		return
 	_hp_base = _read_big(c, "enemy_hp_base")
 	_hp_growth = _read_factor(c, "enemy_hp_growth")
@@ -138,10 +141,10 @@ func _load(curves: Variant, roster: Variant) -> void:
 	_read_roster(r)
 
 
-func _schema_ok(data: Dictionary, expected: int, file_name: String) -> bool:
+func _schema_ok(data: Dictionary, oldest: int, newest: int, file_name: String) -> bool:
 	var v: Variant = data.get("schema_version")
-	if not (v is int or v is float) or int(v) != expected:
-		_error = "%s: unsupported schema_version (expected %d)" % [file_name, expected]
+	if not (v is int or v is float) or int(v) < oldest or int(v) > newest:
+		_error = "%s: unsupported schema_version (expected %d)" % [file_name, newest]
 		return false
 	return true
 
