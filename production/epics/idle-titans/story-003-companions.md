@@ -1,12 +1,12 @@
 # Story 003: Compagnons et paliers
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Logic
 > **Estimate**: L
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-30
 
 ## Context
 
@@ -56,12 +56,14 @@
 
 ## Files
 
-- `src/core/companion.gd`, `src/core/companion_manager.gd`
+- `src/core/companion.gd`, `src/core/companion_manager.gd`, `src/core/click_dps_meter.gd`
+- `src/core/combat.gd`
 - `src/ui/companion_panel.tscn`, `src/ui/companion_panel.gd`
-- `assets/data/companions_roster.json`
-- `tests/unit/companions/companions_test.gd`
-
----
+- `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
+- `assets/data/companions_roster.json`, `assets/data/core_curves.json`
+- `assets/data/data_schema.md`, `assets/data/balance_notes.md`
+- `tools/simulate_progress.gd`
+- `tests/unit/core-loop/core_loop_test.gd`, `tests/unit/core-loop/click_dps_meter_test.gd`
 
 ## QA Test Cases
 
@@ -84,3 +86,12 @@
 
 - Depends on: `production/epics/idle-titans/story-002-core-loop.md`
 - Unlocks: `production/epics/idle-titans/story-004-boss.md`
+
+---
+
+## Completion Notes
+**Completed**: 2026-10-30
+**Criteria**: 9/9 passing (none deferred). AC-2, AC-3 and AC-6 rest on the user's play test; AC-4, AC-5, AC-7 and AC-9 are covered by the retained screenshots; AC-8 by the simulator run and `assets/data/balance_notes.md`.
+**Deviations**: None blocking. The panel shows damage per second instead of damage per attack, at the user's request (AC-7 says "dégâts"). Screenshots 01 and 02 predate that change; 03 shows the current UI. Engine check left three low-severity remarks open: full redraw on every attack (`main_screen.gd`), attack interval accepted down to 0.001 s (`companion.gd`), no validation of `--dt` (`tools/simulate_progress.gd`). The soft wall (stage 100 at 10.3 h, stage 117 at 24 h) is accepted; re-measure after stories 004, 006 and 007. `tools/*` is still embedded in the web export.
+**Test Evidence**: `production/qa/evidence/story-003-companions/03-dps-display.png` (with 01 and 02); logic tests waived at qa.level minimal (`tests/unit/core-loop/click_dps_meter_test.gd` exists anyway: 93/93 pass).
+**Reviewed by**: self, no independent review

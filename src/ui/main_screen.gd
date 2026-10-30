@@ -1,8 +1,9 @@
 extends Control
-## Main screen of Idle Titans (story 002): stage, gold, click damage, the enemy,
-## its HP bar and the score. Composition root: loads data and saves, builds the
-## [Combat] / [FloorManager] core, forwards clicks to it and redraws on its
-## signals. All rules live in src/core; this script only displays.
+## Main screen of Idle Titans (stories 002, 003): stage, gold, click damage, the
+## enemy, its HP bar, the score and the companion panel. Composition root: loads
+## data and saves, builds the [Combat] / [FloorManager] / [CompanionManager] core,
+## feeds it frame time, forwards clicks to it and redraws on its signals. All rules
+## live in src/core; this script only displays.
 ##
 ## Persistence: loads [GameState] and [PermanentState] through [SaveManager]
 ## (default user:// paths) at startup; saves every autosave_interval_seconds
@@ -16,11 +17,16 @@ const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 ## Used only when core_curves.json has no valid autosave_interval_seconds
 ## (infrastructure setting, not a gameplay value).
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
+## Time between two redraws of the DPS line (display setting, not a gameplay value).
+const DPS_REFRESH_SECONDS: float = 0.25
 
+var _click_dps: ClickDpsMeter = ClickDpsMeter.new()
+var _dps_refresh_left: float = 0.0
 var _game: GameState
 var _permanent: PermanentState
 var _saves: SaveManager
 var _floors: FloorManager
+var _companions: CompanionManager
 var _autosave_timer: Timer
 
 @onready var _stage_label: Label = %StageLabel
@@ -29,9 +35,11 @@ var _autosave_timer: Timer
 @onready var _hp_bar: ColorRect = %HpBar
 @onready var _hp_fill: ColorRect = %HpFill
 @onready var _hp_label: Label = %HpLabel
+@onready var _dps_label: Label = %DpsLabel
 @onready var _score_label: Label = %ScoreLabel
 @onready var _error_label: Label = %ErrorLabel
 @onready var _enemy: EnemyView = %Enemy
+@onready var _companion_panel: CompanionPanel = %CompanionPanel
 
 
 func _ready() -> void:
@@ -42,6 +50,8 @@ func _ready() -> void:
 		_error_label.text = combat.get_error()
 		_error_label.visible = true
 		_enemy.visible = false
+		_companion_panel.visible = false
+		_dps_label.visible = false
 		return
 	_saves = SaveManager.new()
 	_game = _saves.load_game()
@@ -50,9 +60,24 @@ func _ready() -> void:
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
 	_enemy.clicked.connect(_on_enemy_clicked)
+	_companions = CompanionManager.new(_game, combat, _floors)
+	_companions.companion_leveled_up.connect(_on_companion_leveled_up)
+	_companion_panel.buy_requested.connect(_on_companion_buy_requested)
+	_companion_panel.setup(_companions)
 	_start_autosave(curves)
 	_enemy.set_stage(_game.stage)
 	_refresh()
+
+
+func _process(delta: float) -> void:
+	if _companions == null:
+		return
+	_companions.tick(delta)
+	_click_dps.tick(delta)
+	_dps_refresh_left -= delta
+	if _dps_refresh_left <= 0.0:
+		_dps_refresh_left = DPS_REFRESH_SECONDS
+		_refresh_dps()
 
 
 func _exit_tree() -> void:
@@ -83,7 +108,7 @@ func _save() -> void:
 
 
 func _on_enemy_clicked() -> void:
-	_floors.click()
+	_click_dps.record(_floors.click())
 	_enemy.play_hit()
 
 
@@ -94,6 +119,16 @@ func _on_enemy_damaged(_damage: BigNumber, _remaining: BigNumber) -> void:
 func _on_stage_started(stage: int, _max_hp: BigNumber) -> void:
 	_enemy.set_stage(stage)
 	_refresh()
+	_companion_panel.refresh()
+
+
+func _on_companion_buy_requested(id: String) -> void:
+	_companions.buy_or_upgrade(id)
+
+
+func _on_companion_leveled_up(_id: String, _new_level: int) -> void:
+	_refresh()
+	_companion_panel.refresh()
 
 
 func _refresh() -> void:
@@ -104,3 +139,10 @@ func _refresh() -> void:
 	_score_label.text = tr("Score (étage atteint) : %d") % stage
 	_hp_label.text = "%s / %s" % [_floors.current_hp().format(), _floors.max_hp().format()]
 	_hp_fill.size.x = _hp_bar.size.x * _floors.hp_ratio()
+
+
+func _refresh_dps() -> void:
+	var from_companions: BigNumber = _companions.total_power()
+	var from_clicks: BigNumber = _click_dps.rate()
+	_dps_label.text = tr("DPS : %s") % from_companions.add(from_clicks).format()
+	_dps_label.tooltip_text = tr("Compagnons : %s\nClics : %s") % [from_companions.format(), from_clicks.format()]

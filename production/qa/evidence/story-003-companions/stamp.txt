@@ -1,0 +1,13 @@
+Reviewed-Content-Hash: src/core/companion.gd 6c210ccac3933ec98be4e7bf1b7b17e2fbff256e
+Reviewed-Content-Hash: src/core/companion_manager.gd 94e24c0d39981f99edb8a61350d8444ba58732c9
+Reviewed-Content-Hash: src/core/click_dps_meter.gd 636fc21692dce28ab6851ba72d8a84f02d7f3f02
+Reviewed-Content-Hash: src/core/combat.gd 1f3cfeb1dd37a21e1eb15f8c2cc65eda490d6541
+Reviewed-Content-Hash: src/ui/companion_panel.gd b3febd342b1609bb5209e1dbe3aa93b6cc6419d2
+Reviewed-Content-Hash: src/ui/companion_panel.tscn 4bf53c8cc23b3c34f74800f1f47a9310092bce4f
+Reviewed-Content-Hash: src/ui/main_screen.gd b0989e84bc149b56bd3df3e1a3a83310310a950c
+Reviewed-Content-Hash: src/ui/main_screen.tscn dddf2385940c6951e9a6575ce69cbb2c39ab42f4
+Reviewed-Content-Hash: tools/simulate_progress.gd 4291b14b1624bb30d4754aa4ddbf9c7ae0e2fb23
+Reviewed-Content-Hash: assets/data/companions_roster.json e7986906e6187991005e1edea58561ea278e5cb9
+Reviewed-Content-Hash: assets/data/core_curves.json cec85545aa83d6abf22ad43569f0132d2f8dee8e
+Reviewed-Content-Hash: assets/data/data_schema.md 68170874a3b2d3f37a860b2dbe6c464aa591103e
+Reviewed-Content-Hash: assets/data/balance_notes.md f9a6ec8582bb692e74d430ac436c9219efd7c0d1

@@ -1,6 +1,133 @@
 {
-	"schema_version": 1,
+	"schema_version": 2,
 	"companions": [
-		{ "id": "placeholder_companion", "name": "Placeholder", "base_cost": "10", "base_damage": "1" }
+		{
+			"id": "scout",
+			"name": "Éclaireur",
+			"base_cost": "10",
+			"base_damage": "1",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.0,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "spearman",
+			"name": "Lancier",
+			"base_cost": "300",
+			"base_damage": "40",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.0,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "archer",
+			"name": "Archer",
+			"base_cost": "9000",
+			"base_damage": "1500",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 0.8,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "guardian",
+			"name": "Gardien",
+			"base_cost": "270000",
+			"base_damage": "60000",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.5,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "mage",
+			"name": "Mage",
+			"base_cost": "8100000",
+			"base_damage": "2300000",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.2,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "knight",
+			"name": "Chevalier",
+			"base_cost": "240000000",
+			"base_damage": "90000000",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.0,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "alchemist",
+			"name": "Alchimiste",
+			"base_cost": "7200000000",
+			"base_damage": "3500000000",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 2.0,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		},
+		{
+			"id": "dragon",
+			"name": "Dragon",
+			"base_cost": "220000000000",
+			"base_damage": "140000000000",
+			"cost_growth": "1.08",
+			"attack_interval_seconds": 1.5,
+			"tiers": [
+				{ "level": 10, "damage_multiplier": "2" },
+				{ "level": 25, "damage_multiplier": "2" },
+				{ "level": 50, "damage_multiplier": "2" },
+				{ "level": 100, "damage_multiplier": "3" },
+				{ "level": 150, "damage_multiplier": "3" },
+				{ "level": 200, "damage_multiplier": "3" }
+			]
+		}
 	]
 }

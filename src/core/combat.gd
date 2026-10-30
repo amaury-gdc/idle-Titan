@@ -8,11 +8,15 @@ extends RefCounted
 ## [codeblock]
 ## enemy_max_hp(stage)  = enemy_hp_base * enemy_hp_growth^(stage - 1)            (at least 1)
 ## gold_per_kill(stage) = gold_per_kill_base * gold_per_kill_growth^(stage - 1)
-## companion_power      = sum over companions of base_damage * level   (0 if none bought)
-## click_damage         = click_damage_base + companion_power * click_companion_power_factor
+## companion_power      = sum over bought companions of their damage PER SECOND at their level
+##                        (0 if none bought), see [method Companion.damage_per_second_at_level]
+## click_damage         = click_damage_base + floor(companion_power * click_companion_power_factor)
 ## [/codeblock]
-## companion_power is a placeholder linear formula; story 003 (tiers, upgrades)
-## replaces it without changing click_damage.
+## Companion power is damage per second, not per attack: companions attack at
+## different intervals, and per-second is what they really add to the fight, so
+## the click share stays fair when an interval is retuned. The factor is data.
+## The companion formulas (cost, damage, tiers) live in [Companion]; this class
+## only sums them, so there is one definition of companion damage.
 ##
 ## Single-thread only. Build with [method from_data] and check [method is_valid].
 ##
@@ -31,7 +35,7 @@ extends RefCounted
 ## Version of core_curves.json this code understands.
 const SUPPORTED_CURVES_SCHEMA: int = 2
 ## Version of companions_roster.json this code understands.
-const SUPPORTED_ROSTER_SCHEMA: int = 1
+const SUPPORTED_ROSTER_SCHEMA: int = 2
 
 var _error: String = ""
 var _hp_base: BigNumber
@@ -40,8 +44,13 @@ var _gold_base: BigNumber
 var _gold_growth: String = ""
 var _click_base: BigNumber
 var _click_power_factor: String = ""
-## Companion id (String) -> base damage per level (BigNumber).
-var _companion_damage: Dictionary = {}
+## core_curves.json "cost_growth" when valid, "" otherwise (only needed by
+## companions that define no cost_growth of their own).
+var _default_cost_growth: String = ""
+## Companion id (String) -> [Companion].
+var _companion_by_id: Dictionary = {}
+## Companions in roster order.
+var _companions: Array[Companion] = []
 
 
 ## Parses and validates the two data files (as returned by [method DataLoader.load_json],
@@ -73,18 +82,26 @@ func gold_per_kill(stage: int) -> BigNumber:
 	return GrowthCurve.value_at(_gold_base, _gold_growth, maxi(stage, 1) - 1)
 
 
-## Sum of companion damage. [param companion_levels] is [member GameState.companion_levels]
-## (id -> level). Ids missing from the roster and levels <= 0 contribute nothing.
+## Companions in roster order (empty when the data is invalid). Read-only: do not modify.
+func companions() -> Array[Companion]:
+	return _companions
+
+
+## The companion with [param id], or null when the roster has none.
+func companion(id: String) -> Companion:
+	return _companion_by_id.get(id)
+
+
+## Sum of the damage per second of every bought companion. [param companion_levels]
+## is [member GameState.companion_levels] (id -> level). Ids missing from the roster
+## and levels <= 0 contribute nothing.
 func companion_power(companion_levels: Dictionary) -> BigNumber:
 	var total: BigNumber = BigNumber.new()
 	for id: Variant in companion_levels:
-		if not _companion_damage.has(id):
+		var def: Companion = _companion_by_id.get(id)
+		if def == null:
 			continue
-		var level: int = int(companion_levels[id])
-		if level <= 0:
-			continue
-		var damage: BigNumber = _companion_damage[id]
-		total = total.add(damage.multiply(BigNumber.from_int(level)))
+		total = total.add(def.damage_per_second_at_level(int(companion_levels[id])))
 	return total
 
 
@@ -113,6 +130,9 @@ func _load(curves: Variant, roster: Variant) -> void:
 	_gold_growth = _read_factor(c, "gold_per_kill_growth")
 	_click_base = _read_big(c, "click_damage_base")
 	_click_power_factor = _read_factor(c, "click_companion_power_factor")
+	var growth: Variant = c.get("cost_growth")
+	if growth is String and GrowthCurve.is_valid_factor(growth):
+		_default_cost_growth = growth
 	if not _error.is_empty():
 		return
 	_read_roster(r)
@@ -153,19 +173,15 @@ func _read_roster(roster: Dictionary) -> void:
 		if not entry is Dictionary:
 			_fail("companions_roster.json: each companion must be an object")
 			return
-		var id: Variant = entry.get("id")
-		var damage: Variant = entry.get("base_damage")
-		if not id is String or (id as String).is_empty():
-			_fail("companions_roster.json: companion without a string 'id'")
+		var def: Companion = Companion.from_entry(entry, _default_cost_growth)
+		if not def.is_valid():
+			_fail(def.get_error())
 			return
-		if _companion_damage.has(id):
-			_fail("companions_roster.json: duplicate id '%s'" % id)
+		if _companion_by_id.has(def.id):
+			_fail("companions_roster.json: duplicate id '%s'" % def.id)
 			return
-		var parsed: BigNumber = BigNumber.from_string(damage) if damage is String else null
-		if parsed == null:
-			_fail("companions_roster.json: '%s' base_damage must be a digit string" % id)
-			return
-		_companion_damage[id] = parsed
+		_companion_by_id[def.id] = def
+		_companions.append(def)
 
 
 # Keeps the first error only.

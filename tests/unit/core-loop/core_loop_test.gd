@@ -14,7 +14,7 @@ func _make_combat() -> Combat:
 		"click_damage_base": "1",
 		"click_companion_power_factor": "0",
 	}
-	var roster: Dictionary = {"schema_version": 1, "companions": []}
+	var roster: Dictionary = {"schema_version": 2, "companions": []}
 	return Combat.from_data(curves, roster)
 
 
