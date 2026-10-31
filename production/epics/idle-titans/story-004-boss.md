@@ -28,13 +28,13 @@
 
 *From `design/game-brief.md`, core loop and fail state:*
 
-- [ ] Un étage multiple de 10 contient un boss (points de vie et or selon des courbes de boss en données).
-- [ ] Un chronomètre démarre au début du combat de boss ; sa durée (30 s par défaut) est en données.
-- [ ] Tuer le boss avant la fin du chrono passe à l'étage suivant.
-- [ ] Si le chrono expire, le joueur retourne à l'étage précédent et continue de farmer ; le boss n'est retenté que sur demande ou selon la règle choisie et notée.
-- [ ] Le chrono et le boss sont clairement visibles à l'écran (lisibilité).
-- [ ] L'étage maximal atteint est conservé comme score, même après un repli.
-- [ ] Une capture d'écran d'un combat de boss est conservée dans `production/qa/evidence/`.
+- [x] Un étage multiple de 10 contient un boss (points de vie et or selon des courbes de boss en données).
+- [x] Un chronomètre démarre au début du combat de boss ; sa durée (30 s par défaut) est en données.
+- [x] Tuer le boss avant la fin du chrono passe à l'étage suivant.
+- [x] Si le chrono expire, le joueur retourne à l'étage précédent et continue de farmer ; le boss n'est retenté que sur demande ou selon la règle choisie et notée.
+- [x] Le chrono et le boss sont clairement visibles à l'écran (lisibilité).
+- [x] L'étage maximal atteint est conservé comme score, même après un repli.
+- [x] Une capture d'écran d'un combat de boss est conservée dans `production/qa/evidence/`.
 
 ---
 
@@ -92,3 +92,5 @@
 **Deviations**: Advisory : captures 01-03 montrent l'ancien interrupteur de défi automatique (05 montre l'actuel) ; contrôle moteur non relancé depuis le défi automatique et l'abandon ; à 3 clics/s le boss 110 n'est pas battu en 72 h (arrêt de plus de 60 h, à juger en équilibrage). Hors `## Files` mais déjà au commit 119be38 : réintégration du hors-ligne (brief, epic, stories 001/004b/005/006/007), DPS de clic, `tools/*` à exclure du preset Web.
 **Test Evidence**: waived at qa.level minimal ; captures dans `production/qa/evidence/story-004-boss/`
 **Reviewed by**: self, no independent review
+
+**Recontrôle du 2026-10-31**: 7/7, statut inchangé. Le passage d'un boss et le repli ont été revus dans l'export web sous Edge. Contrôle moteur relancé sur les fichiers modifiés depuis : rien de faux. Le stamp des preuves signale des fichiers changés depuis la capture, par les stories 004b et 005 : les captures 01 à 03 montrent encore l'ancien interrupteur, et `production/qa/evidence/story-005-skills/02-web-skills-ready-boss.png` montre un combat de boss sur le build récent. À tester par Amaury : aucun critère. Le mur du boss 110 reste à juger (voir `production/bilan-2026-10-31.md`).
