@@ -28,6 +28,10 @@ extends SceneTree
 ## earned, greedily: the first buyable node in data order, checked once per simulated
 ## second (default 0, no talents). --build=<branch>,<branch> looks at the nodes of these
 ## branches first (ids of talents.json); --talentsdata=<path> replaces talents.json.
+## --loot=1 (story 007) drops the real items of the bosses and critical hits, and wears a drop
+## as soon as it beats the worn item of its type by the "worse item" rule (rarity, then sum of
+## percentages, blind to the stat: an honest measure, not an optimistic one). Default 0, no
+## items, no critical hit. --seed=<n> seeds the dice (default 1), --itemsdata=<path> replaces items.json.
 ## Report: time to the first boss fight, to the first boss kill, to stages 50/100/150,
 ## the stage at 3 h and the number of failed boss attempts (at each milestone and at the
 ## end). With --away, milestones also give the wall time (active + away) and each
@@ -45,6 +49,7 @@ const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const SKILLS_PATH: String = "res://assets/data/skills.json"
 const TALENTS_PATH: String = "res://assets/data/talents.json"
+const ITEMS_PATH: String = "res://assets/data/items.json"
 ## Stages reported by the run besides the first boss fight and the first boss kill,
 ## which come from the boss data (measurement points, not balance values).
 const MILESTONES: Array[int] = [50, 100, 110, 120, 130, 150]
@@ -79,11 +84,11 @@ func _init() -> void:
 		printerr("simulate_progress: " + offline.get_error())
 		quit(1)
 		return
-	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"])
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"])
 	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String) -> bool:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
@@ -103,6 +108,24 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			printerr("simulate_progress: " + talents.get_error())
 			return false
 		talent_order = _talent_order(talents, build)
+	# Two generators: the many critical rolls must not shift the loot of a seed.
+	var loot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	loot_rng.seed = seed_value
+	var crit_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	crit_rng.seed = seed_value + 1
+	var inventory: Inventory = null
+	var hub: ModifierHub = null
+	var drops: Array[int] = [0, 0]
+	if use_loot:
+		inventory = Inventory.from_data(DataLoader.load_json(items_path), permanent, state, combat, loot_rng.randf)
+		if not inventory.is_valid():
+			printerr("simulate_progress: " + inventory.get_error())
+			return false
+		floors.set_crit_roll(crit_rng.randf)
+		floors.boss_killed.connect(inventory.on_boss_killed)
+		inventory.loot_received.connect(func(item: Item, sold: Array[Item], _gold: BigNumber) -> void: _wear_if_better(inventory, item, sold, drops))
+		hub = ModifierHub.new(floors, offline, talents, inventory)
+		print("Loot: greedy on rarity then sum of percentages, blind to the stat; seed %d" % seed_value)
 	var skill_uses: Array[int] = [0, 0, 0]
 	var failed_attempts: Array[int] = [0]
 	floors.boss_failed.connect(func(_failed: int, _back_to: int) -> void: failed_attempts[0] += 1)
@@ -154,7 +177,7 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		while _buy_cheapest_affordable(companions):
 			pass
 		if talents != null and step % check_every == 0 and talents.available_points() > 0:
-			_spend_talents(talents, talent_order, floors, offline)
+			_spend_talents(talents, talent_order, floors, offline, hub)
 		if floors.is_farming() and step % check_every == 0:
 			floors.set_click_dps(floors.click_damage().multiply_decimal(cps_factor))
 			if not auto and floors.can_beat_next_boss():
@@ -177,6 +200,12 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	print("End of run at %.1f h: best stage %d (current %d), failed boss attempts %d, levels %s" % [hours, state.max_stage_reached, state.stage, failed_attempts[0], str(state.companion_levels)])
 	if talents != null:
 		print("Talents at the end: %d earned, %d spent, %d left; click x%s, companions x%s, gold x%s, offline gold x%s" % [talents.earned_points(), talents.spent_points(), talents.available_points(), talents.factor(TalentTree.STAT_CLICK_DAMAGE), talents.factor(TalentTree.STAT_COMPANION_DAMAGE), talents.factor(TalentTree.STAT_GOLD), talents.factor(TalentTree.STAT_OFFLINE_GOLD)])
+	if inventory != null:
+		var worn: Array[String] = []
+		for item: Item in inventory.equipped_items():
+			worn.append("%s %s %s" % [item.rarity, item.type, str(item.stats)])
+		print("Loot at the end: %d drops, %d sold, %d in the bag; worn %s" % [drops[0], drops[1], inventory.bag().size(), str(worn)])
+		print("Item totals: %s; critical chance %d%%, bonus %d%%" % [str(inventory.totals()), hub.crit_chance_percent(), hub.crit_bonus_percent()])
 	if skills != null:
 		print("Skill activations: %d big hits, %d damage buffs, %d gold bonuses" % [skill_uses[0], skill_uses[1], skill_uses[2]])
 	print("Real time: %.1f s" % (float(Time.get_ticks_msec() - started_ms) / 1000.0))
@@ -226,7 +255,7 @@ func _talent_order(talents: TalentTree, build: String) -> Array[String]:
 
 
 # Buys the first buyable node of [param order], again and again, then updates the formulas.
-func _spend_talents(talents: TalentTree, order: Array[String], floors: FloorManager, offline: OfflineIncome) -> void:
+func _spend_talents(talents: TalentTree, order: Array[String], floors: FloorManager, offline: OfflineIncome, hub: ModifierHub) -> void:
 	var bought: bool = true
 	while bought:
 		bought = false
@@ -234,7 +263,20 @@ func _spend_talents(talents: TalentTree, order: Array[String], floors: FloorMana
 			if talents.buy(id):
 				bought = true
 				break
-	talents.apply_to(floors, offline)
+	# The hub already followed each purchase; apply_to would overwrite the items.
+	if hub == null:
+		talents.apply_to(floors, offline)
+
+
+# Wears the new item when it was not sold and beats the worn item of its type. Counts drops and sales.
+func _wear_if_better(inventory: Inventory, item: Item, sold: Array[Item], drops: Array[int]) -> void:
+	drops[0] += 1
+	drops[1] += sold.size()
+	if sold.has(item):
+		return
+	var worn: Item = inventory.equipped(item.type)
+	if worn == null or inventory.is_worse(worn, item):
+		inventory.equip(item.uid)
 
 
 func _buy_cheapest_affordable(companions: CompanionManager) -> bool:
@@ -263,7 +305,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": ""}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

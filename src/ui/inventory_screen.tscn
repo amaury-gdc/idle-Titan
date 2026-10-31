@@ -1,0 +1,163 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/inventory_screen.gd" id="1_screen"]
+
+[sub_resource type="StyleBoxFlat" id="screen_panel"]
+content_margin_left = 16.0
+content_margin_top = 12.0
+content_margin_right = 16.0
+content_margin_bottom = 12.0
+bg_color = Color(0.04, 0.05, 0.09, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.84, 0.25, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="InventoryScreen" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_behavior_recursive = 2
+script = ExtResource("1_screen")
+
+[node name="Blocker" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("screen_panel")
+
+[node name="Content" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Panel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Panel/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
+theme_override_font_sizes/font_size = 32
+text = "Inventaire"
+
+[node name="CloseButton" type="Button" parent="Panel/Content/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Fermer"
+
+[node name="Body" type="HBoxContainer" parent="Panel/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="EquippedColumn" type="VBoxContainer" parent="Panel/Content/Body"]
+custom_minimum_size = Vector2(310, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="EquippedTitle" type="Label" parent="Panel/Content/Body/EquippedColumn"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Équipement"
+
+[node name="Slots" type="VBoxContainer" parent="Panel/Content/Body/EquippedColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BagColumn" type="VBoxContainer" parent="Panel/Content/Body"]
+custom_minimum_size = Vector2(430, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BagLabel" type="Label" parent="Panel/Content/Body/BagColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Sac : 0 / 0"
+
+[node name="EmptyLabel" type="Label" parent="Panel/Content/Body/BagColumn"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.8, 1)
+theme_override_font_sizes/font_size = 18
+text = "Ton sac est vide. Bats des boss pour trouver des objets."
+autowrap_mode = 3
+
+[node name="BagScroll" type="ScrollContainer" parent="Panel/Content/Body/BagColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+follow_focus = true
+horizontal_scroll_mode = 0
+
+[node name="BagList" type="VBoxContainer" parent="Panel/Content/Body/BagColumn/BagScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="DetailColumn" type="VBoxContainer" parent="Panel/Content/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailTitle" type="Label" parent="Panel/Content/Body/DetailColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Sélectionne un objet"
+autowrap_mode = 3
+
+[node name="DetailStatus" type="Label" parent="Panel/Content/Body/DetailColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.8, 1)
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 3
+
+[node name="CompareTable" type="VBoxContainer" parent="Panel/Content/Body/DetailColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Spacer" type="Control" parent="Panel/Content/Body/DetailColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="EquipButton" type="Button" parent="Panel/Content/Body/DetailColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 52)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Équiper"

@@ -247,18 +247,32 @@ func reset() -> int:
 ## Factor the bought nodes give to [param stat] (one of [constant STATS]), as a decimal
 ## string: "1" when there is none, else "1.40" for +40%. Percentages of the same stat add up.
 func factor(stat: String) -> String:
-	var percent: int = 0
+	return factor_from_percent(percent(stat))
+
+
+## Sum of the percentages the bought nodes give to [param stat] (0 for none or a stat no
+## node has).
+func percent(stat: String) -> int:
+	var total: int = 0
 	for def: TalentDef in _nodes:
 		if def.stat == stat and is_owned(def.id):
-			percent += def.percent
-	if percent == 0:
+			total += def.percent
+	return total
+
+
+## The decimal-string factor of a total of [param percentage] percent: "1" for 0, "1.40" for 40,
+## "2.00" for 100. [ModifierHub] uses it on the sum of talents and items.
+static func factor_from_percent(percentage: int) -> String:
+	if percentage <= 0:
 		return "1"
 	@warning_ignore("integer_division")
-	return "%d.%02d" % [1 + percent / 100, percent % 100]
+	return "%d.%02d" % [1 + percentage / 100, percentage % 100]
 
 
-## Pushes the factors to [param floors] (see [method FloorManager.set_talent_modifiers]) and
-## to [param offline] (see [method OfflineIncome.set_talent_factor]).
+## Pushes the talent factors ALONE to [param floors] (see [method FloorManager.set_talent_modifiers])
+## and to [param offline] (see [method OfflineIncome.set_talent_factor]). With an [Inventory]
+## in play, do NOT use it: it would overwrite the sum of talents and items. Use
+## [ModifierHub.refresh] instead, the single place that merges both.
 func apply_to(floors: FloorManager, offline: OfflineIncome) -> void:
 	floors.set_talent_modifiers(factor(STAT_CLICK_DAMAGE), factor(STAT_COMPANION_DAMAGE), factor(STAT_GOLD))
 	offline.set_talent_factor(factor(STAT_OFFLINE_GOLD))

@@ -1,0 +1,15 @@
+Reviewed-Content-Hash: src/core/item.gd ee5fcaf69777871c3ac6f77aa79a1a4a5d9642f0
+Reviewed-Content-Hash: src/core/inventory.gd e8b3e4a60ca4d032deddd7922c8793e980a47f14
+Reviewed-Content-Hash: src/core/loot_table.gd e38d2b82e1c8a3191cffd12a9a36d0e6b1aab0cc
+Reviewed-Content-Hash: src/core/modifier_hub.gd c49189f694d0d26d39ae2083d99d77357070ce30
+Reviewed-Content-Hash: src/core/floor_manager.gd 1d5cf32bf9ae6b8f68af88387dcf2103b70c2645
+Reviewed-Content-Hash: src/core/permanent_state.gd 413bd318bdf53a90362eea0b350ab8ec267aa511
+Reviewed-Content-Hash: src/core/talent_tree.gd f64f71c7d13ca3ebaecdf518751b6b29aa181da1
+Reviewed-Content-Hash: src/core/offline_income.gd 1554f9af9e9e017ed8a98e08938e576847cf5940
+Reviewed-Content-Hash: src/ui/inventory_screen.gd 8f60288e5ade64254dc0d4443870d35a7d88d770
+Reviewed-Content-Hash: src/ui/inventory_screen.tscn 60de1413997c4357f2ac5aa1cfadf6f7cfa83f60
+Reviewed-Content-Hash: src/ui/main_screen.gd c14305312d8cfc8ddee9b64090316907de1380d0
+Reviewed-Content-Hash: src/ui/main_screen.tscn 6532dbaffec3dc7f59b24a6b211360e8a55a9962
+Reviewed-Content-Hash: assets/data/items.json 699a2e97d547aa5a4b8d10378093d31a75bb9aa3
+Reviewed-Content-Hash: tools/simulate_progress.gd c2519da12fa9c6b88a5b45595e31bfe4c8ba705f
+Reviewed-Content-Hash: tests/unit/loot/loot_test.gd 9a2bfa43316697c020c869029216f3e91552b050

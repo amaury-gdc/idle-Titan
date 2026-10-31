@@ -60,7 +60,8 @@ func get_error() -> String:
 
 
 ## Sets the permanent factor of the talents on offline gold (story 006): a valid decimal
-## string ("1.25"), "1" meaning none. It stays until the next call.
+## string ("1.25"), "1" meaning none. It stays until the next call. With items in play, pass
+## the SUM of talents and items for "offline_gold" (story 007, see [ModifierHub]).
 func set_talent_factor(factor: String) -> void:
 	_talent_factor = factor
 

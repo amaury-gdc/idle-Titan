@@ -1,12 +1,12 @@
 # Story 007: Objets et butin
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: L
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-31
 
 ## Context
 
@@ -55,12 +55,14 @@
 
 ## Files
 
-- `src/core/item.gd`, `src/core/inventory.gd`, `src/core/loot_table.gd`
-- `src/ui/inventory_screen.tscn`, `src/ui/inventory_screen.gd`
+- `src/core/item.gd`, `src/core/inventory.gd`, `src/core/loot_table.gd`, `src/core/modifier_hub.gd` et leurs `.uid`
+- `src/ui/inventory_screen.tscn`, `src/ui/inventory_screen.gd`, `.uid`
 - `assets/data/items.json`
+- `src/core/floor_manager.gd`, `src/core/permanent_state.gd`, `src/core/talent_tree.gd`, `src/core/offline_income.gd`
+- `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
+- `tools/simulate_progress.gd`
 - `tests/unit/loot/loot_test.gd`
-
----
+- `assets/data/data_schema.md`, `assets/data/balance_notes.md`
 
 ## QA Test Cases
 
@@ -75,7 +77,7 @@
 **Story Type**: Logic
 **Required evidence**: `tests/unit/loot/loot_test.gd` (facultatif) ; capture d'écran conservée dans `production/qa/evidence/`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created: `tests/unit/loot/loot_test.gd`, 57 tests
 
 ---
 
@@ -83,3 +85,22 @@
 
 - Depends on: `production/epics/idle-titans/story-006-talents.md`
 - Unlocks: None
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-31
+**Criteria**: 9/9 passing. À tester par Amaury, non vérifié ici : clic réel au pointeur dans l'inventaire, Tab et manette dans l'écran, sensation de puissance des objets.
+**Deviations**:
+- `modifier_hub.gd` ajouté hors de la liste d'origine : point unique qui fusionne talents et objets pour qu'ils ne s'écrasent pas.
+- Prix de vente exprimé en kills de l'étage du boss (10 / 40 / 200), par rareté, dans `items.json`.
+- Le critique ne vient que du clic (décision d'Amaury) : jamais mesuré en 72 h, les objets portés donnant 0 % de chance de critique.
+- La vente automatique ne se déclenche jamais en 72 h (11 objets pour 12 places).
+- Valeurs provisoires (sac de 12, plages, prix, raretés, critique de base), réglage unique après cette story. Premier boss à 1,5 min, sous la cible de 2 à 3 min.
+- 9 remarques mineures du contrôle moteur non corrigées (plafond de `percent`, dé qui ne renvoie pas un nombre, voisin de focus manette, entre autres).
+- Nom de la dernière ligne du sac plein coupé à l'écran ; le détail donne l'information complète.
+- Types affichés en français (Épée, Casque, Plastron, Aura, Entaille), le brief garde Sword, Helmet, Chest, Aura, Slash.
+- Hors liste : `.godot/global_script_class_cache.cfg` (généré, suivi volontairement).
+**Test Evidence**: `tests/unit/loot/loot_test.gd` (57 tests, suite 194/194) ; captures dans `production/qa/evidence/story-007-loot/`, stamp à jour.
+**Reviewed by**: self, no independent review

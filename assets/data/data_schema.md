@@ -233,3 +233,102 @@ highest `GameState.max_stage_reached` ever seen, never lowered. The record is ne
 the available points would go negative. An older save has no record and starts from the
 `max_stage_reached` of the game save at the first query. The field `talent_points` is still
 read and written so older saves keep their value, but nothing uses it since version 4.
+
+## items.json
+
+Loaded by `LootTable` (`src/core/loot_table.gd`), through `Inventory.from_data`
+(`src/core/inventory.gd`). All keys are required unless stated. All values are provisional
+(see `balance_notes.md`).
+
+| Key | Type | Required | Meaning |
+|---|---|---|---|
+| `schema_version` | int | yes | Currently 1. `LootTable` refuses any other value. |
+| `worse_item_rule` | non-empty string | yes | The "worse item" rule in words, kept next to the data. Documentation: the code applies the rule below, it does not read this text. |
+| `inventory_capacity` | integer >= 1 (items) | yes | Size of the bag. Equipped items are not counted. |
+| `crit.base_chance_percent` | integer, 0..`max_chance_percent` | yes | Chance of a critical hit without items. |
+| `crit.base_bonus_percent` | integer >= 0 | yes | Damage added by a critical hit without items: 100 deals double. |
+| `crit.max_chance_percent` | integer, 0..100 | yes | Ceiling of the chance, items included. |
+| `stats` | array of object | yes | All nine stats, each once, in any order. |
+| `stats[].id` | string | yes | One of the nine ids below. |
+| `stats[].name` | string | yes | Display name (French). |
+| `stats[].ranges` | object | yes | Rarity id -> `[min, max]`, whole percentages, 1 <= min <= max. Every rarity is required. Used for primary and secondary stats alike. |
+| `rarities` | array of object | yes | LEAST RARE FIRST: this order is the rank the "worse item" rule compares. |
+| `rarities[].id` | string | yes | Unique stable id, saved in each item. |
+| `rarities[].name` | string | yes | Display name (French). |
+| `rarities[].secondary_stats` | integer >= 0 | yes | Secondary stats of an item of this rarity, at most 8. |
+| `rarities[].sell_kills` | integer >= 0 (normal kills) | yes | Sale price, see below. |
+| `types` | array of object | yes | The slots. One item is worn per type. |
+| `types[].id` | string | yes | Unique stable id, saved in each item. |
+| `types[].name` | string | yes | Display name. |
+| `types[].primary_stat` | stat id | yes | Stat every item of this type has. |
+| `types[].drop_weight` | integer >= 1 | yes | Weight in the draw of the type. |
+| `boss_loot` | array of object | yes | Loot tiers, `from_stage` strictly increasing. |
+| `boss_loot[].from_stage` | integer >= 1 | yes | The tier applies to the bosses of this stage and above, until the next tier. A boss below the first tier drops nothing. |
+| `boss_loot[].drop_percent` | integer, 0..100 | yes | Chance that the boss drops an item. |
+| `boss_loot[].rarity_weights` | object | yes | Rarity id -> integer >= 0. A missing rarity weighs 0; the sum must be above 0. |
+
+Stats. Percentages are whole numbers, like the talents.
+
+| Id | Applies to | Where |
+|---|---|---|
+| `click_damage` | Click damage (base + companion share). Also a talent stat. | `FloorManager.click_damage` |
+| `companion_damage` | Each companion attack and the DPS shown. Also a talent stat. | `FloorManager.companion_damage` |
+| `global_damage` | Every hit: click, companion attack, "Gros coup". | `FloorManager.buffed_damage` |
+| `boss_damage` | Every hit while a boss fight runs. | `FloorManager.buffed_damage` |
+| `crit_chance` | Added to `crit.base_chance_percent`, capped by `crit.max_chance_percent`. | `ModifierHub` |
+| `crit_damage` | Added to `crit.base_bonus_percent`. | `ModifierHub` |
+| `gold` | Gold of every kill, boss kills included. Also a talent stat. | `FloorManager.apply_damage` |
+| `boss_gold` | Gold of a boss kill only. | `FloorManager.apply_damage` |
+| `offline_gold` | Gold of an absence. Also a talent stat. | `OfflineIncome` |
+
+Formulas (exact BigNumber):
+
+- The percentages of ONE stat add up, across items and talents: +10% from a talent and +10%
+  from an item give +20%, not +21%. `ModifierHub` makes the sum and pushes one factor per stat.
+  It is the only caller allowed to push them; `TalentTree.apply_to` must not run next to it.
+- DIFFERENT stats multiply. Each step is floor(value * factor), and at least value + 1 when the
+  factor is above 1, the same minimum as the talents and the damage buff:
+
+      hit  = click or companion damage (with click_damage or companion_damage)
+      hit  = hit * global_damage, then * boss_damage during a boss fight, then * the damage buff
+      hit  = hit * (1 + crit bonus / 100) when a click is critical
+      gold = kill gold * gold, then * boss_gold on a boss kill, then * the gold bonus of the skills
+
+- "Gros coup" reads click and companion damage, then goes through `apply_damage`: it gets
+  `global_damage` and `boss_damage`, and is never critical.
+- Critical hit: rolled once per click, in `FloorManager.click` only. Companion attacks and
+  "Gros coup" are never critical. The dice are injected (`set_crit_roll`, a `Callable` returning
+  a float in [0, 1)); without them no click is ever critical.
+- `FloorManager.can_beat_next_boss` counts `global_damage` and `boss_damage`, as they are
+  permanent. It does not count critical hits, which are random.
+- The damage shown on the main screen goes through `buffed_damage`, so it includes
+  `global_damage` and, during a boss fight, `boss_damage`. It never includes critical hits.
+
+Item roll (`LootTable`, dice injected): the tier gives the drop and the rarity, `drop_weight` the
+type. The item has the primary stat of its type, then `secondary_stats` different stats drawn
+among the 8 others. Each value is uniform in the range of (stat, rarity). Values are fixed at the
+roll: retuning `ranges` never changes an item already owned.
+
+Worse item rule (`Inventory.is_worse`), applied when an arrival puts the bag over
+`inventory_capacity`, the new item included:
+
+1. the less rare goes first (order of `rarities`);
+2. at equal rarity, the smaller sum of bonuses, all stats alike (percentages added);
+3. at equal sum, the oldest (smallest `uid`), so a perfect tie keeps the new item.
+
+A new item that is itself the worst is sold at once. An equipped item is never sold. If a retuned
+`inventory_capacity` is below the bag, nothing is sold at load; the next arrival sells down to it.
+
+Sale price = `sell_kills` of the rarity * normal kill gold of the boss stage, added to
+`GameState.gold`. A flat price per rarity would mean nothing past the first bosses, as gold grows
+exponentially.
+
+Equip: `Inventory.equip` swaps a bag item with the worn item of its type, so it never overflows the
+bag. There is no unequip.
+
+Saved fields, in the permanent save (version 5): `inventory` (array of items, in order of arrival)
+and `equipped` (type id -> item), both survive `GameState.reset()`. An item is `{"uid", "type",
+"rarity", "stats": [{"stat", "percent"}, ...]}`, the primary stat first. A save of versions 1 to 4
+loads with both empty. Dropped at load: a malformed item, a repeated `uid`, an equipped item under
+another type than its own. An item whose ids the data no longer knows is kept: an unknown stat gives
+nothing, an unknown rarity ranks as the worst and sells for 0, an unknown type cannot be equipped.

@@ -1,0 +1,39 @@
+{
+	"schema_version": 1,
+	"worse_item_rule": "Quand l'inventaire est plein, l'objet vendu est le moins bon : d'abord la moins rare (ordre de 'rarities', la moins rare en premier) ; à rareté égale, la plus petite somme des bonus (en pourcentage, toutes stats confondues) ; à somme égale, le plus ancien (le plus petit uid). Le nouvel objet entre dans la comparaison : s'il est le moins bon il est vendu aussitôt. Un objet équipé n'est jamais vendu automatiquement.",
+	"inventory_capacity": 12,
+	"crit": {
+		"base_chance_percent": 0,
+		"base_bonus_percent": 100,
+		"max_chance_percent": 100
+	},
+	"stats": [
+		{"id": "click_damage", "name": "Dégâts du clic", "ranges": {"common": [2, 4], "rare": [5, 8], "legendary": [10, 15]}},
+		{"id": "global_damage", "name": "Dégâts globaux", "ranges": {"common": [1, 3], "rare": [3, 5], "legendary": [6, 9]}},
+		{"id": "crit_damage", "name": "Dégâts critiques", "ranges": {"common": [4, 8], "rare": [10, 16], "legendary": [20, 30]}},
+		{"id": "crit_chance", "name": "Chance de critique", "ranges": {"common": [1, 1], "rare": [2, 3], "legendary": [4, 6]}},
+		{"id": "companion_damage", "name": "Dégâts des compagnons", "ranges": {"common": [1, 3], "rare": [4, 6], "legendary": [7, 10]}},
+		{"id": "boss_damage", "name": "Dégâts de boss", "ranges": {"common": [2, 4], "rare": [5, 9], "legendary": [10, 15]}},
+		{"id": "gold", "name": "Or global", "ranges": {"common": [1, 3], "rare": [3, 5], "legendary": [6, 9]}},
+		{"id": "boss_gold", "name": "Or des boss", "ranges": {"common": [2, 4], "rare": [5, 8], "legendary": [10, 15]}},
+		{"id": "offline_gold", "name": "Or hors-ligne", "ranges": {"common": [2, 4], "rare": [5, 8], "legendary": [10, 15]}}
+	],
+	"rarities": [
+		{"id": "common", "name": "Commun", "secondary_stats": 0, "sell_kills": 10},
+		{"id": "rare", "name": "Rare", "secondary_stats": 1, "sell_kills": 40},
+		{"id": "legendary", "name": "Légendaire", "secondary_stats": 2, "sell_kills": 200}
+	],
+	"types": [
+		{"id": "sword", "name": "Épée", "primary_stat": "click_damage", "drop_weight": 1},
+		{"id": "helmet", "name": "Casque", "primary_stat": "global_damage", "drop_weight": 1},
+		{"id": "chest", "name": "Plastron", "primary_stat": "companion_damage", "drop_weight": 1},
+		{"id": "aura", "name": "Aura", "primary_stat": "gold", "drop_weight": 1},
+		{"id": "slash", "name": "Entaille", "primary_stat": "crit_damage", "drop_weight": 1}
+	],
+	"boss_loot": [
+		{"from_stage": 10, "drop_percent": 100, "rarity_weights": {"common": 90, "rare": 10, "legendary": 0}},
+		{"from_stage": 30, "drop_percent": 100, "rarity_weights": {"common": 60, "rare": 35, "legendary": 5}},
+		{"from_stage": 60, "drop_percent": 100, "rarity_weights": {"common": 30, "rare": 55, "legendary": 15}},
+		{"from_stage": 100, "drop_percent": 100, "rarity_weights": {"common": 10, "rare": 55, "legendary": 35}}
+	]
+}

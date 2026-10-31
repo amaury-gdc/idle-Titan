@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004, 004b, 005, 006)
+# Balance notes (stories 003, 004, 004b, 005, 006, 007)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -9,6 +9,61 @@ The numbers that apply to the game today are in "Bosses".
 Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
+
+## Items (story 007)
+
+**Nothing here is measured or decided.** Every value of `items.json` (rules in `data_schema.md`)
+is a first guess, to be tuned once with all the sources of power in place, against the target of
+a net wall before stage 130 (see Talents). The reasons below are the reasoning behind each guess.
+
+| Value | In file | Reason |
+|---|---|---|
+| Bag size | 12 | Bosses come every 10 stages, so 12 drops is about stage 130: a first run fills the bag only around the wall, then the automatic sale starts to matter. |
+| Secondary stats | 0 / 1 / 2 | The smallest step that makes each rarity read differently. The primary stat alone keeps a Commun simple. |
+| Primary stats | Épée click, Casque global, Plastron companions, Aura gold, Entaille critical damage | Each slot has a recognisable role. Critical chance, boss damage, boss gold and offline gold only come as secondary stats, so a Commun never has them. |
+| Ranges | Commun about the size of one talent node (+2 to +4%), Rare about double, Légendaire about four times | Talents own +18% click and +10% companions at the wall, and +4% already moved stage 120 by about 20 h: the first try of the talents showed how fast bonuses dissolve the wall. Global and companion stats stay lower than click, as they apply to most of the damage. |
+| Critical chance | 1 / 2-3 / 4-6%, base 0, ceiling 100, clicks only | Base 0: without items, the curve stays as measured. Five slots of Légendaire with this stat give at most about 30%. Decided on 2026-10-31: only a click can be critical, so the stat weighs little once the companions deal most of the damage. |
+| Critical damage | Base +100% (double), items +4 to +30% | The usual double hit. It does nothing until an item gives a chance. |
+| Sale price | 10 / 40 / 200 kills of gold at the boss stage | Expressed in kills, as a flat price is worthless after a few bosses. Computed from the curves (not measured): a boss is worth about 6 kills at stage 10 and 23 at stage 100, so a Commun sells for 1.7 then 0.4 boss, a Rare for 6.8 then 1.7, a Légendaire for 34 then 8.6. The Légendaire is high for a consolation, but a sold Légendaire is rare. |
+| Loot tiers | 100% drop on every boss; Commun/Rare/Légendaire 90/10/0 from stage 10, 60/35/5 from 30, 30/55/15 from 60, 10/55/35 from 100 | First item guaranteed at stage 10, as the brief says. No Légendaire before stage 30. Every boss drops, since a boss falls only once per run. The tiers follow how many bosses a run sees, not a measured need. |
+
+Risks to check when tuning:
+
+- Full legendary gear gives far more than the talents, and global damage and boss damage multiply
+  each other on a boss, critical clicks on top. The wall is exposed to this.
+- The "worse item" sum weighs all stats alike, while +1% critical chance is worth more than +1%
+  gold. The rule is decided; the ranges are what can compensate.
+- Critical clicks add variance to a boss fight that the estimate of "Défi automatique" ignores. It
+  only errs towards waiting.
+
+`--loot=1` in `tools/simulate_progress.gd` drops the real items and equips greedily: a drop is
+worn when the worn item of its type `Inventory.is_worse` than it. It looks at rarity and sum only,
+so it may wear +15% offline gold in place of +8% click: an honest measure, not an optimistic one.
+No talent reset, no choice between stats. `--seed=<n>` (default 1) sets the dice of loot and
+critical hits, two separate generators, so results depend on the seed: read several before
+concluding. `--itemsdata=<path>` replaces `items.json`.
+
+72 h, same settings as the "Current game" row of Talents, plus `--loot=1`, two seeds. Times are
+active play.
+
+| Run | First boss reached | Stage 50 | Stage 100 | Stage 110 | Stage 120 | Best at 72 h | Failed | Drops | Sold |
+|---|---|---|---|---|---|---|---|---|---|
+| Without loot | 1.5 min | 30.5 min | 5.55 h | 6.83 h | 48.0 h | 120 | 12 | - | - |
+| Loot, seed 1 | 1.5 min | 30.4 min | 5.22 h | 6.02 h | 35.0 h | 120 | 12 | 11 | 0 |
+| Loot, seed 2 | 1.5 min | 30.4 min | 4.67 h | 5.91 h | 33.3 h | 120 | 12 | 11 | 0 |
+
+Stage 130 is not reached, so the wall before stage 130 holds with this loot model. Two seeds of a
+model blind to the stats are not a bound: a player who picks the stats gets more, and that is
+not measured. The boss of stage 120 comes 13 to 15 h sooner.
+
+**Critical hits weigh nothing in these numbers.** Both seeds wear 0% critical chance at 72 h, since
+that stat only comes as a secondary one, so no hit is ever critical. Limiting the critical hit to
+clicks therefore changed no result: the runs before and after it are identical. Its effect is
+not measured.
+
+**The automatic sale never happens in these runs**: 11 drops in 72 h for 12 places, 6 or 7 of them
+in the bag at the end. It was only seen in a test with a bag filled by hand. To weigh at the tuning:
+either the capacity or the drops per boss.
 
 ## Talents (story 006)
 

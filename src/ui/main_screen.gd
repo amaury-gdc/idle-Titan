@@ -4,12 +4,20 @@ extends Control
 ## the "Défi automatique" toggle, the score (best stage reached, kept after a boss
 ## fallback), the companion panel and the message shown on return after an absence.
 ## The skill bar (story 005) sits in the free column left of the enemy. The talent tree
-## (story 006) opens over everything: while it is open the game waits, as it does behind the
-## return message, and the keyboard focus cannot leave it.
+## (story 006) and the inventory (story 007) open over everything: while one is open the game
+## waits, as it does behind the return message, and the keyboard focus cannot leave it.
+## The loot message and the critical hit text sit in the free column right of the enemy: they
+## come during the fight, so they live here and not in the inventory screen, take no mouse
+## and no focus, and hide by themselves.
 ## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
-## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] core, feeds it frame time,
-## forwards clicks to it and redraws on its signals. All rules live in src/core; this
-## script only displays.
+## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] / [TalentTree] /
+## [Inventory] / [ModifierHub] core, feeds it frame time, forwards clicks to it and redraws on
+## its signals. All rules live in src/core; this script only displays.
+##
+## Permanent bonuses: only the [ModifierHub] pushes them. It is built BEFORE the handlers of
+## this script connect to the "changed" signals of the talents and the inventory: a signal
+## calls its connections in order, so the factors are fresh when those handlers redraw. It is
+## also built before the first offline grant, which reads the offline gold factor.
 ##
 ## Persistence: loads [GameState] and [PermanentState] through [SaveManager]
 ## (default user:// paths) at startup; saves every autosave_interval_seconds
@@ -28,11 +36,16 @@ const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const SKILLS_PATH: String = "res://assets/data/skills.json"
 const TALENTS_PATH: String = "res://assets/data/talents.json"
+const ITEMS_PATH: String = "res://assets/data/items.json"
 ## Used only when core_curves.json has no valid autosave_interval_seconds
 ## (infrastructure setting, not a gameplay value).
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
 ## Time between two redraws of the DPS line (display setting, not a gameplay value).
 const DPS_REFRESH_SECONDS: float = 0.25
+## Time the loot message stays on screen (display setting, not a gameplay value).
+const LOOT_MESSAGE_SECONDS: float = 4.0
+## Time the critical hit text stays on screen (display setting, not a gameplay value).
+const CRIT_MESSAGE_SECONDS: float = 0.8
 const SECONDS_PER_MINUTE: int = 60
 const SECONDS_PER_HOUR: int = 3600
 
@@ -45,7 +58,14 @@ var _floors: FloorManager
 var _companions: CompanionManager
 var _skills: SkillManager
 var _talents: TalentTree
+var _inventory: Inventory
+# Kept alive here: it stops pushing the bonuses if this object is freed.
+var _modifiers: ModifierHub
+var _loot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _crit_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _autosave_timer: Timer
+var _loot_timer: Timer
+var _crit_timer: Timer
 var _offline: OfflineIncome
 var _document: JavaScriptObject
 # Kept alive here: the browser listener stops working if this object is freed.
@@ -70,6 +90,11 @@ var _tab_visibility_callback: JavaScriptObject
 @onready var _boss_hint_label: Label = %BossHintLabel
 @onready var _talents_button: Button = %TalentsButton
 @onready var _talent_screen: TalentScreen = %TalentScreen
+@onready var _inventory_button: Button = %InventoryButton
+@onready var _inventory_screen: InventoryScreen = %InventoryScreen
+@onready var _crit_label: Label = %CritLabel
+@onready var _loot_toast: PanelContainer = %LootToast
+@onready var _loot_message: Label = %LootMessage
 @onready var _offline_blocker: ColorRect = %OfflineBlocker
 @onready var _offline_panel: PanelContainer = %OfflinePanel
 @onready var _offline_message: Label = %OfflineMessage
@@ -101,8 +126,18 @@ func _ready() -> void:
 	if not _talents.is_valid():
 		_show_error(_talents.get_error())
 		return
-	_talents.apply_to(_floors, _offline)
+	_loot_rng.randomize()
+	_crit_rng.randomize()
+	_inventory = Inventory.from_data(DataLoader.load_json(ITEMS_PATH), _permanent, _game, combat, _loot_rng.randf)
+	if not _inventory.is_valid():
+		_show_error(_inventory.get_error())
+		return
+	_floors.set_crit_roll(_crit_rng.randf)
+	_floors.boss_killed.connect(_inventory.on_boss_killed)
+	# Before the offline grant, and before any handler below connects to a "changed" signal.
+	_modifiers = ModifierHub.new(_floors, _offline, _talents, _inventory)
 	var offline_gain: Dictionary = _grant_offline_gold()
+	_floors.critical_hit.connect(_on_critical_hit)
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
 	_floors.farming_changed.connect(_on_farming_changed)
@@ -126,6 +161,13 @@ func _ready() -> void:
 	_talent_screen.setup(_talents)
 	_talents_button.pressed.connect(_on_talents_pressed)
 	_refresh_talents_button()
+	_inventory.changed.connect(_on_inventory_changed)
+	_inventory.loot_received.connect(_on_loot_received)
+	_inventory_screen.equip_requested.connect(_on_equip_requested)
+	_inventory_screen.closed.connect(_on_inventory_closed)
+	_inventory_screen.setup(_inventory)
+	_inventory_button.pressed.connect(_on_inventory_pressed)
+	_start_message_timers()
 	_start_autosave(curves)
 	_enemy.set_stage(_game.stage, _floors.is_boss_fight())
 	_refresh()
@@ -138,8 +180,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The game waits behind the return message and the talent tree: a boss countdown must
-	# not run out on them.
+	# The game waits behind the return message, the talent tree and the inventory: a boss
+	# countdown must not run out on them.
 	if _companions == null or _game_waits():
 		return
 	# Damage first, then the boss countdown (see FloorManager: a boss killed this
@@ -177,6 +219,22 @@ func _show_error(error: String) -> void:
 	_skill_bar.visible = false
 	_dps_label.visible = false
 	_talents_button.visible = false
+	_inventory_button.visible = false
+
+
+func _start_message_timers() -> void:
+	_loot_timer = _new_message_timer(LOOT_MESSAGE_SECONDS, _loot_toast)
+	_crit_timer = _new_message_timer(CRIT_MESSAGE_SECONDS, _crit_label)
+
+
+# A one-shot timer that hides [param message] when it runs out.
+func _new_message_timer(seconds: float, message: Control) -> Timer:
+	var timer: Timer = Timer.new()
+	timer.wait_time = seconds
+	timer.one_shot = true
+	timer.timeout.connect(message.hide)
+	add_child(timer)
+	return timer
 
 
 func _start_autosave(curves: Variant) -> void:
@@ -228,8 +286,9 @@ func _on_tab_visibility_changed(_args: Array) -> void:
 
 
 func _show_offline_gain(gain: Dictionary) -> void:
-	# A web return can come while the tree is open: the message goes first.
+	# A web return can come while the tree or the inventory is open: the message goes first.
 	_talent_screen.close()
+	_inventory_screen.close()
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
 	if gain["capped"]:
@@ -258,7 +317,7 @@ func _format_duration(seconds: int) -> String:
 
 
 func _game_waits() -> bool:
-	return _offline_panel.visible or _talent_screen.visible
+	return _offline_panel.visible or _talent_screen.visible or _inventory_screen.visible
 
 
 func _on_talents_pressed() -> void:
@@ -280,7 +339,6 @@ func _on_talent_reset_requested() -> void:
 
 
 func _on_talents_changed() -> void:
-	_talents.apply_to(_floors, _offline)
 	_talent_screen.refresh()
 	_refresh_talents_button()
 	_refresh()
@@ -290,6 +348,52 @@ func _on_talents_changed() -> void:
 
 func _refresh_talents_button() -> void:
 	_talents_button.text = tr("Talents (points : %d)") % _talents.available_points()
+
+
+func _on_inventory_pressed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
+	_inventory_screen.open()
+
+
+func _on_inventory_closed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
+	_inventory_button.grab_focus()
+
+
+func _on_equip_requested(uid: int) -> void:
+	_inventory.equip(uid)
+
+
+func _on_inventory_changed() -> void:
+	_inventory_screen.refresh()
+	_refresh()
+	_companion_panel.refresh()
+	_refresh_dps()
+
+
+func _on_loot_received(item: Item, sold: Array[Item], gold_gained: BigNumber) -> void:
+	_loot_message.text = _loot_text(item, sold, gold_gained)
+	_loot_message.add_theme_color_override("font_color", _inventory_screen.rarity_color(item.rarity))
+	_loot_toast.visible = true
+	_loot_timer.start()
+
+
+func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> String:
+	var lines: PackedStringArray = PackedStringArray([tr("Butin !"), _inventory_screen.describe(item)])
+	var gold: String = gold_gained.format()
+	if sold.has(item):
+		lines.append(tr("Vendu aussitôt : +%s or") % gold)
+	elif sold.size() == 1:
+		lines.append(tr("Sac plein, vendu : %s, +%s or") % [_inventory_screen.describe(sold[0]), gold])
+	elif sold.size() > 1:
+		lines.append(tr("Sac plein, %d objets vendus, +%s or") % [sold.size(), gold])
+	return "\n".join(lines)
+
+
+func _on_critical_hit(damage: BigNumber) -> void:
+	_crit_label.text = tr("Critique !\n%s") % damage.format()
+	_crit_label.visible = true
+	_crit_timer.start()
 
 
 func _on_enemy_clicked() -> void:

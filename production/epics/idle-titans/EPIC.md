@@ -35,4 +35,4 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 | 004b | Progression hors-ligne | Logic | Complete | N/A |
 | 005 | Compétences actives | Logic | Complete | N/A |
 | 006 | Arbre de talents | Logic | Complete | N/A |
-| 007 | Objets et butin | Logic | Ready | N/A |
+| 007 | Objets et butin | Logic | Complete | N/A |

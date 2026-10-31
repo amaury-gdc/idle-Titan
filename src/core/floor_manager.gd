@@ -42,6 +42,19 @@ extends RefCounted
 ## The skill burst ([method SkillManager.burst_damage]) gets the click and companion factors
 ## through those two methods. Offline gold has its own talent, see [OfflineIncome].
 ##
+## ITEMS (story 007): the bonuses of the equipped [Inventory] items. The percentages of the
+## stats that talents have too (click, companion, gold) are summed with the talents by
+## [ModifierHub], which pushes ONE factor each through [method set_talent_modifiers]; never
+## call [method TalentTree.apply_to] next to it. The stats only items have come through
+## [method set_item_modifiers]. Global damage and boss damage are applied in
+## [method buffed_damage] (the boss one only during a boss fight), after the click and
+## companion factors and before the damage buff; boss gold after the gold factor, on a boss
+## kill only. Critical hits ([method set_crit_roll]) only come from [method click], after
+## the damage buff: companion attacks and the skill burst go through [method apply_damage]
+## and are never critical. Different stats multiply each other (global x boss x buff); the
+## same stat adds up.
+## [signal boss_killed] is the hook of the loot.
+##
 ## Order inside one frame: damage (clicks, companion attacks) is applied first, then
 ## [method tick] advances the countdown. A boss killed by the damage of a frame is
 ## therefore killed even when that same frame's delta would have run the countdown
@@ -70,6 +83,12 @@ signal enemy_damaged(damage: BigNumber, remaining_hp: BigNumber)
 ## state, and GameState.stage already points at the next stage (it stays on
 ## [param stage] for a kill that farm mode respawns).
 signal enemy_killed(stage: int, gold_reward: BigNumber)
+## The boss of [param stage] died (story 007 loot hook). Emitted right after [signal enemy_killed]
+## for the same kill, with the state already consistent; not emitted for a normal enemy.
+signal boss_killed(stage: int)
+## A click was a critical hit and deals [param damage] (the final damage, critical bonus
+## included). Emitted before the matching [signal enemy_damaged] or [signal enemy_killed].
+signal critical_hit(damage: BigNumber)
 ## A new enemy began: next stage after a kill, boss fallback, farm mode respawn
 ## (same [param stage]) or boss challenge. It is already spawned at full HP. Not
 ## emitted for the first stage after construction (read [method current_stage] and
@@ -108,6 +127,15 @@ var _gold_multiplier: String = "1"
 var _talent_click: String = "1"
 var _talent_companion: String = "1"
 var _talent_gold: String = "1"
+## Factors only items give (story 007), "1" meaning none.
+var _global_damage: String = "1"
+var _boss_damage: String = "1"
+var _boss_gold: String = "1"
+## Critical hit: chance in percent (0 = never), factor of the damage of a critical hit, and
+## the injected dice (a Callable returning a float in [0.0, 1.0)); without it, no hit is critical.
+var _crit_chance: int = 0
+var _crit_factor: String = "2"
+var _crit_roll: Callable
 
 
 ## [param state] and [param combat] are required; [param combat] must be valid.
@@ -191,6 +219,8 @@ func can_beat_next_boss() -> bool:
 	if not _state.farming:
 		return false
 	var dps: BigNumber = companion_power().add(_click_dps)
+	# Permanent item bonuses count, like the talents: the next fight is a boss fight.
+	dps = _with_talent(_with_talent(dps, _global_damage), _boss_damage)
 	return dps.multiply_decimal("%.3f" % _boss.timer_seconds()).compare(_safe_boss_hp) >= 0
 
 
@@ -213,11 +243,35 @@ func set_gold_multiplier(factor: String) -> void:
 ## [param companion] on companion damage, [param gold] on the gold of every kill, boss
 ## kills included. Each is a valid decimal string ("1.25"); "1" means none. Unlike the
 ## skill buffs they stay until the next call. The estimate of [method can_beat_next_boss]
-## counts them, since they are permanent.
+## counts them, since they are permanent. With items in play, pass the SUM of talents and
+## items for these three stats (see [ModifierHub]): a later call replaces the earlier one.
 func set_talent_modifiers(click: String, companion: String, gold: String) -> void:
 	_talent_click = click
 	_talent_companion = companion
 	_talent_gold = gold
+
+
+## Sets the factors only items give (story 007), pushed by [ModifierHub]: [param global_damage]
+## on every damage, [param boss_damage] on every damage during a boss fight, [param boss_gold]
+## on the gold of a boss kill, each a valid decimal string ("1.25"), "1" meaning none.
+## [param crit_chance_percent] (0..100) is the chance of a critical hit per click and
+## [param crit_factor] the factor of its damage ("2.00" doubles it). They stay until the
+## next call; the estimate of [method can_beat_next_boss] counts the first two factors, not
+## the critical hits.
+func set_item_modifiers(global_damage: String, boss_damage: String, boss_gold: String, crit_chance_percent: int, crit_factor: String) -> void:
+	_global_damage = global_damage
+	_boss_damage = boss_damage
+	_boss_gold = boss_gold
+	_crit_chance = clampi(crit_chance_percent, 0, 100)
+	_crit_factor = crit_factor
+
+
+## Injects the dice of the critical hits: a [Callable] returning a float in [0.0, 1.0), for
+## example [code]rng.randf[/code] of a seeded [RandomNumberGenerator]. A click is critical when
+## the roll * 100 is below the chance. Without a valid Callable, no click is ever critical
+## (deterministic by default). It is read only when the chance is above 0.
+func set_crit_roll(roll: Callable) -> void:
+	_crit_roll = roll
 
 
 ## Damage a click deals right now (base + companion share, times the click talents),
@@ -238,10 +292,17 @@ func companion_power() -> BigNumber:
 	return companion_damage(_combat.companion_power(_state.companion_levels))
 
 
-## [param damage] with the damage buff applied, unchanged when no buff is on. A buff adds
-## at least 1: floor(1 * 1.5) would otherwise leave the smallest hits untouched.
+## [param damage] with the item stats (global damage, boss damage in a boss fight) and the damage
+## buff applied, unchanged when none is on. Each adds at least 1: floor(1 * 1.5) would otherwise
+## leave the smallest hits untouched. Critical hits are NOT included (random, see [method click]).
 func buffed_damage(damage: BigNumber) -> BigNumber:
-	if _damage_multiplier == "1" or damage.is_zero():
+	if damage.is_zero():
+		return damage
+	# Item stats first: global damage, then boss damage during a boss fight (each at least +1).
+	damage = _with_talent(damage, _global_damage)
+	if _boss.is_active():
+		damage = _with_talent(damage, _boss_damage)
+	if _damage_multiplier == "1":
 		return damage
 	var buffed: BigNumber = damage.multiply_decimal(_damage_multiplier)
 	return buffed if buffed.compare(damage) > 0 else damage.add(BigNumber.from_int(1))
@@ -254,12 +315,13 @@ func hp_ratio() -> float:
 	return float(permille.to_decimal_string().to_int()) / 1000.0
 
 
-## A player click: deals [method click_damage] to the enemy (times the damage buff).
-## Returns the click damage BEFORE the buff, so the measured click dps that feeds
+## A player click: deals [method click_damage] to the enemy (times the damage buff), and
+## rolls a critical hit, the only damage that can be critical. Returns the click damage
+## BEFORE the buff and the critical hit, so the measured click dps that feeds
 ## [method can_beat_next_boss] stays a buff-free estimate.
 func click() -> BigNumber:
 	var damage: BigNumber = click_damage()
-	apply_damage(damage)
+	_deal(_roll_critical(buffed_damage(damage)))
 	return damage
 
 
@@ -272,13 +334,20 @@ func click() -> BigNumber:
 ## [signal farming_changed] when farm mode was left, [signal stage_started] and, when
 ## a boss begins, [signal boss_started] are emitted (state already consistent).
 func apply_damage(damage: BigNumber) -> void:
-	damage = buffed_damage(damage)
+	_deal(buffed_damage(damage))
+
+
+# Takes [param damage], final, off the current enemy: see [method apply_damage].
+func _deal(damage: BigNumber) -> void:
 	if damage.compare(_current_hp) < 0:
 		_current_hp = _current_hp.subtract(damage)
 		enemy_damaged.emit(damage, _current_hp)
 		return
 	var killed_stage: int = _state.stage
+	var was_boss: bool = _boss.is_active()
 	var reward: BigNumber = _with_talent(_reward, _talent_gold)
+	if was_boss:
+		reward = _with_talent(reward, _boss_gold)
 	if _gold_multiplier != "1":
 		reward = reward.multiply_decimal(_gold_multiplier)
 	_state.gold = _state.gold.add(reward)
@@ -292,6 +361,8 @@ func apply_damage(damage: BigNumber) -> void:
 	else:
 		_current_hp = _max_hp
 	enemy_killed.emit(killed_stage, reward)
+	if was_boss:
+		boss_killed.emit(killed_stage)
 	if left_farm:
 		farming_changed.emit(false)
 	stage_started.emit(_state.stage, _max_hp)
@@ -353,6 +424,18 @@ func _with_talent(value: BigNumber, factor: String) -> BigNumber:
 		return value
 	var scaled: BigNumber = value.multiply_decimal(factor)
 	return scaled if scaled.compare(value) > 0 else value.add(BigNumber.from_int(1))
+
+
+# [param damage] times the critical factor when this click is critical, else unchanged. The dice
+# are read only when a chance and a valid roll exist, so the default stays deterministic.
+func _roll_critical(damage: BigNumber) -> BigNumber:
+	if _crit_chance <= 0 or not _crit_roll.is_valid():
+		return damage
+	if float(_crit_roll.call()) * 100.0 >= float(_crit_chance):
+		return damage
+	var critical: BigNumber = _with_talent(damage, _crit_factor)
+	critical_hit.emit(critical)
+	return critical
 
 
 func _update_safe_boss_hp() -> void:
