@@ -89,6 +89,22 @@ signal boss_killed(stage: int)
 ## A click was a critical hit and deals [param damage] (the final damage, critical bonus
 ## included). Emitted before the matching [signal enemy_damaged] or [signal enemy_killed].
 signal critical_hit(damage: BigNumber)
+## Where a hit comes from, for the display only ([signal hit_landed]): [constant AUTO] is a
+## companion attack (the default of [method apply_damage]), [constant CLICK] a plain player
+## click, [constant CRITICAL] a click that rolled a critical hit, [constant BURST] the skill
+## burst (Gros coup). It never changes the damage.
+enum HitSource { AUTO, CLICK, CRITICAL, BURST }
+
+## A hit was dealt: [param damage] is the FINAL damage (item stats, damage buff and critical
+## hit included, overkill not subtracted), [param source] a [enum HitSource]. Emitted at the top
+## of every hit, for the hit that kills as well, before [signal enemy_damaged] or
+## [signal enemy_killed]. Display hook (story 009): nothing in the game listens to it.
+signal hit_landed(damage: BigNumber, source: int)
+## The enemy of [param stage] died and [param gold] (the final reward, already in the state) was
+## granted; [param was_boss] says it was a boss. Emitted right after [signal enemy_killed], in
+## the same call. Display hook (story 009): after the kill, [method is_boss_fight] already
+## describes the next stage, so the boss flag is only known here.
+signal kill_rewarded(stage: int, gold: BigNumber, was_boss: bool)
 ## A new enemy began: next stage after a kill, boss fallback, farm mode respawn
 ## (same [param stage]) or boss challenge. It is already spawned at full HP. Not
 ## emitted for the first stage after construction (read [method current_stage] and
@@ -321,7 +337,12 @@ func hp_ratio() -> float:
 ## [method can_beat_next_boss] stays a buff-free estimate.
 func click() -> BigNumber:
 	var damage: BigNumber = click_damage()
-	_deal(_roll_critical(buffed_damage(damage)))
+	var final_damage: BigNumber = buffed_damage(damage)
+	var critical: bool = _rolls_critical()
+	if critical:
+		final_damage = _with_talent(final_damage, _crit_factor)
+		critical_hit.emit(final_damage)
+	_deal(final_damage, HitSource.CRITICAL if critical else HitSource.CLICK)
 	return damage
 
 
@@ -330,15 +351,19 @@ func click() -> BigNumber:
 ## it dies: gold (boss gold for a boss, times the gold bonus when one is on) is granted,
 ## the next stage starts with a fresh enemy (in farm mode, the same
 ## stage again unless auto challenge is on and [method can_beat_next_boss] is true),
-## then [signal enemy_killed],
+## then [signal enemy_killed], [signal kill_rewarded],
 ## [signal farming_changed] when farm mode was left, [signal stage_started] and, when
 ## a boss begins, [signal boss_started] are emitted (state already consistent).
-func apply_damage(damage: BigNumber) -> void:
-	_deal(buffed_damage(damage))
+## [param source] only tells the display where the hit comes from ([signal hit_landed]): the
+## companions keep the default [constant HitSource.AUTO], the skill burst passes
+## [constant HitSource.BURST].
+func apply_damage(damage: BigNumber, source: HitSource = HitSource.AUTO) -> void:
+	_deal(buffed_damage(damage), source)
 
 
 # Takes [param damage], final, off the current enemy: see [method apply_damage].
-func _deal(damage: BigNumber) -> void:
+func _deal(damage: BigNumber, source: HitSource) -> void:
+	hit_landed.emit(damage, source)
 	if damage.compare(_current_hp) < 0:
 		_current_hp = _current_hp.subtract(damage)
 		enemy_damaged.emit(damage, _current_hp)
@@ -361,6 +386,7 @@ func _deal(damage: BigNumber) -> void:
 	else:
 		_current_hp = _max_hp
 	enemy_killed.emit(killed_stage, reward)
+	kill_rewarded.emit(killed_stage, reward, was_boss)
 	if was_boss:
 		boss_killed.emit(killed_stage)
 	if left_farm:
@@ -426,16 +452,12 @@ func _with_talent(value: BigNumber, factor: String) -> BigNumber:
 	return scaled if scaled.compare(value) > 0 else value.add(BigNumber.from_int(1))
 
 
-# [param damage] times the critical factor when this click is critical, else unchanged. The dice
-# are read only when a chance and a valid roll exist, so the default stays deterministic.
-func _roll_critical(damage: BigNumber) -> BigNumber:
+# True when this click is critical. The dice are read only when a chance and a valid roll exist,
+# so the default stays deterministic.
+func _rolls_critical() -> bool:
 	if _crit_chance <= 0 or not _crit_roll.is_valid():
-		return damage
-	if float(_crit_roll.call()) * 100.0 >= float(_crit_chance):
-		return damage
-	var critical: BigNumber = _with_talent(damage, _crit_factor)
-	critical_hit.emit(critical)
-	return critical
+		return false
+	return float(_crit_roll.call()) * 100.0 < float(_crit_chance)
 
 
 func _update_safe_boss_hp() -> void:

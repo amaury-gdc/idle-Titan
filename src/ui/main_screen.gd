@@ -6,10 +6,18 @@ extends Control
 ## The skill bar (story 005) sits in the free column left of the enemy. The talent tree
 ## (story 006) and the inventory (story 007) open over everything: while one is open the game
 ## waits, as it does behind the return message, and the keyboard focus cannot leave it.
-## The loot message and the critical hit text sit in the free column right of the enemy: they
-## come during the fight, so they live here and not in the inventory screen, take no mouse
-## and no focus, and hide by themselves. The game version sits in the bottom left corner, so that
-## a player's feedback can name it; the "Sauvegarde" button opens the [SaveScreen].
+## The loot message sits in the free column right of the enemy: it comes during the fight, so
+## it lives here and not in the inventory screen, takes no mouse and no focus, and hides by
+## itself. The game version sits in the bottom left corner, so that a player's feedback can name
+## it; the "Sauvegarde" button opens the [SaveScreen].
+##
+## Visual feedback (story 009, display only): a [FloatingTextLayer] shows the damage of the
+## player's hits (a critical hit is a bigger number ending with "!", which replaces the former
+## "Critique !" text) and the gold of a kill; [CompanionOrbs] draws one sphere per owned companion
+## beside the enemy and a ball thrown at it on each attack. Both read the [FloorManager] and
+## [CompanionManager] signals and change nothing. The "Effets visuels" button (bottom left, next to
+## the version) turns them off; the choice lives in [DisplaySettings], a file of its own, never in
+## the save. Hidden tab and modal screens stop and clear them.
 ## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
 ## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] / [TalentTree] /
 ## [Inventory] / [ModifierHub] core, feeds it frame time, forwards clicks to it and redraws on
@@ -45,8 +53,6 @@ const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
 const DPS_REFRESH_SECONDS: float = 0.25
 ## Time the loot message stays on screen (display setting, not a gameplay value).
 const LOOT_MESSAGE_SECONDS: float = 4.0
-## Time the critical hit text stays on screen (display setting, not a gameplay value).
-const CRIT_MESSAGE_SECONDS: float = 0.8
 const SECONDS_PER_MINUTE: int = 60
 const SECONDS_PER_HOUR: int = 3600
 
@@ -66,8 +72,11 @@ var _loot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _crit_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _autosave_timer: Timer
 var _loot_timer: Timer
-var _crit_timer: Timer
 var _offline: OfflineIncome
+var _display: DisplaySettings
+# Whether the effects are stopped now (modal screen or hidden tab); see _sync_effects_pause.
+var _effects_paused: bool = false
+var _tab_hidden: bool = false
 var _document: JavaScriptObject
 # Kept alive here: the browser listener stops working if this object is freed.
 var _tab_visibility_callback: JavaScriptObject
@@ -96,7 +105,9 @@ var _tab_visibility_callback: JavaScriptObject
 @onready var _version_label: Label = %VersionLabel
 @onready var _save_button: Button = %SaveButton
 @onready var _save_screen: SaveScreen = %SaveScreen
-@onready var _crit_label: Label = %CritLabel
+@onready var _orbs: CompanionOrbs = %CompanionOrbs
+@onready var _texts: FloatingTextLayer = %FloatingTextLayer
+@onready var _effects_toggle: Button = %EffectsToggle
 @onready var _loot_toast: PanelContainer = %LootToast
 @onready var _loot_message: Label = %LootMessage
 @onready var _offline_blocker: ColorRect = %OfflineBlocker
@@ -108,7 +119,8 @@ var _tab_visibility_callback: JavaScriptObject
 func _ready() -> void:
 	_version_label.text = tr("Version %s") % _game_version()
 	var curves: Variant = DataLoader.load_json(CURVES_PATH)
-	var combat: Combat = Combat.from_data(curves, DataLoader.load_json(ROSTER_PATH))
+	var roster: Variant = DataLoader.load_json(ROSTER_PATH)
+	var combat: Combat = Combat.from_data(curves, roster)
 	var boss: BossFight = BossFight.from_data(DataLoader.load_json(BOSSES_PATH))
 	_offline = OfflineIncome.from_data(curves, combat)
 	var error: String = combat.get_error()
@@ -142,7 +154,6 @@ func _ready() -> void:
 	# Before the offline grant, and before any handler below connects to a "changed" signal.
 	_modifiers = ModifierHub.new(_floors, _offline, _talents, _inventory)
 	var offline_gain: Dictionary = _grant_offline_gold()
-	_floors.critical_hit.connect(_on_critical_hit)
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
 	_floors.farming_changed.connect(_on_farming_changed)
@@ -155,6 +166,7 @@ func _ready() -> void:
 	_enemy.clicked.connect(_on_enemy_clicked)
 	_companions = CompanionManager.new(_game, combat, _floors)
 	_companions.companion_leveled_up.connect(_on_companion_leveled_up)
+	_setup_visual_effects(roster)
 	_companion_panel.buy_requested.connect(_on_companion_buy_requested)
 	_companion_panel.setup(_companions)
 	_skill_bar.activate_requested.connect(_on_skill_requested)
@@ -192,7 +204,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	# The game waits behind the return message, the talent tree and the inventory: a boss
 	# countdown must not run out on them.
-	if _companions == null or _game_waits():
+	if _companions == null:
+		return
+	_sync_effects_pause()
+	if _game_waits():
 		return
 	# Damage first, then the boss countdown (see FloorManager: a boss killed this
 	# frame is killed even if this frame's delta would have run the countdown out).
@@ -228,6 +243,7 @@ func _show_error(error: String) -> void:
 	_enemy.visible = false
 	_boss_timer.visible = false
 	_auto_toggle.visible = false
+	_effects_toggle.visible = false
 	_companion_panel.visible = false
 	_skill_bar.visible = false
 	_dps_label.visible = false
@@ -241,18 +257,11 @@ func _game_version() -> String:
 
 
 func _start_message_timers() -> void:
-	_loot_timer = _new_message_timer(LOOT_MESSAGE_SECONDS, _loot_toast)
-	_crit_timer = _new_message_timer(CRIT_MESSAGE_SECONDS, _crit_label)
-
-
-# A one-shot timer that hides [param message] when it runs out.
-func _new_message_timer(seconds: float, message: Control) -> Timer:
-	var timer: Timer = Timer.new()
-	timer.wait_time = seconds
-	timer.one_shot = true
-	timer.timeout.connect(message.hide)
-	add_child(timer)
-	return timer
+	_loot_timer = Timer.new()
+	_loot_timer.wait_time = LOOT_MESSAGE_SECONDS
+	_loot_timer.one_shot = true
+	_loot_timer.timeout.connect(_loot_toast.hide)
+	add_child(_loot_timer)
 
 
 func _start_autosave(curves: Variant) -> void:
@@ -292,7 +301,9 @@ func _watch_tab_visibility() -> void:
 
 
 func _on_tab_visibility_changed(_args: Array) -> void:
-	if _document.hidden:
+	_tab_hidden = _document.hidden
+	_sync_effects_pause()
+	if _tab_hidden:
 		_save()
 		return
 	var gain: Dictionary = _grant_offline_gold()
@@ -435,10 +446,51 @@ func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> String
 	return "\n".join(lines)
 
 
-func _on_critical_hit(damage: BigNumber) -> void:
-	_crit_label.text = tr("Critique !\n%s") % damage.format()
-	_crit_label.visible = true
-	_crit_timer.start()
+# Wires the floating texts and the companion spheres to the core signals and applies the saved
+# "Effets visuels" setting. [param roster] is the data of companions_roster.json (sphere colours).
+func _setup_visual_effects(roster: Variant) -> void:
+	_display = DisplaySettings.new()
+	_orbs.setup(roster)
+	for companion: Companion in _companions.companions():
+		_orbs.set_level(companion.id, _companions.level(companion.id))
+	_floors.hit_landed.connect(_texts.show_hit)
+	_floors.kill_rewarded.connect(_texts.show_gold)
+	_companions.companion_attacked.connect(_orbs.on_companion_attacked)
+	_enemy.item_rect_changed.connect(_on_enemy_rect_changed)
+	_on_enemy_rect_changed()
+	_effects_toggle.set_pressed_no_signal(_display.visual_effects())
+	_apply_visual_effects()
+	_effects_toggle.toggled.connect(_on_effects_toggled)
+
+
+# Both effects aim at the center of the enemy, wherever the layout put it.
+func _on_enemy_rect_changed() -> void:
+	var center: Vector2 = _enemy.position + _enemy.size / 2.0
+	_texts.set_target_point(center)
+	_orbs.set_target_point(center)
+
+
+func _on_effects_toggled(enabled: bool) -> void:
+	_display.set_visual_effects(enabled)
+	_apply_visual_effects()
+
+
+func _apply_visual_effects() -> void:
+	var enabled: bool = _display.visual_effects()
+	_texts.set_enabled(enabled)
+	_orbs.set_enabled(enabled)
+	_effects_toggle.text = tr("Effets visuels : OUI") if enabled else tr("Effets visuels : NON")
+
+
+# Modal screens and a hidden tab stop the effects and clear what was running, so that nothing
+# replays when the game goes on.
+func _sync_effects_pause() -> void:
+	var paused: bool = _tab_hidden or _game_waits()
+	if paused == _effects_paused:
+		return
+	_effects_paused = paused
+	_texts.set_paused(paused)
+	_orbs.set_paused(paused)
 
 
 func _on_enemy_clicked() -> void:
@@ -499,7 +551,8 @@ func _on_skill_requested(id: String) -> void:
 	_skill_bar.refresh()
 
 
-func _on_companion_leveled_up(_id: String, _new_level: int) -> void:
+func _on_companion_leveled_up(id: String, new_level: int) -> void:
+	_orbs.set_level(id, new_level)
 	_refresh()
 	_companion_panel.refresh()
 

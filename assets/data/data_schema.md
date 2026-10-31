@@ -24,6 +24,7 @@ same for `boss_curves.json`.
 | `companions` | array of object | yes | One entry per companion (8 in the MVP), in display order. |
 | `companions[].id` | string | yes | Unique stable id; the key used in `GameState.companion_levels`. Renaming one orphans the saved level. |
 | `companions[].name` | string | yes | Display name (French). |
+| `companions[].color` | hex colour string (`"#rrggbb"`) | no | Colour of the companion's sphere and balls on the main screen (story 009, display only). Read by `CompanionOrbs`, not by `Combat`: absent or invalid gives a neutral grey and never breaks the load. |
 | `companions[].base_cost` | digit string (gold) | yes | Gold cost of level 1. |
 | `companions[].base_damage` | digit string (damage per attack) | yes | Damage at level 1, before tiers. |
 | `companions[].cost_growth` | decimal string (unitless factor) | no | Per-level cost multiplier. Default when absent: `cost_growth` of core_curves.json. |

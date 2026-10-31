@@ -36,3 +36,4 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 | 005 | Compétences actives | Logic | Complete | N/A |
 | 006 | Arbre de talents | Logic | Complete | N/A |
 | 007 | Objets et butin | Logic | Complete | N/A |
+| 009 | Retours visuels (hors brief MVP) | Visual/Feel | Complete | N/A |

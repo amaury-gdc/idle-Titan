@@ -1,0 +1,10 @@
+Reviewed-Content-Hash: src/core/display_settings.gd 5123d090cf23a40b3972ec38f6ef0a724a017825
+Reviewed-Content-Hash: src/core/floor_manager.gd a277d29ea08666df5622841671684d7053ae16a9
+Reviewed-Content-Hash: src/core/skill_manager.gd 69910254f80453acc96d560fadaeb5d3b7383bfd
+Reviewed-Content-Hash: src/ui/floating_text_layer.gd 19ad74b1745472648384f9350505972ceddad7a0
+Reviewed-Content-Hash: src/ui/companion_orbs.gd baf20ccc99eb5e3657cc362259c9c093a9d4c097
+Reviewed-Content-Hash: src/ui/main_screen.gd 3290a51647acd3db98d9da3781db3c3baa3eb463
+Reviewed-Content-Hash: src/ui/main_screen.tscn 76fc6a59fea9ea63dbd4cbc99c511c0fb621d644
+Reviewed-Content-Hash: assets/data/companions_roster.json 24317d3c6950bcf179645bcd7d2e72796ac6e343
+Reviewed-Content-Hash: assets/data/data_schema.md a0d6a08e083a498c7cbb73fe59b19a70c725e5d7
+Reviewed-Content-Hash: tests/unit/visual-feedback/visual_feedback_test.gd ad48e3606159ec6f5457db1e4964bc288d417e6a

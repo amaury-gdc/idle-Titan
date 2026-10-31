@@ -139,7 +139,7 @@ func activate(id: String) -> bool:
 	var found: Skill = _by_id[id]
 	found.start(effective_cooldown(found))
 	if found.effect == Skill.Effect.BURST:
-		_floors.apply_damage(burst_damage(found))
+		_floors.apply_damage(burst_damage(found), FloorManager.HitSource.BURST)
 	else:
 		_push_multipliers()
 	return true

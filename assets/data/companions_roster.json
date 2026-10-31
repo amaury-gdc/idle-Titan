@@ -4,6 +4,7 @@
 		{
 			"id": "scout",
 			"name": "Éclaireur",
+			"color": "#8bc34a",
 			"base_cost": "10",
 			"base_damage": "1",
 			"cost_growth": "1.08",
@@ -20,6 +21,7 @@
 		{
 			"id": "spearman",
 			"name": "Lancier",
+			"color": "#4fc3f7",
 			"base_cost": "300",
 			"base_damage": "40",
 			"cost_growth": "1.08",
@@ -36,6 +38,7 @@
 		{
 			"id": "archer",
 			"name": "Archer",
+			"color": "#ffb74d",
 			"base_cost": "9000",
 			"base_damage": "1500",
 			"cost_growth": "1.08",
@@ -52,6 +55,7 @@
 		{
 			"id": "guardian",
 			"name": "Gardien",
+			"color": "#cfd8dc",
 			"base_cost": "270000",
 			"base_damage": "60000",
 			"cost_growth": "1.08",
@@ -68,6 +72,7 @@
 		{
 			"id": "mage",
 			"name": "Mage",
+			"color": "#ba68c8",
 			"base_cost": "8100000",
 			"base_damage": "2300000",
 			"cost_growth": "1.08",
@@ -84,6 +89,7 @@
 		{
 			"id": "knight",
 			"name": "Chevalier",
+			"color": "#fff176",
 			"base_cost": "240000000",
 			"base_damage": "90000000",
 			"cost_growth": "1.08",
@@ -100,6 +106,7 @@
 		{
 			"id": "alchemist",
 			"name": "Alchimiste",
+			"color": "#26a69a",
 			"base_cost": "7200000000",
 			"base_damage": "3500000000",
 			"cost_growth": "1.08",
@@ -116,6 +123,7 @@
 		{
 			"id": "dragon",
 			"name": "Dragon",
+			"color": "#ef5350",
 			"base_cost": "220000000000",
 			"base_damage": "140000000000",
 			"cost_growth": "1.08",
