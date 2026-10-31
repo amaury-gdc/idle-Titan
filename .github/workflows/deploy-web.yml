@@ -1,0 +1,89 @@
+name: Deploy Web Build
+
+# Never on a plain push: a commit on main may be half finished. A version goes
+# out only when someone starts this workflow or pushes a v* tag. It does not run
+# the tests: check that Automated Tests is green on the commit first.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# Two deployments at once would race: the second one waits for the first.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: '4.7.2'
+
+jobs:
+  build:
+    name: Export Web Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      # The templates archive weighs 1.3 GB: only the web templates are kept,
+      # and the cache spares the next runs that download.
+      - name: Restore Godot
+        id: godot-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/godot-engine
+            ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-${{ env.GODOT_VERSION }}-web-${{ runner.os }}
+
+      - name: Download Godot and its web templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p ~/godot-engine
+          unzip -j godot.zip -d ~/godot-engine
+          mv ~/godot-engine/Godot_v* ~/godot-engine/godot
+          unzip -j templates.tpz 'templates/web_*' 'templates/version.txt' \
+            -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          rm godot.zip templates.tpz
+
+      # .godot/ is not committed: a fresh checkout has to import before it can
+      # export. Godot may exit 0 on a failed export, hence the check on the files.
+      - name: Export the Web preset in release mode
+        run: |
+          mkdir -p build/web
+          ~/godot-engine/godot --headless --path . --import
+          ~/godot-engine/godot --headless --path . --export-release "Web" build/web/index.html
+          test -s build/web/index.html
+          test -s build/web/index.pck
+          test -s build/web/index.wasm
+
+      - name: Check that Pages is enabled
+        uses: actions/configure-pages@v6
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/web
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
