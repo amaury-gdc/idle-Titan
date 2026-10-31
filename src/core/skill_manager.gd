@@ -16,8 +16,9 @@ extends RefCounted
 ##                           and bosses) by "multiplier" while active
 ## [/codeblock]
 ## "companion_power + click_damage" reads as one second of damage with one click per second:
-## the click term keeps the burst useful before any companion is bought. The data holds
-## exactly one skill per effect, so buffs never stack.
+## the click term keeps the burst useful before any companion is bought. Both come from
+## [FloorManager], so the burst gets the click and companion talents (story 006). The data
+## holds exactly one skill per effect, so buffs never stack.
 ##
 ## The multipliers are pushed to the [FloorManager] when a buff starts or ends, so the
 ## FloorManager never depends on this class. Offline gold ([OfflineIncome]) does not use them.
@@ -117,9 +118,9 @@ func effective_cooldown(skill_to_check: Skill) -> float:
 
 
 ## Damage the burst [param skill] deals now, before the damage buff:
-## floor((companion_power + click_damage) * dps_seconds).
+## floor((companion_power + click_damage) * dps_seconds), both with their talents.
 func burst_damage(burst: Skill) -> BigNumber:
-	var per_second: BigNumber = _combat.companion_power(_state.companion_levels).add(_combat.click_damage(_state.companion_levels))
+	var per_second: BigNumber = _floors.companion_power().add(_floors.click_damage())
 	return per_second.multiply_decimal(burst.amount)
 
 

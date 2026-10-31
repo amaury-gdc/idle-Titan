@@ -65,8 +65,9 @@ Offline gold (`OfflineIncome`, `src/core/offline_income.gd`), granted once at st
 
 - Counted seconds = min(now - `GameState.last_saved_unix`, `offline_max_hours` * 3600).
 - Gold = floor(companion power * counted seconds * Gold(stage) / HP(stage) *
-  `offline_efficiency`), exact. Stage is `GameState.stage`; Gold and HP are those of the
-  normal enemy of that stage, even on a boss stage. Only gold changes.
+  `offline_efficiency` * talent factor), exact. Stage is `GameState.stage`; Gold and HP are
+  those of the normal enemy of that stage, even on a boss stage. Companion power is the
+  bare sum; the talent factor comes from the `offline_gold` talents only. Only gold changes.
 - No gain when the saved time is unknown, when the elapsed time is zero or negative
   (clock moved back), when it is below `offline_min_seconds`, or with no companion.
 
@@ -109,7 +110,7 @@ damage per second) * `timer_seconds` >= boss HP * `auto_challenge_margin`. Other
 the player keeps farming.
 
 Saved fields: `farming` (bool, default false) in the game save, kept across a reload
-and cleared by `GameState.reset()`; in the permanent save (version 3), `auto_challenge`
+and cleared by `GameState.reset()`; in the permanent save (since version 3), `auto_challenge`
 (bool, default false), a preference that survives run resets, and `boss_hint_shown`
 (bool, default false), set when the message of the first failed boss is shown, so it
 appears only once per player. Older saves load with these at false. If a loaded save says farming but the next stage is not a boss
@@ -140,9 +141,10 @@ screen error, like the files above.
 
 Effects (exact BigNumber, applied by `FloorManager`):
 
-- Burst damage = floor((companion power + click damage) * `dps_seconds`), dealt at once.
-  The click term keeps it useful before the first companion, and companion power makes
-  it scale up to the bosses. It is multiplied by the damage buff when that runs.
+- Burst damage = floor((companion power + click damage) * `dps_seconds`), dealt at once,
+  both terms with their talents. The click term keeps it useful before the first companion,
+  and companion power makes it scale up to the bosses. It is multiplied by the damage buff
+  when that runs.
 - The damage buff applies to clicks, companion attacks and the burst, and always adds at
   least 1 damage per hit: floor(1 * 1.5) would leave the smallest hits untouched. The
   gold bonus applies to the gold of normal kills and boss kills.
@@ -153,7 +155,7 @@ Effects (exact BigNumber, applied by `FloorManager`):
 
 Cooldown modifier: `SkillManager.set_cooldown_modifier(factor)` scales every cooldown
 started afterwards, for the talents of story 006. Default 1.0, never below the duration.
-Not saved: talents will set it again at startup.
+Not saved. No talent uses it for now (story 006).
 
 Time: timers count game time fed to `SkillManager.tick`, cut to 5 s per call
 (`MAX_TICK_SECONDS`, same bound as the companions and the boss countdown), so skills stop
@@ -174,3 +176,60 @@ save has no such key and loads with every skill ready. A malformed entry is drop
 unknown ids are ignored, and values are cut to the current data. As saves happen every
 `autosave_interval_seconds`, a reload can lose up to that much of a timer in either
 direction. The game save has no version number, so none was bumped.
+
+## talents.json
+
+Loaded by `TalentTree` (`src/core/talent_tree.gd`). An invalid or missing file stops the
+game on the main screen error, like the files above.
+
+| Key | Type | Required | Meaning |
+|---|---|---|---|
+| `schema_version` | int | yes | Currently 1. `TalentTree` refuses any other value. |
+| `stages_per_point` | integer >= 1 | yes | One talent point every this many stages reached. Value in file: 5 (brief). |
+| `branches` | array of object | yes | Branches in display order (3 in the MVP), one column each. |
+| `branches[].id` | string | yes | Unique stable id. |
+| `branches[].name` | string | yes | Display name (French). |
+| `nodes` | array of object | yes | The nodes (15 in the MVP). |
+| `nodes[].id` | string | yes | Unique stable id; the key used in `PermanentState.talents`. Renaming one drops the purchase and gives its points back. |
+| `nodes[].branch` | string | yes | Id of its branch. |
+| `nodes[].name` | string | yes | Display name (French). |
+| `nodes[].cost` | integer >= 1 (talent points) | yes | Points it costs. |
+| `nodes[].requires` | array of string | no, default [] | Ids of the nodes to buy first, ALL of them. They must come earlier in the file and in the same branch, so no cycle is possible. The longest chain above a node gives its row on screen. |
+| `nodes[].effect.stat` | string | yes | `click_damage` (damage of a click), `companion_damage` (damage of the companions' attacks), `gold` (gold of every kill, boss kills included) or `offline_gold` (gold of an absence). |
+| `nodes[].effect.percent` | integer >= 1 (percent) | yes | Bonus added to that stat. |
+
+Points (`TalentTree`):
+
+- Earned = floor(`PermanentState.best_stage_record` / `stages_per_point`). A stage counts as
+  reached as soon as its fight begins, like the score.
+- Spent = sum of the current `cost` of the bought nodes. It is derived, not stored: a
+  retuned cost applies to old saves at once, and a reset gives back exactly what is spent.
+- Available = max(earned - spent, 0). If a retuned cost puts spent above earned, nothing can
+  be bought until a reset.
+- A node can be bought when all its `requires` are bought and available >= `cost`.
+- The reset is free, possible at any time, and removes every bought node.
+
+Effects (exact BigNumber, applied by `FloorManager`, offline gold by `OfflineIncome`):
+
+- The percentages of a stat add up: two nodes of +10% give +20%, not +21%.
+- Value with talents = floor(value * (1 + sum of percentages / 100)), and at least value + 1,
+  the same minimum as the damage buff: a bonus must not round to nothing on a small value.
+- Click: applied to the whole click damage (base + companion share). The share itself stays
+  based on the companions' power WITHOUT their talents.
+- Companions: applied to each attack, to the DPS of the companion panel and to the DPS line.
+- Gold: applied to the gold of a kill, before the gold bonus of the skills.
+- Skill buffs multiply the result: damage = floor(floor(base * talents) * buff). The talent
+  and buff minimums of +1 stack on the smallest hits.
+- `FloorManager.can_beat_next_boss` counts the talents, as they are permanent.
+- The burst of "Gros coup" (`SkillManager.burst_damage`) reads the click damage and the
+  companion power from `FloorManager`, so it gets both talents.
+- `OfflineIncome` gets `offline_gold` only, multiplied into the formula above; `gold` does
+  not apply to an absence. Its factor has no minimum of +1.
+
+Saved fields, in the permanent save (version 4): `talents` (id -> rank, 1 for a bought node;
+ids unknown to the data are kept and ignored) and `best_stage_record` (int, default 0), the
+highest `GameState.max_stage_reached` ever seen, never lowered. The record is needed because
+`GameState.reset()` sets `max_stage_reached` back to 1 while the talents survive: without it
+the available points would go negative. An older save has no record and starts from the
+`max_stage_reached` of the game save at the first query. The field `talent_points` is still
+read and written so older saves keep their value, but nothing uses it since version 4.

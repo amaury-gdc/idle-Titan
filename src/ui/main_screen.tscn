@@ -1,10 +1,11 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
 [ext_resource type="PackedScene" path="res://src/ui/companion_panel.tscn" id="3_panel"]
 [ext_resource type="PackedScene" path="res://src/ui/boss_timer.tscn" id="4_boss"]
 [ext_resource type="PackedScene" path="res://src/ui/skill_bar.tscn" id="5_skills"]
+[ext_resource type="PackedScene" path="res://src/ui/talent_screen.tscn" id="6_talents"]
 
 [sub_resource type="StyleBoxFlat" id="auto_off"]
 bg_color = Color(0.25, 0.25, 0.3, 1)
@@ -310,7 +311,9 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 405.0
 offset_top = -90.0
+offset_right = -375.0
 offset_bottom = -30.0
 grow_horizontal = 2
 grow_vertical = 0
@@ -336,6 +339,26 @@ theme_override_styles/hover = SubResource("auto_off_hover")
 theme_override_styles/pressed = SubResource("auto_on")
 toggle_mode = true
 text = "Défi automatique : NON"
+
+[node name="TalentsButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -360.0
+offset_top = -84.0
+offset_right = -10.0
+offset_bottom = -36.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("auto_off")
+theme_override_styles/hover = SubResource("auto_off_hover")
+theme_override_styles/pressed = SubResource("auto_off_hover")
+text = "Talents (points : 0)"
 
 [node name="CompanionPanel" parent="." instance=ExtResource("3_panel")]
 unique_name_in_owner = true
@@ -384,6 +407,10 @@ theme_override_font_sizes/font_size = 28
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
+
+[node name="TalentScreen" parent="." instance=ExtResource("6_talents")]
+unique_name_in_owner = true
+layout_mode = 1
 
 [node name="OfflineBlocker" type="ColorRect" parent="."]
 unique_name_in_owner = true

@@ -65,16 +65,16 @@ func level(id: String) -> int:
 	return maxi(int(_state.companion_levels.get(id, 0)), 0)
 
 
-## Damage of one attack of [param id] at its current level (0 when not bought).
-## [param id] must be in the roster.
+## Damage of one attack of [param id] at its current level, with the companion talents
+## (story 006); 0 when not bought. [param id] must be in the roster.
 func damage(id: String) -> BigNumber:
-	return _combat.companion(id).damage_at_level(level(id))
+	return _floors.companion_damage(_combat.companion(id).damage_at_level(level(id)))
 
 
-## Damage per second of [param id] at its current level (0 when not bought).
-## [param id] must be in the roster.
+## Damage per second of [param id] at its current level, with the companion talents;
+## 0 when not bought. [param id] must be in the roster.
 func damage_per_second(id: String) -> BigNumber:
-	return _combat.companion(id).damage_per_second_at_level(level(id))
+	return _floors.companion_damage(_combat.companion(id).damage_per_second_at_level(level(id)))
 
 
 ## Gold cost of the next level of [param id] (level 1 when not bought).
@@ -103,10 +103,11 @@ func buy_or_upgrade(id: String) -> bool:
 	return true
 
 
-## Total companion power as used by the click formula (sum of damage per second,
-## see [method Combat.companion_power]).
+## Total damage per second of the companions, with the companion talents (story 006).
+## The click formula and the offline gold use the bare sum of [method Combat.companion_power]
+## instead.
 func total_power() -> BigNumber:
-	return _combat.companion_power(_state.companion_levels)
+	return _floors.companion_power()
 
 
 ## Advances time by [param delta] seconds (clamped to 0..[constant MAX_TICK_SECONDS]).
@@ -127,7 +128,7 @@ func tick(delta: float) -> void:
 		_elapsed[companion.id] = elapsed - float(attacks) * companion.attack_interval_seconds
 		if attacks == 0:
 			continue
-		var attack_damage: BigNumber = companion.damage_at_level(current_level)
+		var attack_damage: BigNumber = _floors.companion_damage(companion.damage_at_level(current_level))
 		for i in attacks:
 			_floors.apply_damage(attack_damage)
 			companion_attacked.emit(companion.id, attack_damage)

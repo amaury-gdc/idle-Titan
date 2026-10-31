@@ -1,7 +1,7 @@
 class_name PermanentState
 extends RefCounted
-## State that survives run resets: talent points/ranks and (later) artifacts.
-## Saved separately from [GameState].
+## State that survives run resets: talents, the stage record that earns their points,
+## player preferences and (later) artifacts. Saved separately from [GameState].
 ##
 ## Versioning: [constant CURRENT_VERSION] is written on save. from_dict() reads
 ## every known field with a default and ignores unknown keys, so adding a field
@@ -15,12 +15,20 @@ extends RefCounted
 ## [/codeblock]
 
 ## Save-format version written by this build.
-const CURRENT_VERSION: int = 3
+const CURRENT_VERSION: int = 4
 
-## Unspent talent points.
+## Unused since version 4, kept so that older saves keep their value: spent points are
+## derived from [member talents] and their costs, earned points from
+## [member best_stage_record] (see [TalentTree]).
 var talent_points: int = 0
-## Talent id (String) -> rank (int).
+## Talent id (String) -> rank (int); a bought node has rank 1 (story 006). Ids that the
+## talent data no longer knows are kept untouched and ignored by [TalentTree].
 var talents: Dictionary = {}
+## Highest stage ever reached, across runs (story 006). [member GameState.max_stage_reached]
+## is reset with the run, but the talents it paid for are not: this record, raised by
+## [method TalentTree.sync_best_stage] and never lowered, keeps the earned points above
+## the spent ones after a reset. Added in version 4; 0 means unknown.
+var best_stage_record: int = 0
 ## Reserved for post-V1 artifacts; stored untouched.
 var artifacts: Array = []
 ## Player preference "Défi automatique" (story 004): a kill in farm mode starts the
@@ -38,6 +46,7 @@ func to_dict() -> Dictionary:
 		"version": CURRENT_VERSION,
 		"talent_points": talent_points,
 		"talents": talents.duplicate(),
+		"best_stage_record": best_stage_record,
 		"artifacts": artifacts.duplicate(),
 		"auto_challenge": auto_challenge,
 		"boss_hint_shown": boss_hint_shown,
@@ -57,6 +66,9 @@ static func from_dict(data: Dictionary) -> PermanentState:
 			var rank: Variant = t[id]
 			if id is String and (rank is float or rank is int):
 				state.talents[id] = maxi(int(rank), 0)
+	var record: Variant = data.get("best_stage_record", 0)
+	if record is float or record is int:
+		state.best_stage_record = maxi(int(record), 0)
 	var a: Variant = data.get("artifacts", [])
 	if a is Array:
 		state.artifacts = a.duplicate()

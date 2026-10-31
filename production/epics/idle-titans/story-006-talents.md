@@ -1,12 +1,12 @@
 # Story 006: Arbre de talents
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: L
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-31
 
 ## Context
 
@@ -48,18 +48,21 @@
 ## Out of Scope
 
 - [Story 007]: objets.
-- Talents liés au hors-ligne (non prévus en V1).
 
 ---
 
 ## Files
 
-- `src/core/talent_tree.gd`
-- `src/ui/talent_screen.tscn`, `src/ui/talent_screen.gd`
+- `src/core/talent_tree.gd`, `.uid`
+- `src/ui/talent_screen.tscn`, `src/ui/talent_screen.gd`, `.uid`
 - `assets/data/talents.json`
+- `src/core/floor_manager.gd`, `src/core/companion_manager.gd`, `src/core/permanent_state.gd`
+- `src/core/offline_income.gd`, `src/core/skill_manager.gd`
 - `tests/unit/talents/talents_test.gd`
-
----
+- `design/game-brief.md`
+- `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
+- `tools/simulate_progress.gd`
+- `assets/data/data_schema.md`, `assets/data/balance_notes.md`
 
 ## QA Test Cases
 
@@ -74,7 +77,7 @@
 **Story Type**: Logic
 **Required evidence**: `tests/unit/talents/talents_test.gd` (facultatif) ; capture d'écran conservée dans `production/qa/evidence/`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created: `tests/unit/talents/talents_test.gd`, 31 tests
 
 ---
 
@@ -82,3 +85,18 @@
 
 - Depends on: `production/epics/idle-titans/story-005-skills.md`
 - Unlocks: `production/epics/idle-titans/story-007-loot.md`
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-31
+**Criteria**: 8/8 passing. À tester par Amaury, non vérifié ici : clic réel au pointeur dans l'arbre, Tab et manette (contrôlés seulement sans affichage), sensation des bonus de 2 à 10 %.
+**Deviations**:
+- Points dépensés déduits des nœuds achetés (non stockés), `talent_points` conservé sans usage, `best_stage_record` ajouté à la sauvegarde (v4).
+- À la demande d'Amaury : « Gros coup » profite des talents de clic et de compagnons ; nœud Rentes (+25 % d'or hors-ligne) ajouté, la ligne « hors périmètre » retirée de la story ; brief mis à jour.
+- Fichiers hors liste `## Files` : `.godot/global_script_class_cache.cfg` (généré, suivi volontairement), `EPIC.md`, `story-005-skills.md`, `production/bilan-2026-10-31.md` (restes de la 005), `tools/simulate_progress.gd`.
+- `SkillManager._combat` n'est plus utilisé (le retirer touche aux tests de la 005).
+- Valeurs provisoires (%, coûts, Rentes, mur avant l'étage 130) : réglage unique après la story 007. Premier boss à 1,5 min, sous la cible de 2 à 3 min.
+**Test Evidence**: `tests/unit/talents/talents_test.gd` (31 tests, suite 137/137) ; captures dans `production/qa/evidence/story-006-talents/`, stamp à jour.
+**Reviewed by**: self, no independent review

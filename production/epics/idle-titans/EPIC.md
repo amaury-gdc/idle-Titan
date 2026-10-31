@@ -33,6 +33,6 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 | 003 | Compagnons et paliers | Logic | Complete | N/A |
 | 004 | Boss et repli | Logic | Complete | N/A |
 | 004b | Progression hors-ligne | Logic | Complete | N/A |
-| 005 | Compétences actives | Logic | Complete (critère 2 à tester) | N/A |
-| 006 | Arbre de talents | Logic | Ready | N/A |
+| 005 | Compétences actives | Logic | Complete | N/A |
+| 006 | Arbre de talents | Logic | Complete | N/A |
 | 007 | Objets et butin | Logic | Ready | N/A |

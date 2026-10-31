@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004, 004b, 005)
+# Balance notes (stories 003, 004, 004b, 005, 006)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -9,6 +9,87 @@ The numbers that apply to the game today are in "Bosses".
 Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
+
+## Talents (story 006)
+
+Values in `talents.json` (rules in `data_schema.md`): 1 point every 5 stages; each branch
+costs 1, 1, 2, 3 and 5 points, 36 in all; Clic +4, +4, +4, +6, +10%; Compagnons and Économie
++2, +2, +2, +4, +6%. Économie also has "Rentes": 2 points, needs Butin, +25% offline gold
+(`offline_efficiency` 0.1 reads as 0.125), so 38 points in all.
+
+**Target, decided on 2026-10-31: a net wall before stage 130, inside the brief's range.** It
+replaces the stage 110 target of story 003. Boss HP and the curves are not touched now: story
+007 adds another source of power, so the tuning is done once, after it, with every source in
+place. All the talent values here are provisional until then.
+
+    <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=72 --auto=1 --skills=1 --away=0.5:8,3:8,6:12,24:8,36:8,48:12 --talents=1
+
+3 clicks/s, `--auto=1`, `--skills=1`, 72 h of active play, six returns. Times are active
+play. Points are spent greedily, once per simulated second; `--build=` sets which branch
+comes first. The greedy model never saves points, so it never buys a node of 5: the three
+builds differ early and end alike, with the first four nodes of each branch.
+
+| Run | First boss reached | First boss killed | Stage 50 | Stage 100 | Stage 110 | Stage 120 | Best at 72 h | Failed |
+|---|---|---|---|---|---|---|---|---|
+| No talents | 1.9 min | 8.0 min | 34.7 min | 6.02 h | 8.61 h | 85.3 h (110 h run) | 110 | 11 |
+| Kept, Clic first | 1.5 min | 6.9 min | 30.5 min | 5.52 h | 6.89 h | 47.2 h | 120 | 12 |
+| Kept, Compagnons first | 1.7 min | 7.2 min | 30.6 min | 5.47 h | 6.91 h | 47.2 h | 120 | 12 |
+| Kept, Économie first | 1.8 min | 7.6 min | 30.5 min | 5.46 h | 6.90 h | 47.1 h | 120 | 12 |
+| Compagnons and Économie complete (24 points) | not read | not read | 30.5 min | 5.27 h | 6.59 h | 45.0 h | 120 | 12 |
+| **Current game**: Rentes, talents in "Gros coup", default order | 1.5 min | 6.8 min | 30.5 min | 5.55 h | 6.83 h | 48.0 h | 120 | 12 |
+
+The "Current game" row is the only one measured with Rentes and with "Gros coup" reading the
+talents; the others predate both. It ends with 23 of 24 points spent: click x1.18, companions
+x1.10, gold x1.10, offline gold x1.25. Stage 130 is not reached, so the wall holds. Stage 120
+comes 0.8 h later than the Clic first row, probably because the 2 points of Rentes leave
+Compagnons or Économie (not measured apart). It is one run, not a build comparison.
+
+The fifth row is the strongest end state with those two branches, +16% companions and +16%
+gold, measured on a copy of the data where the two nodes of 5 cost 1. It gets them earlier
+than a real player could, so it is an upper bound on these two branches. Stage 130 is not
+reached either. Other splits of the 24 points were not measured.
+
+Without absences, stage 50 comes at 42.6 min with talents, against 46.4 min without (-8%),
+in either build. In the table above stage 50 falls just after the first return, so 30.5 min
+says more about that return than about the talents.
+
+Variants tried, Compagnons or Économie first. Factors are what the run owned at 72 h, click /
+companions / gold. Costs are per branch.
+
+| Costs | Factors | Stage 100 | Stage 120 |
+|---|---|---|---|
+| 1, 1, 1, 2, 3 (first try, full tree at 24 points) | +110 / +80 / +80% | 3.0 h | 17.8 h |
+| same | +70 / +40 / +40% | 4.0 h | 26.4 h |
+| same | +40 / +25 / +25% | 4.8 h | 31.8 h |
+| same | +20 / +12 / +12% | 5.4 h | 46.2 h |
+| 1, 1, 2, 3, 5 | +25 / +15 / +15% | 5.2 h | 42.3 h |
+| same (kept) | +18 / +10 / +10% | 5.5 h | 47.2 h |
+| same | +10 / +5 / +5% | 5.9 h | 62.6 h |
+| same | +8 / +4 / +4% | 5.9 h | 64.8 h |
+
+The former target is missed: **stage 110 is passed within 72 h, by every variant tried.** It
+cannot be held with bonuses a player would notice, hence the new target above. Without talents the boss of stage 110
+falls at 85.3 h, so the 72 h run stopped only 13 h before it; even +4% moves that to
+64.8 h. The kept values were not tuned further: below them a node reads as nothing.
+
+Why these values: the wall stays net, one boss later. With the kept values the boss of stage
+110 costs about 40 h of farm, then the boss of stage 120 holds until the end of the run:
+stage 130 is not reached in 72 h, even with the two branches complete. That is inside the brief's range (a net wall between stages
+100 and 150). The costs 1, 1, 2, 3, 5 leave the whole tree out of reach (36 points, 24 at
+stage 120), so a build means giving something up.
+
+Limits:
+
+- The greedy model spends in data order and leaves points unspent when the next node costs
+  more: the runs end with 3 points left. It tests no reset.
+- Whether one branch beats the others is not shown by these numbers: the greedy builds
+  converge, and bonuses this small move the curve little. To check in playtest.
+- First boss with Clic first: 1.5 min, against a 2 to 3 min target. Already 1.9 min without
+  talents. The first point comes at stage 5 and the minimum of +1 per hit weighs on small
+  clicks. Left as it is, like the same point on the damage buff above.
+- Talents are measured with the "each skill as soon as ready" model, which never misses.
+- No talent changes skill cooldowns, so those are not measured. "Gros coup" gets the click and
+  companion talents; the +25% of Rentes is the first guess, not a tuned value.
 
 ## Active skills (story 005)
 

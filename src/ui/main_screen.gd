@@ -3,7 +3,9 @@ extends Control
 ## the enemy, its HP bar, the boss banner or the "Défier le boss" button of farm mode,
 ## the "Défi automatique" toggle, the score (best stage reached, kept after a boss
 ## fallback), the companion panel and the message shown on return after an absence.
-## The skill bar (story 005) sits in the free column left of the enemy.
+## The skill bar (story 005) sits in the free column left of the enemy. The talent tree
+## (story 006) opens over everything: while it is open the game waits, as it does behind the
+## return message, and the keyboard focus cannot leave it.
 ## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
 ## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] core, feeds it frame time,
 ## forwards clicks to it and redraws on its signals. All rules live in src/core; this
@@ -25,6 +27,7 @@ const CURVES_PATH: String = "res://assets/data/core_curves.json"
 const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const SKILLS_PATH: String = "res://assets/data/skills.json"
+const TALENTS_PATH: String = "res://assets/data/talents.json"
 ## Used only when core_curves.json has no valid autosave_interval_seconds
 ## (infrastructure setting, not a gameplay value).
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
@@ -41,6 +44,7 @@ var _saves: SaveManager
 var _floors: FloorManager
 var _companions: CompanionManager
 var _skills: SkillManager
+var _talents: TalentTree
 var _autosave_timer: Timer
 var _offline: OfflineIncome
 var _document: JavaScriptObject
@@ -64,6 +68,8 @@ var _tab_visibility_callback: JavaScriptObject
 @onready var _abandon_button: Button = %AbandonButton
 @onready var _auto_toggle: Button = %AutoChallengeToggle
 @onready var _boss_hint_label: Label = %BossHintLabel
+@onready var _talents_button: Button = %TalentsButton
+@onready var _talent_screen: TalentScreen = %TalentScreen
 @onready var _offline_blocker: ColorRect = %OfflineBlocker
 @onready var _offline_panel: PanelContainer = %OfflinePanel
 @onready var _offline_message: Label = %OfflineMessage
@@ -91,6 +97,11 @@ func _ready() -> void:
 	if not _skills.is_valid():
 		_show_error(_skills.get_error())
 		return
+	_talents = TalentTree.from_data(DataLoader.load_json(TALENTS_PATH), _permanent, _game)
+	if not _talents.is_valid():
+		_show_error(_talents.get_error())
+		return
+	_talents.apply_to(_floors, _offline)
 	var offline_gain: Dictionary = _grant_offline_gold()
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
@@ -108,6 +119,13 @@ func _ready() -> void:
 	_companion_panel.setup(_companions)
 	_skill_bar.activate_requested.connect(_on_skill_requested)
 	_skill_bar.setup(_skills)
+	_talents.changed.connect(_on_talents_changed)
+	_talent_screen.buy_requested.connect(_on_talent_buy_requested)
+	_talent_screen.reset_requested.connect(_on_talent_reset_requested)
+	_talent_screen.closed.connect(_on_talents_closed)
+	_talent_screen.setup(_talents)
+	_talents_button.pressed.connect(_on_talents_pressed)
+	_refresh_talents_button()
 	_start_autosave(curves)
 	_enemy.set_stage(_game.stage, _floors.is_boss_fight())
 	_refresh()
@@ -120,8 +138,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The game waits behind the return message: a boss countdown must not run out on it.
-	if _companions == null or _offline_panel.visible:
+	# The game waits behind the return message and the talent tree: a boss countdown must
+	# not run out on them.
+	if _companions == null or _game_waits():
 		return
 	# Damage first, then the boss countdown (see FloorManager: a boss killed this
 	# frame is killed even if this frame's delta would have run the countdown out).
@@ -157,6 +176,7 @@ func _show_error(error: String) -> void:
 	_companion_panel.visible = false
 	_skill_bar.visible = false
 	_dps_label.visible = false
+	_talents_button.visible = false
 
 
 func _start_autosave(curves: Variant) -> void:
@@ -176,6 +196,8 @@ func _save() -> void:
 		return
 	if _skills != null and _skills.is_valid():
 		_skills.save_to(_game)
+	if _talents != null and _talents.is_valid():
+		_talents.sync_best_stage()
 	_saves.save(_game, _permanent)
 
 
@@ -206,6 +228,8 @@ func _on_tab_visibility_changed(_args: Array) -> void:
 
 
 func _show_offline_gain(gain: Dictionary) -> void:
+	# A web return can come while the tree is open: the message goes first.
+	_talent_screen.close()
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
 	if gain["capped"]:
@@ -233,6 +257,41 @@ func _format_duration(seconds: int) -> String:
 	return tr("%d s") % seconds
 
 
+func _game_waits() -> bool:
+	return _offline_panel.visible or _talent_screen.visible
+
+
+func _on_talents_pressed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
+	_talent_screen.open()
+
+
+func _on_talents_closed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
+	_talents_button.grab_focus()
+
+
+func _on_talent_buy_requested(id: String) -> void:
+	_talents.buy(id)
+
+
+func _on_talent_reset_requested() -> void:
+	_talents.reset()
+
+
+func _on_talents_changed() -> void:
+	_talents.apply_to(_floors, _offline)
+	_talent_screen.refresh()
+	_refresh_talents_button()
+	_refresh()
+	_companion_panel.refresh()
+	_refresh_dps()
+
+
+func _refresh_talents_button() -> void:
+	_talents_button.text = tr("Talents (points : %d)") % _talents.available_points()
+
+
 func _on_enemy_clicked() -> void:
 	_click_dps.record(_floors.click())
 	_enemy.play_hit()
@@ -246,6 +305,7 @@ func _on_stage_started(stage: int, _max_hp: BigNumber) -> void:
 	_enemy.set_stage(stage, _floors.is_boss_fight())
 	_refresh()
 	_companion_panel.refresh()
+	_refresh_talents_button()
 
 
 func _on_farming_changed(farming: bool) -> void:
@@ -283,8 +343,8 @@ func _on_companion_buy_requested(id: String) -> void:
 
 
 func _on_skill_requested(id: String) -> void:
-	# Behind the return message the game is paused (see _process): so are the skills.
-	if _offline_panel.visible:
+	# Behind a modal the game is paused (see _process): so are the skills.
+	if _game_waits():
 		return
 	_skills.activate(id)
 	_skill_bar.refresh()

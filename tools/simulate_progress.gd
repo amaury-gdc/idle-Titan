@@ -24,6 +24,10 @@ extends SceneTree
 ## as it is ready; 2 = the gold bonus as soon as it is ready, the burst and the damage buff
 ## only during a boss fight (the way a player who knows the game would use them).
 ## --skillsdata=<path> replaces skills.json.
+## --talents=1 (story 006) spends the points on the real [TalentTree] as soon as they are
+## earned, greedily: the first buyable node in data order, checked once per simulated
+## second (default 0, no talents). --build=<branch>,<branch> looks at the nodes of these
+## branches first (ids of talents.json); --talentsdata=<path> replaces talents.json.
 ## Report: time to the first boss fight, to the first boss kill, to stages 50/100/150,
 ## the stage at 3 h and the number of failed boss attempts (at each milestone and at the
 ## end). With --away, milestones also give the wall time (active + away) and each
@@ -40,6 +44,7 @@ const CURVES_PATH: String = "res://assets/data/core_curves.json"
 const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const SKILLS_PATH: String = "res://assets/data/skills.json"
+const TALENTS_PATH: String = "res://assets/data/talents.json"
 ## Stages reported by the run besides the first boss fight and the first boss kill,
 ## which come from the boss data (measurement points, not balance values).
 const MILESTONES: Array[int] = [50, 100, 110, 120, 130, 150]
@@ -74,11 +79,11 @@ func _init() -> void:
 		printerr("simulate_progress: " + offline.get_error())
 		quit(1)
 		return
-	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"])
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"])
 	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String) -> bool:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
@@ -90,6 +95,14 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		if not skills.is_valid():
 			printerr("simulate_progress: " + skills.get_error())
 			return false
+	var talents: TalentTree = null
+	var talent_order: Array[String] = []
+	if use_talents:
+		talents = TalentTree.from_data(DataLoader.load_json(talents_path), permanent, state)
+		if not talents.is_valid():
+			printerr("simulate_progress: " + talents.get_error())
+			return false
+		talent_order = _talent_order(talents, build)
 	var skill_uses: Array[int] = [0, 0, 0]
 	var failed_attempts: Array[int] = [0]
 	floors.boss_failed.connect(func(_failed: int, _back_to: int) -> void: failed_attempts[0] += 1)
@@ -104,6 +117,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	var cps_factor: String = "%.3f" % cps
 	var skill_text: String = ["none", "each skill as soon as it is ready", "gold bonus when ready, burst and damage buff in boss fights only"][clampi(skill_mode, 0, 2)]
 	print("Player model: %.2f clicks/s without pause, cheapest affordable level bought after every %.2f s step; boss countdown %.0f s; farm mode exit: %s; skills: %s" % [cps, dt, boss.timer_seconds(), "auto challenge setting" if auto else "challenge when expected damage covers the boss HP", skill_text])
+	if talents != null:
+		print("Talents: greedy, order %s" % str(talent_order))
 	var report_step: int = int(REPORT_STAGE_AT_HOURS * SECONDS_PER_HOUR / dt)
 	var steps: int = int(hours * SECONDS_PER_HOUR / dt)
 	var next_milestone: int = 0
@@ -138,6 +153,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			skills.tick(dt)
 		while _buy_cheapest_affordable(companions):
 			pass
+		if talents != null and step % check_every == 0 and talents.available_points() > 0:
+			_spend_talents(talents, talent_order, floors, offline)
 		if floors.is_farming() and step % check_every == 0:
 			floors.set_click_dps(floors.click_damage().multiply_decimal(cps_factor))
 			if not auto and floors.can_beat_next_boss():
@@ -158,6 +175,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	for i in range(next_milestone, milestones.size()):
 		print("Stage %d NOT reached in %.1f h" % [milestones[i], hours])
 	print("End of run at %.1f h: best stage %d (current %d), failed boss attempts %d, levels %s" % [hours, state.max_stage_reached, state.stage, failed_attempts[0], str(state.companion_levels)])
+	if talents != null:
+		print("Talents at the end: %d earned, %d spent, %d left; click x%s, companions x%s, gold x%s, offline gold x%s" % [talents.earned_points(), talents.spent_points(), talents.available_points(), talents.factor(TalentTree.STAT_CLICK_DAMAGE), talents.factor(TalentTree.STAT_COMPANION_DAMAGE), talents.factor(TalentTree.STAT_GOLD), talents.factor(TalentTree.STAT_OFFLINE_GOLD)])
 	if skills != null:
 		print("Skill activations: %d big hits, %d damage buffs, %d gold bonuses" % [skill_uses[0], skill_uses[1], skill_uses[2]])
 	print("Real time: %.1f s" % (float(Time.get_ticks_msec() - started_ms) / 1000.0))
@@ -194,6 +213,30 @@ func _use_skills(skills: SkillManager, floors: FloorManager, mode: int, uses: Ar
 		uses[int(skill.effect)] += 1
 
 
+# Node ids in buying order: the branches of [param build] first, then data order.
+func _talent_order(talents: TalentTree, build: String) -> Array[String]:
+	var order: Array[String] = []
+	for branch: String in build.split(",", false):
+		for def: TalentTree.TalentDef in talents.nodes_of(branch):
+			order.append(def.id)
+	for def: TalentTree.TalentDef in talents.nodes():
+		if not order.has(def.id):
+			order.append(def.id)
+	return order
+
+
+# Buys the first buyable node of [param order], again and again, then updates the formulas.
+func _spend_talents(talents: TalentTree, order: Array[String], floors: FloorManager, offline: OfflineIncome) -> void:
+	var bought: bool = true
+	while bought:
+		bought = false
+		for id: String in order:
+			if talents.buy(id):
+				bought = true
+				break
+	talents.apply_to(floors, offline)
+
+
 func _buy_cheapest_affordable(companions: CompanionManager) -> bool:
 	var best_id: String = ""
 	var best_cost: BigNumber = null
@@ -220,7 +263,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": ""}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

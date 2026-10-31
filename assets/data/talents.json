@@ -1,0 +1,29 @@
+{
+	"schema_version": 1,
+	"stages_per_point": 5,
+	"branches": [
+		{ "id": "click", "name": "Clic" },
+		{ "id": "companions", "name": "Compagnons" },
+		{ "id": "economy", "name": "Économie" }
+	],
+	"nodes": [
+		{ "id": "click_1", "branch": "click", "name": "Poigne ferme", "cost": 1, "requires": [], "effect": { "stat": "click_damage", "percent": 4 } },
+		{ "id": "click_2", "branch": "click", "name": "Coup précis", "cost": 1, "requires": ["click_1"], "effect": { "stat": "click_damage", "percent": 4 } },
+		{ "id": "click_3", "branch": "click", "name": "Coup lourd", "cost": 2, "requires": ["click_1"], "effect": { "stat": "click_damage", "percent": 4 } },
+		{ "id": "click_4", "branch": "click", "name": "Frappe double", "cost": 3, "requires": ["click_2", "click_3"], "effect": { "stat": "click_damage", "percent": 6 } },
+		{ "id": "click_5", "branch": "click", "name": "Maître du clic", "cost": 5, "requires": ["click_4"], "effect": { "stat": "click_damage", "percent": 10 } },
+
+		{ "id": "companions_1", "branch": "companions", "name": "Camaraderie", "cost": 1, "requires": [], "effect": { "stat": "companion_damage", "percent": 2 } },
+		{ "id": "companions_2", "branch": "companions", "name": "Entraînement", "cost": 1, "requires": ["companions_1"], "effect": { "stat": "companion_damage", "percent": 2 } },
+		{ "id": "companions_3", "branch": "companions", "name": "Discipline", "cost": 2, "requires": ["companions_1"], "effect": { "stat": "companion_damage", "percent": 2 } },
+		{ "id": "companions_4", "branch": "companions", "name": "Formation", "cost": 3, "requires": ["companions_2", "companions_3"], "effect": { "stat": "companion_damage", "percent": 4 } },
+		{ "id": "companions_5", "branch": "companions", "name": "Légion", "cost": 5, "requires": ["companions_4"], "effect": { "stat": "companion_damage", "percent": 6 } },
+
+		{ "id": "economy_1", "branch": "economy", "name": "Bourse", "cost": 1, "requires": [], "effect": { "stat": "gold", "percent": 2 } },
+		{ "id": "economy_2", "branch": "economy", "name": "Butin", "cost": 1, "requires": ["economy_1"], "effect": { "stat": "gold", "percent": 2 } },
+		{ "id": "economy_3", "branch": "economy", "name": "Trésor", "cost": 2, "requires": ["economy_1"], "effect": { "stat": "gold", "percent": 2 } },
+		{ "id": "economy_4", "branch": "economy", "name": "Négoce", "cost": 3, "requires": ["economy_2", "economy_3"], "effect": { "stat": "gold", "percent": 4 } },
+		{ "id": "economy_offline", "branch": "economy", "name": "Rentes", "cost": 2, "requires": ["economy_2"], "effect": { "stat": "offline_gold", "percent": 25 } },
+		{ "id": "economy_5", "branch": "economy", "name": "Fortune", "cost": 5, "requires": ["economy_4"], "effect": { "stat": "gold", "percent": 6 } }
+	]
+}

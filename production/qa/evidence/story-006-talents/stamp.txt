@@ -1,0 +1,13 @@
+Reviewed-Content-Hash: src/core/talent_tree.gd c99d5884a74f68897b8de194c64080fc36f2c651
+Reviewed-Content-Hash: src/ui/talent_screen.gd 0e092ba6c4588385e155b5695d85f56f9e5a9f26
+Reviewed-Content-Hash: src/ui/talent_screen.tscn 61ca32ee254574f533429b1b051a3c2e9bb0ccd6
+Reviewed-Content-Hash: assets/data/talents.json bd90a84e3c2054a2c9e2f3b8660fc96abe7b85cd
+Reviewed-Content-Hash: src/core/floor_manager.gd 31d573a32fa731c14474d3d122af6d93d91391c8
+Reviewed-Content-Hash: src/core/companion_manager.gd f4ec473fa13d6669acb8dbd38fdeef27ca60073d
+Reviewed-Content-Hash: src/core/permanent_state.gd 30b060af3d48100a45f24fa7e7298fd1e9db627d
+Reviewed-Content-Hash: src/core/offline_income.gd e80e80f2ee64310d636a381b5d895ce9a780fef1
+Reviewed-Content-Hash: src/core/skill_manager.gd 121e4c46762fbfa93c170465705fc7bdcda5d417
+Reviewed-Content-Hash: src/ui/main_screen.gd 261e111ebd3f8452e7337d0ed6633d83c3116754
+Reviewed-Content-Hash: src/ui/main_screen.tscn e3e2fbaca0c2155763074ea2a3431bd4b736006e
+Reviewed-Content-Hash: tools/simulate_progress.gd ad19e1fd1b277aa5de17e3ee2f249e128a5bbabe
+Reviewed-Content-Hash: tests/unit/talents/talents_test.gd f36cec44178895e0fbec59ea739e2d8ca6f8191a

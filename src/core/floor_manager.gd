@@ -32,6 +32,16 @@ extends RefCounted
 ## scores 10 even if the boss is never beaten. The record is never lowered by a
 ## fallback.
 ##
+## TALENTS (story 006): the permanent bonuses of [TalentTree] are pushed here with
+## [method set_talent_modifiers] and kept apart from the skill buffs above, which
+## [SkillManager] overwrites each time a buff starts or ends. Each is one factor applied
+## at one place: click damage in [method click_damage], companion damage in
+## [method companion_damage] / [method companion_power], kill gold in [method apply_damage].
+## They come BEFORE the skill buffs: a click is floor(base * talent) then, if the damage
+## buff runs, floor(that * buff); the two minimums of +1 stack on the smallest hits.
+## The skill burst ([method SkillManager.burst_damage]) gets the click and companion factors
+## through those two methods. Offline gold has its own talent, see [OfflineIncome].
+##
 ## Order inside one frame: damage (clicks, companion attacks) is applied first, then
 ## [method tick] advances the countdown. A boss killed by the damage of a frame is
 ## therefore killed even when that same frame's delta would have run the countdown
@@ -94,6 +104,10 @@ var _click_dps: BigNumber = BigNumber.new()
 ## (story 005) while a buff runs. "1" means none; compared as a string to skip the math.
 var _damage_multiplier: String = "1"
 var _gold_multiplier: String = "1"
+## Permanent factors of the talents (story 006), "1" meaning none.
+var _talent_click: String = "1"
+var _talent_companion: String = "1"
+var _talent_gold: String = "1"
 
 
 ## [param state] and [param combat] are required; [param combat] must be valid.
@@ -176,7 +190,7 @@ func set_click_dps(dps: BigNumber) -> void:
 func can_beat_next_boss() -> bool:
 	if not _state.farming:
 		return false
-	var dps: BigNumber = _combat.companion_power(_state.companion_levels).add(_click_dps)
+	var dps: BigNumber = companion_power().add(_click_dps)
 	return dps.multiply_decimal("%.3f" % _boss.timer_seconds()).compare(_safe_boss_hp) >= 0
 
 
@@ -195,9 +209,33 @@ func set_gold_multiplier(factor: String) -> void:
 	_gold_multiplier = factor
 
 
-## Damage a click deals right now (base + companion share), before the damage buff.
+## Sets the permanent factors of the talents (story 006): [param click] on click damage,
+## [param companion] on companion damage, [param gold] on the gold of every kill, boss
+## kills included. Each is a valid decimal string ("1.25"); "1" means none. Unlike the
+## skill buffs they stay until the next call. The estimate of [method can_beat_next_boss]
+## counts them, since they are permanent.
+func set_talent_modifiers(click: String, companion: String, gold: String) -> void:
+	_talent_click = click
+	_talent_companion = companion
+	_talent_gold = gold
+
+
+## Damage a click deals right now (base + companion share, times the click talents),
+## before the damage buff.
 func click_damage() -> BigNumber:
-	return _combat.click_damage(_state.companion_levels)
+	return _with_talent(_combat.click_damage(_state.companion_levels), _talent_click)
+
+
+## [param damage], a companion's attack or damage per second, with the companion talents
+## applied. Unchanged when none is bought. The damage buff is not applied here.
+func companion_damage(damage: BigNumber) -> BigNumber:
+	return _with_talent(damage, _talent_companion)
+
+
+## Total damage per second of the companions, with the companion talents (the sum
+## [method Combat.companion_power] gives, scaled once).
+func companion_power() -> BigNumber:
+	return companion_damage(_combat.companion_power(_state.companion_levels))
 
 
 ## [param damage] with the damage buff applied, unchanged when no buff is on. A buff adds
@@ -240,7 +278,9 @@ func apply_damage(damage: BigNumber) -> void:
 		enemy_damaged.emit(damage, _current_hp)
 		return
 	var killed_stage: int = _state.stage
-	var reward: BigNumber = _reward if _gold_multiplier == "1" else _reward.multiply_decimal(_gold_multiplier)
+	var reward: BigNumber = _with_talent(_reward, _talent_gold)
+	if _gold_multiplier != "1":
+		reward = reward.multiply_decimal(_gold_multiplier)
 	_state.gold = _state.gold.add(reward)
 	var left_farm: bool = _permanent.auto_challenge and can_beat_next_boss()
 	if left_farm:
@@ -303,6 +343,16 @@ func _fall_back() -> void:
 	boss_failed.emit(failed_stage, _state.stage)
 	farming_changed.emit(true)
 	stage_started.emit(_state.stage, _max_hp)
+
+
+# [param value] times a talent factor: floor(value * factor), but at least value + 1 when the
+# factor is above 1, like the damage buff (see buffed_damage): a bonus that rounds to
+# nothing on a small value would look broken. A zero value stays zero.
+func _with_talent(value: BigNumber, factor: String) -> BigNumber:
+	if factor == "1" or value.is_zero():
+		return value
+	var scaled: BigNumber = value.multiply_decimal(factor)
+	return scaled if scaled.compare(value) > 0 else value.add(BigNumber.from_int(1))
 
 
 func _update_safe_boss_hp() -> void:

@@ -10,8 +10,10 @@ extends RefCounted
 ##                   (0 when last_saved is unknown, when now <= last_saved, or when the
 ##                   elapsed time is below offline_min_seconds)
 ## gold = floor(companion_power * counted_seconds * gold_per_kill(stage) / enemy_hp(stage)
-##              * offline_efficiency)
+##              * offline_efficiency * talent_factor)
 ## [/codeblock]
+## talent_factor is the "offline_gold" talent bonus (story 006), see [method set_talent_factor].
+## The companion power stays the bare sum: only this factor makes a talent count here.
 ## gold_per_kill / enemy_hp is the gold earned per point of damage on the current stage,
 ## so offline_efficiency is the share of what the companions would earn by farming that
 ## stage. A flat gold-per-damage rate would not work: that ratio falls by a factor of
@@ -34,6 +36,7 @@ var _combat: Combat
 var _efficiency: String = "0"
 var _max_seconds: int = 0
 var _min_seconds: int = 0
+var _talent_factor: String = "1"
 
 
 ## Reads the offline keys of [param curves] (core_curves.json as returned by
@@ -56,6 +59,12 @@ func get_error() -> String:
 	return _error
 
 
+## Sets the permanent factor of the talents on offline gold (story 006): a valid decimal
+## string ("1.25"), "1" meaning none. It stays until the next call.
+func set_talent_factor(factor: String) -> void:
+	_talent_factor = factor
+
+
 ## Seconds of absence that count: 0 when [param last_saved_unix] is unknown (<= 0), when
 ## no time passed or the clock went backwards, or when the elapsed time is below the
 ## minimum; otherwise the elapsed time, capped at the maximum.
@@ -73,7 +82,7 @@ func counted_seconds(last_saved_unix: int, now_unix: int) -> int:
 func gold_for(seconds: int, stage: int, companion_levels: Dictionary) -> BigNumber:
 	var power: BigNumber = _combat.companion_power(companion_levels)
 	var gross: BigNumber = power.multiply(BigNumber.from_int(seconds)).multiply(_combat.gold_per_kill(stage))
-	return gross.multiply_decimal(_efficiency).divide(_combat.enemy_max_hp(stage))
+	return gross.multiply_decimal(_efficiency).multiply_decimal(_talent_factor).divide(_combat.enemy_max_hp(stage))
 
 
 ## Adds the offline gold to [param state] for the time elapsed since
