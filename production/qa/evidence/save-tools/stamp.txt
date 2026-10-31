@@ -1,0 +1,7 @@
+Reviewed-Content-Hash: src/core/save_manager.gd ed01de316e0d5cc04aff134028e65bd236cc35da
+Reviewed-Content-Hash: src/ui/save_screen.gd e38fc7369c79b9834e1a9539399c60ac19630792
+Reviewed-Content-Hash: src/ui/save_screen.tscn edba421f786bc683e65693e1002dcb918fa945cd
+Reviewed-Content-Hash: src/ui/main_screen.gd 96b3ae0aabd84849fa90281c019591eb0d356c67
+Reviewed-Content-Hash: src/ui/main_screen.tscn 1b9e8e8999f2080e7060fb09b3cb3f45f7886ca0
+Reviewed-Content-Hash: tests/integration/save/save_share_test.gd 4004333de170ce9795cd746db0d91c3ff99ed30e
+Reviewed-Content-Hash: project.godot 4b9de1d8d28b2f0067fd66ccbbc7ac6d9fda2608

@@ -8,7 +8,8 @@ extends Control
 ## waits, as it does behind the return message, and the keyboard focus cannot leave it.
 ## The loot message and the critical hit text sit in the free column right of the enemy: they
 ## come during the fight, so they live here and not in the inventory screen, take no mouse
-## and no focus, and hide by themselves.
+## and no focus, and hide by themselves. The game version sits in the bottom left corner, so that
+## a player's feedback can name it; the "Sauvegarde" button opens the [SaveScreen].
 ## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
 ## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] / [TalentTree] /
 ## [Inventory] / [ModifierHub] core, feeds it frame time, forwards clicks to it and redraws on
@@ -92,6 +93,9 @@ var _tab_visibility_callback: JavaScriptObject
 @onready var _talent_screen: TalentScreen = %TalentScreen
 @onready var _inventory_button: Button = %InventoryButton
 @onready var _inventory_screen: InventoryScreen = %InventoryScreen
+@onready var _version_label: Label = %VersionLabel
+@onready var _save_button: Button = %SaveButton
+@onready var _save_screen: SaveScreen = %SaveScreen
 @onready var _crit_label: Label = %CritLabel
 @onready var _loot_toast: PanelContainer = %LootToast
 @onready var _loot_message: Label = %LootMessage
@@ -102,6 +106,7 @@ var _tab_visibility_callback: JavaScriptObject
 
 
 func _ready() -> void:
+	_version_label.text = tr("Version %s") % _game_version()
 	var curves: Variant = DataLoader.load_json(CURVES_PATH)
 	var combat: Combat = Combat.from_data(curves, DataLoader.load_json(ROSTER_PATH))
 	var boss: BossFight = BossFight.from_data(DataLoader.load_json(BOSSES_PATH))
@@ -167,6 +172,11 @@ func _ready() -> void:
 	_inventory_screen.closed.connect(_on_inventory_closed)
 	_inventory_screen.setup(_inventory)
 	_inventory_button.pressed.connect(_on_inventory_pressed)
+	_save_screen.copy_requested.connect(_on_save_copy_requested)
+	_save_screen.reset_confirmed.connect(_on_save_reset_confirmed)
+	_save_screen.closed.connect(_on_save_screen_closed)
+	_save_screen.setup(_game_version())
+	_save_button.pressed.connect(_on_save_button_pressed)
 	_start_message_timers()
 	_start_autosave(curves)
 	_enemy.set_stage(_game.stage, _floors.is_boss_fight())
@@ -200,6 +210,9 @@ func _process(delta: float) -> void:
 
 func _exit_tree() -> void:
 	_save()
+	# The tab listener would outlive this scene when a save reset reloads it.
+	if _document != null:
+		_document.removeEventListener("visibilitychange", _tab_visibility_callback)
 
 
 func _notification(what: int) -> void:
@@ -220,6 +233,11 @@ func _show_error(error: String) -> void:
 	_dps_label.visible = false
 	_talents_button.visible = false
 	_inventory_button.visible = false
+	_save_button.visible = false
+
+
+func _game_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "?"))
 
 
 func _start_message_timers() -> void:
@@ -289,6 +307,7 @@ func _show_offline_gain(gain: Dictionary) -> void:
 	# A web return can come while the tree or the inventory is open: the message goes first.
 	_talent_screen.close()
 	_inventory_screen.close()
+	_save_screen.close()
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
 	if gain["capped"]:
@@ -317,7 +336,7 @@ func _format_duration(seconds: int) -> String:
 
 
 func _game_waits() -> bool:
-	return _offline_panel.visible or _talent_screen.visible or _inventory_screen.visible
+	return _offline_panel.visible or _talent_screen.visible or _inventory_screen.visible or _save_screen.visible
 
 
 func _on_talents_pressed() -> void:
@@ -358,6 +377,32 @@ func _on_inventory_pressed() -> void:
 func _on_inventory_closed() -> void:
 	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
 	_inventory_button.grab_focus()
+
+
+func _on_save_button_pressed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
+	_save_screen.open()
+
+
+func _on_save_screen_closed() -> void:
+	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
+	_save_button.grab_focus()
+
+
+func _on_save_copy_requested() -> void:
+	_save()
+	var text: String = _saves.export_text(_game_version())
+	DisplayServer.clipboard_set(text)
+	_save_screen.show_copied(text)
+
+
+func _on_save_reset_confirmed() -> void:
+	if not _saves.reset():
+		_save_screen.show_reset_failed()
+		return
+	# No save may follow, not even the one of _exit_tree: it would write the old game back.
+	_saves = null
+	get_tree().reload_current_scene()
 
 
 func _on_equip_requested(uid: int) -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/skill_bar.tscn" id="5_skills"]
 [ext_resource type="PackedScene" path="res://src/ui/talent_screen.tscn" id="6_talents"]
 [ext_resource type="PackedScene" path="res://src/ui/inventory_screen.tscn" id="7_inventory"]
+[ext_resource type="PackedScene" path="res://src/ui/save_screen.tscn" id="8_save"]
 
 [sub_resource type="StyleBoxFlat" id="auto_off"]
 bg_color = Color(0.25, 0.25, 0.3, 1)
@@ -397,6 +398,41 @@ theme_override_styles/hover = SubResource("auto_off_hover")
 theme_override_styles/pressed = SubResource("auto_off_hover")
 text = "Inventaire"
 
+[node name="VersionLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -30.0
+offset_right = 212.0
+offset_bottom = -6.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.6, 0.6, 0.66, 1)
+theme_override_font_sizes/font_size = 14
+vertical_alignment = 1
+
+[node name="SaveButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -31.0
+offset_right = -10.0
+offset_bottom = -5.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("auto_off")
+theme_override_styles/hover = SubResource("auto_off_hover")
+theme_override_styles/pressed = SubResource("auto_off_hover")
+text = "Sauvegarde"
+
 [node name="CompanionPanel" parent="." instance=ExtResource("3_panel")]
 unique_name_in_owner = true
 layout_mode = 1
@@ -496,6 +532,10 @@ unique_name_in_owner = true
 layout_mode = 1
 
 [node name="InventoryScreen" parent="." instance=ExtResource("7_inventory")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="SaveScreen" parent="." instance=ExtResource("8_save")]
 unique_name_in_owner = true
 layout_mode = 1
 
