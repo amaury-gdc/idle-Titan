@@ -1,11 +1,11 @@
 Reviewed-Content-Hash: src/core/offline_income.gd d922863f1ece6a36277abea74fbe8e5f80a1bd01
 Reviewed-Content-Hash: src/core/save_manager.gd 587f12fb3d1dc255a020403150985b648ba8cb90
 Reviewed-Content-Hash: src/core/combat.gd a26a56ca60c8e9a57450b05deac3b84cb935af2e
-Reviewed-Content-Hash: src/core/game_state.gd 9145f1fbcb6dcda970d0e43eca850b7fb13e9db6
-Reviewed-Content-Hash: src/ui/main_screen.gd 76fc50c65348571c7cb139cff5a855ed4d9f1281
-Reviewed-Content-Hash: src/ui/main_screen.tscn f4ad6ee011ffe0f0dd0f49cf1d1cdfcd43cb9bfa
-Reviewed-Content-Hash: tools/simulate_progress.gd 407841552bcd920c17f5ed3584c8b22cf9440b53
+Reviewed-Content-Hash: src/core/game_state.gd 006d0e0822fada44fd13c99b6fe32c871277883b
+Reviewed-Content-Hash: src/ui/main_screen.gd f4945925ce25df1f600d9b035b74e5184ad85db9
+Reviewed-Content-Hash: src/ui/main_screen.tscn 36df619a15d6ae9cfeb07fdf3f73cd5f19339bdd
+Reviewed-Content-Hash: tools/simulate_progress.gd a8ccfd4d7f04d15d069377724299b74e3eb89bf5
 Reviewed-Content-Hash: assets/data/core_curves.json 425886be18dd3b486d62825c3b21eb0e4d32f8c5
-Reviewed-Content-Hash: assets/data/data_schema.md f290073b0487adcce56cf9b778263ccc79f2762f
-Reviewed-Content-Hash: assets/data/balance_notes.md 260e9ccea4197cd930893dbc587b927d67f406f9
+Reviewed-Content-Hash: assets/data/data_schema.md f6ede550a02a462c2b05d90e38dc8ac89eeddccc
+Reviewed-Content-Hash: assets/data/balance_notes.md bf7783ccbe923162dd70815b7c9e18345a5b3cbc
 Reviewed-Content-Hash: tests/unit/offline/offline_income_test.gd 4cdcc36bcd143376f318851a3b7c94e01d4e558a
