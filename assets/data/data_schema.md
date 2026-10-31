@@ -8,7 +8,7 @@ Big values (costs, damage, gold) are decimal STRINGS of digits so they stay
 exact beyond int64 and parse with `BigNumber.from_string`. Decimal factors are
 decimal strings such as "1.1" for `BigNumber.multiply_decimal`.
 
-STATUS: all three files hold PROVISIONAL balance, calibrated in stories 003 and 004
+STATUS: all files hold PROVISIONAL balance, calibrated in stories 003 to 005
 against the brief's hypotheses; measurements and gaps are in `balance_notes.md`.
 `Combat` (`src/core/combat.gd`) reads the curves and builds one `Companion`
 (`src/core/companion.gd`) per roster entry. `Combat.from_data` rejects a file with
@@ -119,3 +119,58 @@ a fresh countdown.
 
 A stage counts as reached (`GameState.max_stage_reached`, the score) as soon as its
 fight begins, boss included; a fallback never lowers it.
+
+## skills.json
+
+Loaded by `SkillManager` (`src/core/skill_manager.gd`), one `Skill`
+(`src/core/skill.gd`) per entry. An invalid or missing file stops the game on the main
+screen error, like the files above.
+
+| Key | Type | Required | Meaning |
+|---|---|---|---|
+| `schema_version` | int | yes | Currently 1. `SkillManager` refuses any other value. |
+| `skills` | array of object | yes | Exactly one skill per effect (3 in the MVP), in display order. |
+| `skills[].id` | string | yes | Unique stable id; the key used in `GameState.skill_timers`. Renaming one drops its saved timers. |
+| `skills[].name` | string | yes | Display name (French). |
+| `skills[].effect` | string | yes | `burst`, `damage_multiplier` or `gold_multiplier`. |
+| `skills[].dps_seconds` | decimal string (seconds, > 0) | `burst` only | Seconds of damage dealt at once, see the formula below. Value in file: "6". |
+| `skills[].multiplier` | decimal string (unitless factor > 1) | the two buffs only | `damage_multiplier`: factor on all damage dealt. `gold_multiplier`: factor on the gold of kills. Values in file: "1.5" and "1.5". |
+| `skills[].duration_seconds` | number (seconds, > 0) | the two buffs only | How long the effect lasts. Values in file: 15 and 20. |
+| `skills[].cooldown_seconds` | number (seconds, > 0, >= duration) | yes | Time from activation until the skill is ready again; it includes the duration. Values in file: 60, 90 and 120. |
+
+Effects (exact BigNumber, applied by `FloorManager`):
+
+- Burst damage = floor((companion power + click damage) * `dps_seconds`), dealt at once.
+  The click term keeps it useful before the first companion, and companion power makes
+  it scale up to the bosses. It is multiplied by the damage buff when that runs.
+- The damage buff applies to clicks, companion attacks and the burst, and always adds at
+  least 1 damage per hit: floor(1 * 1.5) would leave the smallest hits untouched. The
+  gold bonus applies to the gold of normal kills and boss kills.
+- While the damage buff runs, the DPS line, its tooltip and the click damage on screen
+  show the buffed values. The DPS of each companion in the panel stays buff-free.
+- Offline gold (`OfflineIncome`) uses neither buff. `FloorManager.can_beat_next_boss`
+  ignores both too: "Défi automatique" does not count on a temporary buff.
+
+Cooldown modifier: `SkillManager.set_cooldown_modifier(factor)` scales every cooldown
+started afterwards, for the talents of story 006. Default 1.0, never below the duration.
+Not saved: talents will set it again at startup.
+
+Time: timers count game time fed to `SkillManager.tick`, cut to 5 s per call
+(`MAX_TICK_SECONDS`, same bound as the companions and the boss countdown), so skills stop
+when the game stops:
+
+- Tab in the background: a hidden tab runs no frames (measured in story 004b), so
+  cooldowns and running buffs are PAUSED, with no catch-up. On return, the first frame
+  credits at most 5 s. This return itself was reasoned from the code, not measured in a
+  browser.
+- "Bon retour !" panel: `_process` stops ticking and skill presses are ignored until it
+  is closed.
+- Absence: no recharge. A cooldown resumes where it stopped.
+
+Saved field: `skill_timers` in the game save (object, default empty), id ->
+`{"cooldown_left", "active_left"}` in seconds, only for skills that are not ready. So
+reloading the page does not refill the skills and a running buff survives it. An older
+save has no such key and loads with every skill ready. A malformed entry is dropped,
+unknown ids are ignored, and values are cut to the current data. As saves happen every
+`autosave_interval_seconds`, a reload can lose up to that much of a timer in either
+direction. The game save has no version number, so none was bumped.

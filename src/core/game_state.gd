@@ -27,6 +27,11 @@ var companion_levels: Dictionary = {}
 ## unknown: a fresh state or a save written before this field existed, which earns no
 ## offline gold. Stamped by [SaveManager] on every save and read by [OfflineIncome].
 var last_saved_unix: int = 0
+## Skills (story 005) that are not ready: id -> {"cooldown_left": float, "active_left":
+## float}, in seconds of game time. Written by [method SkillManager.save_to] before a save
+## and read when the [SkillManager] is built; absent id means ready. Game time only runs
+## while the game does, so an absence does not recharge anything.
+var skill_timers: Dictionary = {}
 
 ## Largest saved time accepted: 2^53, the limit of exact integers in a JSON number
 ## (a float). Anything above is a corrupt value and is read as "unknown".
@@ -41,6 +46,7 @@ func reset() -> void:
 	gold = BigNumber.new()
 	companion_levels = {}
 	last_saved_unix = 0
+	skill_timers = {}
 
 
 ## JSON-safe payload (gold as decimal string).
@@ -52,13 +58,16 @@ func to_dict() -> Dictionary:
 		"gold": gold.to_decimal_string(),
 		"companion_levels": companion_levels.duplicate(),
 		"last_saved_unix": last_saved_unix,
+		"skill_timers": skill_timers.duplicate(true),
 	}
 
 
 ## Builds a state from a payload; missing or invalid fields fall back to defaults.
 ## A save without max_stage_reached (older format) defaults it to the saved stage;
 ## one without farming defaults it to false; one without last_saved_unix (or with a
-## negative, non-numeric or absurd value) defaults it to 0 and stays valid.
+## negative, non-numeric or absurd value) defaults it to 0 and stays valid; one without
+## skill_timers (older format) starts with every skill ready, and a timer entry that is
+## not {"cooldown_left", "active_left"} of finite numbers >= 0 is dropped.
 static func from_dict(data: Dictionary) -> GameState:
 	var state := GameState.new()
 	var s: Variant = data.get("stage", 1)
@@ -85,4 +94,14 @@ static func from_dict(data: Dictionary) -> GameState:
 			var lvl: Variant = levels[id]
 			if id is String and (lvl is float or lvl is int):
 				state.companion_levels[id] = maxi(int(lvl), 0)
+	var timers: Variant = data.get("skill_timers", {})
+	if timers is Dictionary:
+		for id: Variant in timers:
+			var entry: Variant = timers[id]
+			if id is String and entry is Dictionary and _is_timer(entry.get("cooldown_left")) and _is_timer(entry.get("active_left")):
+				state.skill_timers[id] = {"cooldown_left": float(entry["cooldown_left"]), "active_left": float(entry["active_left"])}
 	return state
+
+
+static func _is_timer(value: Variant) -> bool:
+	return (value is float or value is int) and is_finite(float(value)) and float(value) >= 0.0

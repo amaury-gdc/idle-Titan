@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004, 004b)
+# Balance notes (stories 003, 004, 004b, 005)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -9,6 +9,59 @@ The numbers that apply to the game today are in "Bosses".
 Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
+
+## Active skills (story 005)
+
+Values in `skills.json` (formulas and rules in `data_schema.md`): "Gros coup" 6 s of
+damage, cooldown 60 s; "Frénésie" damage x1.5 for 15 s, cooldown 90 s; "Bonus d'or" gold
+x1.5 for 20 s, cooldown 120 s.
+
+    <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=72 --auto=1 --away=0.5:8,3:8,6:12,24:8,36:8,48:12 --skills=1
+
+3 clicks/s, `--auto=1`, 72 h of active play, six returns. Times are active play. The "No
+skills" and "kept" rows were measured on the real `skills.json`, after the damage floor
+of the buff (it adds at least 1 per hit). The other variants come from a copy of the data,
+before that floor. Two skill models: `--skills=1` activates each
+skill as soon as it is ready, for 72 h without a miss, which is an upper bound.
+`--skills=2` keeps the burst and the damage buff for boss fights, and uses the gold bonus
+when ready. Each variant is burst seconds / cooldown, damage factor / duration / cooldown,
+gold factor / duration / cooldown.
+
+| Variant | Model | First boss reached | First boss killed | Stage 50 | Stage 100 | Stage 110 | Best stage at 72 h | Failed |
+|---|---|---|---|---|---|---|---|---|
+| No skills | - | 2.4 min | 9.6 min | 43.4 min | 7.06 h | 10.34 h | 110 | 11 |
+| 10/60, x2/15/90, x2/30/120 (first try) | 1 | 1.5 min | 6.2 min | 30.3 min | 5.32 h | 7.21 h | 120 (70 h) | 12 |
+| same | 2 | 2.1 min | 7.5 min | 30.4 min | 6.01 h | 8.21 h | 110 | 11 |
+| 6/60, x1.5/15/90, x1.5/20/120 (kept) | 1 | 1.9 min | 8.0 min | 34.7 min | 6.02 h | 8.61 h | 110 | 11 |
+| same | 2 | 2.4 min | 8.8 min | 39.0 min | 6.45 h | 9.47 h | 110 | 11 |
+| 5/90, x1.5/15/120, x1.5/15/120 | 1 | 2.3 min | 8.3 min | 35.7 min | 6.02 h | 8.91 h | 110 | 11 |
+| same | 2 | 2.4 min | 8.9 min | 39.6 min | 6.47 h | 9.55 h | 110 | 11 |
+
+Why these values: the first try crossed the wall (stage 120) and brought the first boss
+well below the 2 to 3 min target. The kept values leave best stage 110 at 72 h, with stage
+50 10 to 20% earlier. The third variant gave nearly the same curve, so the stronger burst
+was kept: it is the skill that has to count against a boss. Values were not tuned further.
+
+Open point: with the damage floor, the buff doubles the hits of 1 damage, so with
+`--skills=1` the first boss comes at 1.9 min (2.2 min before the floor), just below the
+target. The other milestones did not move. With `--skills=2` it stays at 2.4 min. Left as
+it is: changing it is a design decision.
+
+Against a boss, with the buff started first, the kept values add about 16.5 s of damage to
+the 30 s of the fight: 9 s from the burst (6 s * x1.5) and 7.5 s from the buff.
+
+Limits:
+
+- Both models challenge a boss only when the estimate passes, and that estimate ignores
+  skills on purpose. So the wall is measured for a player who does not count on them. A
+  player who challenges early and uses all skills well needs about a third less damage
+  per second, not measured here. It may move the wall: to check in playtest.
+- Without absences, the kept values with `--skills=1` give stage 50 at 46.4 min, against
+  55.2 min without skills (-16%), for a model that never misses a cooldown. The brief's
+  target is about 1 h.
+- The burst and the buff count their full effect in the simulator; a real player loses
+  some of it to reaction time, and spends attention on the buttons.
+- Cooldown modifiers (story 006) are not measured: they will increase all of these effects.
 
 ## Offline progress (story 004b)
 
@@ -52,8 +105,8 @@ Limits:
 - The gold is computed once at the return, from the power and stage at that moment.
 - The model buys at once and clicks non-stop; a real player's return may be worth more
   against a lower active income. Needs a playtest.
-- Measured with no skills, talents or items (stories 005 to 007), and the stat "or
-  hors-ligne" of items (story 007) is not applied.
+- Measured with no skills (see "Active skills"), talents or items (stories 006, 007), and
+  the stat "or hors-ligne" of items (story 007) is not applied.
 
 ## Bosses (story 004)
 

@@ -1,0 +1,13 @@
+Reviewed-Content-Hash: src/core/skill.gd ca8f432a767724d33a86b3c0e3390b0ab976b7c9
+Reviewed-Content-Hash: src/core/skill_manager.gd 4bc9ed5f83581174a94cd71934b4ef617e45d773
+Reviewed-Content-Hash: src/ui/skill_bar.gd 58db9e8da7365f1973cc7502d63fa43150501ce2
+Reviewed-Content-Hash: src/ui/skill_bar.tscn 3f747bf4dc1ae92a53c5e508f6c56495cbfb3a5d
+Reviewed-Content-Hash: src/core/floor_manager.gd b397dca0d18abf61832dc38f5d78430e3137675d
+Reviewed-Content-Hash: src/core/game_state.gd 006d0e0822fada44fd13c99b6fe32c871277883b
+Reviewed-Content-Hash: src/ui/main_screen.gd f4945925ce25df1f600d9b035b74e5184ad85db9
+Reviewed-Content-Hash: src/ui/main_screen.tscn 36df619a15d6ae9cfeb07fdf3f73cd5f19339bdd
+Reviewed-Content-Hash: tools/simulate_progress.gd a8ccfd4d7f04d15d069377724299b74e3eb89bf5
+Reviewed-Content-Hash: assets/data/skills.json 6246c7ea8a0471ad7076e06a89417fc0d891931c
+Reviewed-Content-Hash: assets/data/data_schema.md f6ede550a02a462c2b05d90e38dc8ac89eeddccc
+Reviewed-Content-Hash: assets/data/balance_notes.md bf7783ccbe923162dd70815b7c9e18345a5b3cbc
+Reviewed-Content-Hash: tests/unit/skills/skills_test.gd c4e49cb2beba2b097176113600d2c7242cbe0368

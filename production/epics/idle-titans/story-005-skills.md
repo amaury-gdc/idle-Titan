@@ -1,12 +1,12 @@
 # Story 005: Compétences actives
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: [set by /dev-story when implementation begins]
+> **Last Updated**: 2026-10-31
 
 ## Context
 
@@ -28,13 +28,13 @@
 
 *From `design/game-brief.md`, MVP feature 5:*
 
-- [ ] Trois compétences sont définies en données : gros coup, buff de dégâts, bonus d'or (effet, durée, temps de recharge).
-- [ ] Activer une compétence applique son effet : le gros coup inflige des dégâts immédiats, le buff multiplie les dégâts pendant sa durée, le bonus d'or multiplie l'or gagné pendant sa durée.
-- [ ] Après activation, la compétence est indisponible jusqu'à la fin de son temps de recharge.
-- [ ] Le temps de recharge restant est visible sur le bouton de la compétence.
-- [ ] Un buff actif et son temps restant sont visibles à l'écran.
-- [ ] Les temps de recharge et les effets se règlent par les fichiers de données.
-- [ ] Une capture d'écran des boutons de compétences (disponible et en recharge) est conservée dans `production/qa/evidence/`.
+- [x] Trois compétences sont définies en données : gros coup, buff de dégâts, bonus d'or (effet, durée, temps de recharge).
+- [ ] Activer une compétence applique son effet : le gros coup inflige des dégâts immédiats, le buff multiplie les dégâts pendant sa durée, le bonus d'or multiplie l'or gagné pendant sa durée. **À tester par Amaury** : vérifié par tests et clics simulés, mais signalé défaillant en jeu puis corrigé, pas retesté à la souris.
+- [x] Après activation, la compétence est indisponible jusqu'à la fin de son temps de recharge.
+- [x] Le temps de recharge restant est visible sur le bouton de la compétence.
+- [x] Un buff actif et son temps restant sont visibles à l'écran.
+- [x] Les temps de recharge et les effets se règlent par les fichiers de données.
+- [x] Une capture d'écran des boutons de compétences (disponible et en recharge) est conservée dans `production/qa/evidence/`.
 
 ---
 
@@ -54,12 +54,13 @@
 
 ## Files
 
-- `src/core/skill.gd`, `src/core/skill_manager.gd`
-- `src/ui/skill_bar.tscn`
-- `assets/data/skills.json`
-- `tests/unit/skills/skills_test.gd`
-
----
+- `src/core/skill.gd`, `src/core/skill.gd.uid`, `src/core/skill_manager.gd`, `src/core/skill_manager.gd.uid`
+- `src/core/floor_manager.gd`, `src/core/game_state.gd`
+- `src/ui/skill_bar.gd`, `src/ui/skill_bar.gd.uid`, `src/ui/skill_bar.tscn`
+- `src/ui/main_screen.gd`, `src/ui/main_screen.tscn`
+- `assets/data/skills.json`, `assets/data/data_schema.md`, `assets/data/balance_notes.md`
+- `tools/simulate_progress.gd`
+- `tests/unit/skills/skills_test.gd`, `tests/unit/skills/skills_test.gd.uid`
 
 ## QA Test Cases
 
@@ -74,7 +75,7 @@
 **Story Type**: Logic
 **Required evidence**: `tests/unit/skills/skills_test.gd` (facultatif) ; capture d'écran conservée dans `production/qa/evidence/`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Partial (`tests/unit/skills/skills_test.gd` : buff de dégâts seulement)
 
 ---
 
@@ -82,3 +83,12 @@
 
 - Depends on: `production/epics/idle-titans/story-004b-offline.md`
 - Unlocks: `production/epics/idle-titans/story-006-talents.md`
+
+---
+
+## Completion Notes
+**Completed**: 2026-10-31, clôture demandée par Amaury avec le critère 2 laissé à tester
+**Criteria**: 6/7 passing (critère 2 à tester par Amaury : effet en jeu réel, à la souris)
+**Deviations**: Advisory : plancher d'au moins +1 dégât par coup sous buff, ajouté après le signalement d'Amaury (un coup de 1 passe à 2, soit ×2) ; premier boss à 1,9 min avec les compétences utilisées dès que prêtes, sous la cible de 2 à 3 min ; le simulateur ne mesure pas un joueur qui défie tôt avec ses compétences ; le nom « Frénésie » est provisoire. Hors `## Files` d'origine : `floor_manager.gd`, `game_state.gd`, `main_screen.gd/.tscn`, `simulate_progress.gd`, les documents de données, et les corrections du panneau « Bon retour ! » de la story 004b.
+**Test Evidence**: `tests/unit/skills/skills_test.gd` (4 tests, suite 106/106) ; captures dans `production/qa/evidence/story-005-skills/`. Sauvegarde, recharge et expiration vérifiées par des contrôles jetables et dans Edge, pas par des tests conservés.
+**Reviewed by**: lead-programmer (revue de code, rapport lu et défauts corrigés) ; godot-gdscript-specialist (contrôle moteur)

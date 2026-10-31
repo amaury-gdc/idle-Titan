@@ -90,6 +90,10 @@ var _reward: BigNumber
 var _safe_boss_hp: BigNumber = BigNumber.new()
 ## Player's click damage per second, for [method can_beat_next_boss].
 var _click_dps: BigNumber = BigNumber.new()
+## Factor on every damage applied / on the gold of every kill, set by [SkillManager]
+## (story 005) while a buff runs. "1" means none; compared as a string to skip the math.
+var _damage_multiplier: String = "1"
+var _gold_multiplier: String = "1"
 
 
 ## [param state] and [param combat] are required; [param combat] must be valid.
@@ -176,9 +180,33 @@ func can_beat_next_boss() -> bool:
 	return dps.multiply_decimal("%.3f" % _boss.timer_seconds()).compare(_safe_boss_hp) >= 0
 
 
-## Damage a click deals right now (base + companion share).
+## Sets the factor applied to every damage from now on (story 005 damage buff): clicks,
+## companion attacks and skill bursts alike. [param factor] is a valid decimal string
+## ("2", "1.5"); "1" removes the buff. The estimate of [method can_beat_next_boss] ignores
+## it, so a buff only adds margin.
+func set_damage_multiplier(factor: String) -> void:
+	_damage_multiplier = factor
+
+
+## Sets the factor applied to the gold of every kill from now on (story 005 gold bonus),
+## boss kills included. [param factor] is a valid decimal string; "1" removes the bonus.
+## Offline gold ([OfflineIncome]) never uses it.
+func set_gold_multiplier(factor: String) -> void:
+	_gold_multiplier = factor
+
+
+## Damage a click deals right now (base + companion share), before the damage buff.
 func click_damage() -> BigNumber:
 	return _combat.click_damage(_state.companion_levels)
+
+
+## [param damage] with the damage buff applied, unchanged when no buff is on. A buff adds
+## at least 1: floor(1 * 1.5) would otherwise leave the smallest hits untouched.
+func buffed_damage(damage: BigNumber) -> BigNumber:
+	if _damage_multiplier == "1" or damage.is_zero():
+		return damage
+	var buffed: BigNumber = damage.multiply_decimal(_damage_multiplier)
+	return buffed if buffed.compare(damage) > 0 else damage.add(BigNumber.from_int(1))
 
 
 ## Enemy HP as a ratio 0.0..1.0 with 1/1000 resolution, exact for any HP size
@@ -188,26 +216,31 @@ func hp_ratio() -> float:
 	return float(permille.to_decimal_string().to_int()) / 1000.0
 
 
-## A player click: deals [method click_damage] to the enemy. Returns the damage dealt.
+## A player click: deals [method click_damage] to the enemy (times the damage buff).
+## Returns the click damage BEFORE the buff, so the measured click dps that feeds
+## [method can_beat_next_boss] stays a buff-free estimate.
 func click() -> BigNumber:
 	var damage: BigNumber = click_damage()
 	apply_damage(damage)
 	return damage
 
 
-## Deals [param damage] to the current enemy. If it dies: gold is granted (boss gold
-## for a boss), the next stage starts with a fresh enemy (in farm mode, the same
+## Deals [param damage] to the current enemy, multiplied by the damage buff when one is
+## on ([method set_damage_multiplier]); the signals carry the damage actually dealt. If
+## it dies: gold (boss gold for a boss, times the gold bonus when one is on) is granted,
+## the next stage starts with a fresh enemy (in farm mode, the same
 ## stage again unless auto challenge is on and [method can_beat_next_boss] is true),
 ## then [signal enemy_killed],
 ## [signal farming_changed] when farm mode was left, [signal stage_started] and, when
 ## a boss begins, [signal boss_started] are emitted (state already consistent).
 func apply_damage(damage: BigNumber) -> void:
+	damage = buffed_damage(damage)
 	if damage.compare(_current_hp) < 0:
 		_current_hp = _current_hp.subtract(damage)
 		enemy_damaged.emit(damage, _current_hp)
 		return
 	var killed_stage: int = _state.stage
-	var reward: BigNumber = _reward
+	var reward: BigNumber = _reward if _gold_multiplier == "1" else _reward.multiply_decimal(_gold_multiplier)
 	_state.gold = _state.gold.add(reward)
 	var left_farm: bool = _permanent.auto_challenge and can_beat_next_boss()
 	if left_farm:

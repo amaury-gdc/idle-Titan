@@ -20,6 +20,10 @@ extends SceneTree
 ## --away=<start>:<duration>,... absences (story 004b), in hours: <start> is counted in
 ## active play, and each return grants gold through the real [OfflineIncome], which
 ## applies the cap of the data; --eff=<decimal> replaces offline_efficiency.
+## --skills=0|1|2 (story 005): 0 = no skills (default); 1 = each skill is activated as soon
+## as it is ready; 2 = the gold bonus as soon as it is ready, the burst and the damage buff
+## only during a boss fight (the way a player who knows the game would use them).
+## --skillsdata=<path> replaces skills.json.
 ## Report: time to the first boss fight, to the first boss kill, to stages 50/100/150,
 ## the stage at 3 h and the number of failed boss attempts (at each milestone and at the
 ## end). With --away, milestones also give the wall time (active + away) and each
@@ -35,6 +39,7 @@ extends SceneTree
 const CURVES_PATH: String = "res://assets/data/core_curves.json"
 const ROSTER_PATH: String = "res://assets/data/companions_roster.json"
 const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
+const SKILLS_PATH: String = "res://assets/data/skills.json"
 ## Stages reported by the run besides the first boss fight and the first boss kill,
 ## which come from the boss data (measurement points, not balance values).
 const MILESTONES: Array[int] = [50, 100, 110, 120, 130, 150]
@@ -69,16 +74,23 @@ func _init() -> void:
 		printerr("simulate_progress: " + offline.get_error())
 		quit(1)
 		return
-	_simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]))
-	quit(0)
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"])
+	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2]) -> void:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
 	var floors: FloorManager = FloorManager.new(state, combat, boss, permanent)
 	var companions: CompanionManager = CompanionManager.new(state, combat, floors)
+	var skills: SkillManager = null
+	if skill_mode > 0:
+		skills = SkillManager.from_data(DataLoader.load_json(skills_path), state, combat, floors)
+		if not skills.is_valid():
+			printerr("simulate_progress: " + skills.get_error())
+			return false
+	var skill_uses: Array[int] = [0, 0, 0]
 	var failed_attempts: Array[int] = [0]
 	floors.boss_failed.connect(func(_failed: int, _back_to: int) -> void: failed_attempts[0] += 1)
 	var first_boss_stage: int = 1
@@ -90,7 +102,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	# second so a long farm stays cheap to simulate (GrowthCurve, BigNumber sums).
 	var check_every: int = maxi(int(1.0 / dt), 1)
 	var cps_factor: String = "%.3f" % cps
-	print("Player model: %.2f clicks/s without pause, cheapest affordable level bought after every %.2f s step; boss countdown %.0f s; farm mode exit: %s" % [cps, dt, boss.timer_seconds(), "auto challenge setting" if auto else "challenge when expected damage covers the boss HP"])
+	var skill_text: String = ["none", "each skill as soon as it is ready", "gold bonus when ready, burst and damage buff in boss fights only"][clampi(skill_mode, 0, 2)]
+	print("Player model: %.2f clicks/s without pause, cheapest affordable level bought after every %.2f s step; boss countdown %.0f s; farm mode exit: %s; skills: %s" % [cps, dt, boss.timer_seconds(), "auto challenge setting" if auto else "challenge when expected damage covers the boss HP", skill_text])
 	var report_step: int = int(REPORT_STAGE_AT_HOURS * SECONDS_PER_HOUR / dt)
 	var steps: int = int(hours * SECONDS_PER_HOUR / dt)
 	var next_milestone: int = 0
@@ -111,6 +124,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			_apply_absence(offline, state, companions, duration, float(step) * dt, earned[0], earned_samples)
 			away_seconds += duration
 			next_absence += 1
+		if skills != null:
+			_use_skills(skills, floors, skill_mode, skill_uses)
 		click_debt += cps * dt
 		var clicks: int = int(click_debt)
 		click_debt -= float(clicks)
@@ -119,6 +134,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		# Same order as the main screen: damage first, then the boss countdown.
 		companions.tick(dt)
 		floors.tick(dt)
+		if skills != null:
+			skills.tick(dt)
 		while _buy_cheapest_affordable(companions):
 			pass
 		if floors.is_farming() and step % check_every == 0:
@@ -141,7 +158,10 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	for i in range(next_milestone, milestones.size()):
 		print("Stage %d NOT reached in %.1f h" % [milestones[i], hours])
 	print("End of run at %.1f h: best stage %d (current %d), failed boss attempts %d, levels %s" % [hours, state.max_stage_reached, state.stage, failed_attempts[0], str(state.companion_levels)])
+	if skills != null:
+		print("Skill activations: %d big hits, %d damage buffs, %d gold bonuses" % [skill_uses[0], skill_uses[1], skill_uses[2]])
 	print("Real time: %.1f s" % (float(Time.get_ticks_msec() - started_ms) / 1000.0))
+	return true
 
 
 # Grants the gold of an absence of [param duration] seconds, as the main screen does on
@@ -160,6 +180,18 @@ func _apply_absence(offline: OfflineIncome, state: GameState, companions: Compan
 		income = (earned - samples[samples.size() - 1 - window]) / (float(window) * INCOME_SAMPLE_SECONDS)
 	var minutes: float = gold.to_decimal_string().to_float() / income / 60.0 if income > 0.0 else 0.0
 	print(line + "%.1f h counted, +%s gold, %.1f min of recent active income (%.2f gold/s)" % [float(gain["seconds"]) / SECONDS_PER_HOUR, gold.format(), minutes, income])
+
+
+# Mode 1: every skill as soon as it is ready. Mode 2: the gold bonus as soon as it is ready,
+# the burst and the damage buff only while a boss fight runs.
+func _use_skills(skills: SkillManager, floors: FloorManager, mode: int, uses: Array[int]) -> void:
+	for skill: Skill in skills.skills():
+		if skill.state() != Skill.State.READY:
+			continue
+		if mode == 2 and skill.effect != Skill.Effect.GOLD_MULTIPLIER and not floors.is_boss_fight():
+			continue
+		skills.activate(skill.id)
+		uses[int(skill.effect)] += 1
 
 
 func _buy_cheapest_affordable(companions: CompanionManager) -> bool:
@@ -188,7 +220,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": ""}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

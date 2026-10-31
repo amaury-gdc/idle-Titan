@@ -1,0 +1,28 @@
+{
+	"schema_version": 1,
+	"skills": [
+		{
+			"id": "big_hit",
+			"name": "Gros coup",
+			"effect": "burst",
+			"dps_seconds": "6",
+			"cooldown_seconds": 60
+		},
+		{
+			"id": "damage_buff",
+			"name": "Frénésie",
+			"effect": "damage_multiplier",
+			"multiplier": "1.5",
+			"duration_seconds": 15,
+			"cooldown_seconds": 90
+		},
+		{
+			"id": "gold_bonus",
+			"name": "Bonus d'or",
+			"effect": "gold_multiplier",
+			"multiplier": "1.5",
+			"duration_seconds": 20,
+			"cooldown_seconds": 120
+		}
+	]
+}
