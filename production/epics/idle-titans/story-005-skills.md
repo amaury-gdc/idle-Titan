@@ -29,7 +29,7 @@
 *From `design/game-brief.md`, MVP feature 5:*
 
 - [x] Trois compétences sont définies en données : gros coup, buff de dégâts, bonus d'or (effet, durée, temps de recharge).
-- [ ] Activer une compétence applique son effet : le gros coup inflige des dégâts immédiats, le buff multiplie les dégâts pendant sa durée, le bonus d'or multiplie l'or gagné pendant sa durée. **À tester par Amaury** : vérifié par tests et clics simulés, mais signalé défaillant en jeu puis corrigé, pas retesté à la souris.
+- [x] Activer une compétence applique son effet : le gros coup inflige des dégâts immédiats, le buff multiplie les dégâts pendant sa durée, le bonus d'or multiplie l'or gagné pendant sa durée.
 - [x] Après activation, la compétence est indisponible jusqu'à la fin de son temps de recharge.
 - [x] Le temps de recharge restant est visible sur le bouton de la compétence.
 - [x] Un buff actif et son temps restant sont visibles à l'écran.
@@ -87,8 +87,8 @@
 ---
 
 ## Completion Notes
-**Completed**: 2026-10-31, clôture demandée par Amaury avec le critère 2 laissé à tester
-**Criteria**: 6/7 passing (critère 2 à tester par Amaury : effet en jeu réel, à la souris)
+**Completed**: 2026-10-31
+**Criteria**: 7/7 passing (critère 2 confirmé en jeu par Amaury)
 **Deviations**: Advisory : plancher d'au moins +1 dégât par coup sous buff, ajouté après le signalement d'Amaury (un coup de 1 passe à 2, soit ×2) ; premier boss à 1,9 min avec les compétences utilisées dès que prêtes, sous la cible de 2 à 3 min ; le simulateur ne mesure pas un joueur qui défie tôt avec ses compétences ; le nom « Frénésie » est provisoire. Hors `## Files` d'origine : `floor_manager.gd`, `game_state.gd`, `main_screen.gd/.tscn`, `simulate_progress.gd`, les documents de données, et les corrections du panneau « Bon retour ! » de la story 004b.
 **Test Evidence**: `tests/unit/skills/skills_test.gd` (4 tests, suite 106/106) ; captures dans `production/qa/evidence/story-005-skills/`. Sauvegarde, recharge et expiration vérifiées par des contrôles jetables et dans Edge, pas par des tests conservés.
 **Reviewed by**: lead-programmer (revue de code, rapport lu et défauts corrigés) ; godot-gdscript-specialist (contrôle moteur)
