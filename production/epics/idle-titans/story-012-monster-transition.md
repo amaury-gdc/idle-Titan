@@ -1,7 +1,7 @@
 # Story 012: Transition entre monstres
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Visual/Feel
 > **Estimate**: S
@@ -28,16 +28,16 @@
 
 *À faire après la story 011, pas avant. Les durées et le seuil sont des hypothèses à ajuster en jouant.*
 
-- [ ] L'ennemi qui meurt s'estompe et rétrécit légèrement, environ 0,15 s.
-- [ ] Le suivant apparaît en fondu en grossissant légèrement, environ 0,2 s.
-- [ ] Le boss a une entrée plus marquée.
-- [ ] La logique de jeu n'attend jamais l'animation : les clics et les compagnons agissent tout de suite sur le nouvel ennemi.
-- [ ] Au-delà d'environ 3 kills par seconde, la transition raccourcit ou se réduit à un éclair.
-- [ ] Elle respecte le réglage « Effets visuels » et `prefers-reduced-motion`.
-- [ ] Les durées et le seuil de kills se règlent en données, dans `assets/data/`.
-- [ ] Textes, sphères et boules restent alignés sur le monstre pendant la transition.
-- [ ] Le simulateur donne le même résultat qu'avant la story ; tous les tests restent verts.
-- [ ] Captures conservées dans `production/qa/evidence/story-012-monster-transition/`, fluidité mesurée dans l'export, normale et processeur ralenti.
+- [x] L'ennemi qui meurt s'estompe et rétrécit légèrement, environ 0,15 s.
+- [x] Le suivant apparaît en fondu en grossissant légèrement, environ 0,2 s.
+- [x] Le boss a une entrée plus marquée.
+- [x] La logique de jeu n'attend jamais l'animation : les clics et les compagnons agissent tout de suite sur le nouvel ennemi.
+- [x] Au-delà d'environ 3 kills par seconde, la transition raccourcit ou se réduit à un éclair.
+- [x] Elle respecte le réglage « Effets visuels » et `prefers-reduced-motion`.
+- [x] Les durées et le seuil de kills se règlent en données, dans `assets/data/`.
+- [x] Textes, sphères et boules restent alignés sur le monstre pendant la transition.
+- [x] Le simulateur donne le même résultat qu'avant la story ; tous les tests restent verts.
+- [x] Captures conservées dans `production/qa/evidence/story-012-monster-transition/`, fluidité mesurée dans l'export, normale et processeur ralenti.
 
 ---
 
@@ -50,7 +50,8 @@
 
 ## Files
 
-*À remplir à la fin de l'implémentation.*
+- `src/ui/enemy_view.gd`, `src/ui/main_screen.gd`
+- `assets/data/monster_transition.json` (créé), `assets/data/data_schema.md`
 
 ## QA Test Cases
 
@@ -73,3 +74,10 @@
 - Unlocks: None
 
 ---
+
+## Completion Notes
+**Completed**: 2026-11-01
+**Criteria**: 10/10 passing (sensation, réactivité, rafale et réglages confirmés par Amaury ; durées et fluidité mesurées dans l'export)
+**Deviations**: valeurs par défaut et bornes aussi écrites dans `enemy_view.gd` en repli du JSON ; `MAX_FRAME_SECONDS` et `KILL_MEMORY` non réglables en données ; captures prises sur un build aux durées ×10 (affichent encore v0.1.0) ; aucun test unitaire sur `EnemyView` (waived au niveau minimal)
+**Test Evidence**: `production/qa/evidence/story-012-monster-transition/` (4 captures, stamp à jour) et fiche `production/qa/evidence/story-012-monster-transition-evidence.md` (sign-off coché)
+**Reviewed by**: self, no independent review

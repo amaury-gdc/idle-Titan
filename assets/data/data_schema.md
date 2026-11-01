@@ -333,3 +333,42 @@ and `equipped` (type id -> item), both survive `GameState.reset()`. An item is `
 loads with both empty. Dropped at load: a malformed item, a repeated `uid`, an equipped item under
 another type than its own. An item whose ids the data no longer knows is kept: an unknown stat gives
 nothing, an unknown rarity ranks as the worst and sells for 0, an unknown type cannot be equipped.
+
+## monster_transition.json
+
+Loaded by `main_screen.gd` and read by `EnemyView.transition_settings` (`src/ui/enemy_view.gd`,
+story 012). Presentation only: no game rule reads it and it never enters a save. All values are
+hypotheses to tune by playing.
+
+Unlike the files above, this one can never stop the game. Every key is optional: a missing file,
+invalid JSON or another `schema_version` gives all the defaults, and a key that is absent, not a
+number or out of range gives its own default. Nothing is reported.
+
+| Key | Type | Default | Range | Meaning |
+|---|---|---|---|---|
+| `schema_version` | int | - | 1 | Currently 1. Any other value gives all the defaults. |
+| `out_seconds` | float (seconds) | 0.15 | 0..2 | Fade of the enemy that dies. 0: no ghost. |
+| `out_end_scale` | float (1 = full size) | 0.85 | 0.05..1 | Size the ghost shrinks to. |
+| `in_seconds` | float (seconds) | 0.2 | 0..2 | Fade of the next enemy. |
+| `in_start_scale` | float (1 = full size) | 0.85 | 0.05..1 | Size the next enemy grows from. |
+| `boss_in_seconds` | float (seconds) | 0.45 | 0..3 | Same as `in_seconds`, for a boss. |
+| `boss_in_start_scale` | float (1 = full size) | 0.5 | 0.05..1 | Same as `in_start_scale`, for a boss. |
+| `boss_flash_alpha` | float, 0..1 | 0.6 | 0..1 | Opacity of the white disc that goes out during the entry of a boss. 0: none. |
+| `crowded_kills_per_second` | float (kills/s) | 3 | 0.1..100 | Above this rate, the transition shortens. |
+| `flash_kills_per_second` | float (kills/s) | 6 | 0.1..200 | From this rate on, there is no ghost and the entry is a bare fade of `flash_seconds`. At or below `crowded_kills_per_second`, it becomes twice that value. |
+| `rate_window_seconds` | float (seconds) | 1 | 0.25..2 | Sliding window of the rate, counted in frame steps and not on the real clock. |
+| `flash_seconds` | float (seconds) | 0.05 | 0..0.5 | Fade of the flash. 0: instant. |
+
+Formulas (`EnemyView.effective_durations`), with rate = kills in the window, the new one included,
+/ `rate_window_seconds`, and entry = `boss_in_seconds` on a boss, otherwise `in_seconds`:
+
+    rate <= crowded            ghost = out_seconds             entry = entry
+    crowded < rate < flash     ghost = out_seconds * factor    entry = entry * factor
+                               with factor = crowded / rate
+    rate >= flash              no ghost                        entry = min(flash_seconds, entry)
+
+The rate stops rising at 64 kills in the window (`EnemyView.KILL_MEMORY`), so a
+`flash_kills_per_second` above 64 / `rate_window_seconds` is never reached.
+
+The "Effets visuels" setting, `prefers-reduced-motion`, a hidden tab and a modal screen all make the
+change instant. Each change of enemy counts as a kill, a boss abandoned or lost included.

@@ -1,0 +1,14 @@
+{
+	"schema_version": 1,
+	"out_seconds": 0.15,
+	"out_end_scale": 0.85,
+	"in_seconds": 0.2,
+	"in_start_scale": 0.85,
+	"boss_in_seconds": 0.45,
+	"boss_in_start_scale": 0.5,
+	"boss_flash_alpha": 0.6,
+	"crowded_kills_per_second": 3,
+	"flash_kills_per_second": 6,
+	"rate_window_seconds": 1,
+	"flash_seconds": 0.05
+}

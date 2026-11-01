@@ -22,7 +22,8 @@ extends Control
 ## the save, and until the player makes one it follows the browser's prefers-reduced-motion. Hidden
 ## tab and modal screens stop and clear them. Both layers stay full-rect overlays at the root: they
 ## aim at [method EnemyView.anchor_global], converted to their own space whenever the enemy or any of
-## its ancestors moves.
+## its ancestors moves. The transition between monsters (story 012) follows the same toggle and the
+## same pause; its values are in monster_transition.json, a file that can never stop the game.
 ##
 ## Input (story 010): 1, 2 and 3 activate the skills, by key position so that they work on any
 ## keyboard layout; the [SaveScreen] text field is inside a modal, and every modal stops them. A
@@ -57,6 +58,7 @@ const BOSSES_PATH: String = "res://assets/data/boss_curves.json"
 const SKILLS_PATH: String = "res://assets/data/skills.json"
 const TALENTS_PATH: String = "res://assets/data/talents.json"
 const ITEMS_PATH: String = "res://assets/data/items.json"
+const TRANSITION_PATH: String = "res://assets/data/monster_transition.json"
 ## Used only when core_curves.json has no valid autosave_interval_seconds
 ## (infrastructure setting, not a gameplay value).
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
@@ -707,6 +709,7 @@ func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> Packed
 # "Effets visuels" setting. [param roster] is the data of companions_roster.json (sphere colours).
 func _setup_visual_effects(roster: Variant) -> void:
 	_display = DisplaySettings.new()
+	_enemy.configure_transition(DataLoader.load_json(TRANSITION_PATH))
 	_orbs.setup(roster)
 	for companion: Companion in _companions.companions():
 		_orbs.set_level(companion.id, _companions.level(companion.id))
@@ -794,6 +797,7 @@ func _apply_visual_effects() -> void:
 	var enabled: bool = _visual_effects_on()
 	_texts.set_enabled(enabled)
 	_orbs.set_enabled(enabled)
+	_enemy.set_transition_enabled(enabled)
 	_save_screen.set_effects(enabled)
 
 
@@ -817,6 +821,7 @@ func _sync_effects_pause() -> void:
 	_effects_paused = paused
 	_texts.set_paused(paused)
 	_orbs.set_paused(paused)
+	_enemy.set_paused(paused)
 
 
 func _on_enemy_clicked() -> void:
