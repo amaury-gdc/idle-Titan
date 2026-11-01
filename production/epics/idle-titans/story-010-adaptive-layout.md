@@ -68,7 +68,7 @@
 
 - [x] Captures conservées dans `production/qa/evidence/story-010-adaptive-layout/` à chaque taille, émulation tactile, navigation clavier, fluidité mesurée dans l'export (normale et processeur ralenti), référence d'avant la story.
 - [x] Revue indépendante par les agents avant de conclure.
-- [ ] Test tactile sur vrai téléphone : à tester par Amaury, rattaché à la fin de la story 011.
+- [x] Test tactile sur vrai téléphone : testé par Amaury à la fin de la story 011, sans preuve conservée.
 
 ---
 
@@ -122,7 +122,7 @@
 
 ## Completion Notes
 **Completed**: 2026-11-01
-**Criteria**: 23/24 passing (test tactile sur vrai téléphone : à tester par Amaury, rattaché à la fin de la story 011)
+**Criteria**: 24/24 passing (test tactile sur vrai téléphone : attesté par Amaury à la fin de la story 011)
 **Deviations**: glissé et appui long validés dans l'émulation seulement quand le navigateur livre les événements tactiles, soit environ une exécution sur deux, cause non établie. Max sur 8 lignes : 7 ms en régime établi, 13 ms au premier calcul, au-dessus des 8 ms. Corrections issues de la revue UX non relues à la clôture : relecture prévue à la fin de la story 011.
 **Test Evidence**: `production/qa/evidence/story-010-adaptive-layout/`, `production/qa/evidence/story-010-adaptive-layout-evidence.md`
 **Reviewed by**: `lead-programmer`, `ux-designer`, `accessibility-specialist`
