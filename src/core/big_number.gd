@@ -95,10 +95,13 @@ func subtract(other: BigNumber) -> BigNumber:
 	return result
 
 
-## Returns this * other (schoolbook; limb products stay below 2^63).
+## Returns this * other (schoolbook; limb products stay below 2^63). A one-limb
+## [param other] takes a single linear pass.
 func multiply(other: BigNumber) -> BigNumber:
 	if is_zero() or other.is_zero():
 		return BigNumber.new()
+	if other._limbs.size() == 1:
+		return _multiply_small(other._limbs[0])
 	var result := BigNumber.new()
 	result._limbs.resize(_limbs.size() + other._limbs.size())
 	for i in _limbs.size():
@@ -168,22 +171,66 @@ func divide(other: BigNumber) -> BigNumber:
 	return quotient
 
 
-## Returns this ^ exponent, exact (square-and-multiply). exponent 0 gives 1,
-## including 0^0 = 1 (usual convention). A negative exponent pushes an error and
-## returns null. Example: BigNumber.from_int(2).power(100) is 1267650600228229401496703205376.
+## Returns floor(this / 10^[param exponent]), exact: the same value as
+## [method divide] by BigNumber.from_int(10).power(exponent), in one pass over the
+## limbs that remain (a limb shift, then a small division). A negative exponent
+## pushes an error and returns null.
+## [codeblock]
+## var n: BigNumber = BigNumber.from_string("1234567890123")
+## print(n.divide_by_power_of_ten(10).to_decimal_string()) # "123"
+## [/codeblock]
+func divide_by_power_of_ten(exponent: int) -> BigNumber:
+	if exponent < 0:
+		push_error("BigNumber.divide_by_power_of_ten: negative exponent")
+		return null
+	var result: BigNumber = BigNumber.new()
+	@warning_ignore("integer_division")
+	var limb_shift: int = exponent / BASE_DIGITS
+	var count: int = _limbs.size() - limb_shift
+	if count <= 0:
+		return result
+	var digit_shift: int = exponent % BASE_DIGITS
+	if digit_shift == 0:
+		result._limbs = _limbs.slice(limb_shift)
+		return result
+	var divisor: int = 10 ** digit_shift
+	@warning_ignore("integer_division")
+	var upper_scale: int = BASE / divisor
+	var limbs: PackedInt64Array = _limbs
+	var quotient: PackedInt64Array = PackedInt64Array()
+	quotient.resize(count)
+	@warning_ignore("integer_division")
+	var low: int = limbs[limb_shift] / divisor
+	for i in count - 1:
+		var next_limb: int = limbs[limb_shift + i + 1]
+		quotient[i] = low + (next_limb % divisor) * upper_scale
+		@warning_ignore("integer_division")
+		low = next_limb / divisor
+	quotient[count - 1] = low
+	result._limbs = quotient
+	result._trim()
+	return result
+
+
+## Returns this ^ exponent, exact (square-and-multiply, highest bit first, so each
+## squaring stays as small as it can be). exponent 0 gives 1, including 0^0 = 1
+## (usual convention). A negative exponent pushes an error and returns null.
+## Example: BigNumber.from_int(2).power(100) is 1267650600228229401496703205376.
 func power(exponent: int) -> BigNumber:
 	if exponent < 0:
 		push_error("BigNumber.power: negative exponent")
 		return null
 	var result: BigNumber = BigNumber.from_int(1)
-	var base: BigNumber = self
-	var e: int = exponent
-	while e > 0:
-		if e & 1 == 1:
-			result = result.multiply(base)
-		e >>= 1
-		if e > 0:
-			base = base.multiply(base)
+	if exponent == 0:
+		return result
+	var bit: int = 0
+	while exponent >> (bit + 1) > 0:
+		bit += 1
+	while bit >= 0:
+		result = result._square()
+		if (exponent >> bit) & 1 == 1:
+			result = result.multiply(self)
+		bit -= 1
 	return result
 
 
@@ -242,14 +289,54 @@ func _multiply_small(m: int) -> BigNumber:
 	var result: BigNumber = BigNumber.new()
 	if m == 0:
 		return result
+	var limbs: PackedInt64Array = _limbs
+	var count: int = limbs.size()
+	var product: PackedInt64Array = PackedInt64Array()
+	product.resize(count + 1)
 	var carry: int = 0
-	for i in _limbs.size():
-		var cur: int = _limbs[i] * m + carry
-		result._limbs.append(cur % BASE)
+	for i in count:
+		var cur: int = limbs[i] * m + carry
+		product[i] = cur % BASE
 		@warning_ignore("integer_division")
 		carry = cur / BASE
-	if carry > 0:
-		result._limbs.append(carry)
+	product[count] = carry
+	result._limbs = product
+	result._trim()
+	return result
+
+
+# Returns this * this, each cross product computed once and doubled (about half the
+# work of multiply). doubled * limb + two limbs stays below 2^63.
+func _square() -> BigNumber:
+	var result: BigNumber = BigNumber.new()
+	var limbs: PackedInt64Array = _limbs
+	var count: int = limbs.size()
+	if count == 0:
+		return result
+	var square: PackedInt64Array = PackedInt64Array()
+	square.resize(count * 2)
+	square.fill(0)
+	for i in count:
+		var limb: int = limbs[i]
+		var cur: int = square[i * 2] + limb * limb
+		square[i * 2] = cur % BASE
+		@warning_ignore("integer_division")
+		var carry: int = cur / BASE
+		var doubled: int = limb * 2
+		for j in range(i + 1, count):
+			cur = square[i + j] + doubled * limbs[j] + carry
+			square[i + j] = cur % BASE
+			@warning_ignore("integer_division")
+			carry = cur / BASE
+		var k: int = i + count
+		while carry > 0:
+			cur = square[k] + carry
+			square[k] = cur % BASE
+			@warning_ignore("integer_division")
+			carry = cur / BASE
+			k += 1
+	result._limbs = square
+	result._trim()
 	return result
 
 

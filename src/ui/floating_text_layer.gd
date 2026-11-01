@@ -14,8 +14,11 @@ extends Control
 ##
 ## What is shown: a click, a critical hit (bigger, ends with "!") and the skill burst (very
 ## big); a companion attack shows nothing. A kill shows its gold, golden, rising to the right and
-## fading, bigger for a boss. The small sideways offset of the hit texts comes from a counter, not
-## from a random generator: the dice of the game are never touched.
+## fading, bigger for a boss. When enemies die very fast the golds merge (story 011): the first kill
+## shows at once, and for [constant GOLD_MERGE_SECONDS] the next ones add to that same text, which
+## takes the boss size if a boss is in the sum and stays inside the bounds as it grows. The small
+## sideways offset of the hit texts comes from a counter, not from a random generator: the dice of
+## the game are never touched.
 ##
 ## Two switches stop everything: [method set_enabled] (the "Effets visuels" setting) and
 ## [method set_paused] (hidden tab, modal screen). Either one clears the running texts, so that
@@ -38,14 +41,14 @@ const MAX_FRAME_SECONDS: float = 0.1
 ## Size of every label; the text is centered in it (display setting, not a gameplay value).
 const LABEL_SIZE: Vector2 = Vector2(480.0, 110.0)
 ## Dark outline of every text (display setting, not a gameplay value).
-const OUTLINE_SIZE: int = 8
+const OUTLINE_SIZE: int = 6
 const OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0, 1.0)
 ## Font sizes (display setting, not a gameplay value).
-const FONT_SIZE_HIT: int = 30
-const FONT_SIZE_CRITICAL: int = 46
-const FONT_SIZE_BURST: int = 66
-const FONT_SIZE_GOLD: int = 30
-const FONT_SIZE_GOLD_BOSS: int = 48
+const FONT_SIZE_HIT: int = 24
+const FONT_SIZE_CRITICAL: int = 32
+const FONT_SIZE_BURST: int = 48
+const FONT_SIZE_GOLD: int = 24
+const FONT_SIZE_GOLD_BOSS: int = 32
 ## Colors (display setting, not a gameplay value).
 const COLOR_HIT: Color = Color(1.0, 1.0, 1.0, 1.0)
 const COLOR_CRITICAL: Color = Color(1.0, 0.62, 0.45, 1.0)
@@ -55,6 +58,11 @@ const COLOR_GOLD: Color = Color(1.0, 0.84, 0.25, 1.0)
 const HIT_SECONDS: float = 0.8
 const GOLD_SECONDS: float = 1.3
 const FADE_START: float = 0.6
+## Seconds after a gold text opens during which the next kills add to it (display setting, not a
+## gameplay value).
+const GOLD_MERGE_SECONDS: float = 0.3
+## [member _merge_slot] when no gold text is open to merging.
+const NO_MERGE: int = -1
 ## Where a text starts relative to the anchor, and how far it travels (display setting).
 ## A hit rises straight up; the gold rises diagonally to the RIGHT.
 const HIT_START_OFFSET: Vector2 = Vector2(0.0, -40.0)
@@ -73,11 +81,23 @@ var _origin: PackedVector2Array = PackedVector2Array()
 var _travel: PackedVector2Array = PackedVector2Array()
 ## Start order of each text; the smallest number of the busy ones is the oldest.
 var _order: PackedInt64Array = PackedInt64Array()
+## Font size each label was last given: a text of the same size touches no theme override.
+var _font_sizes: PackedInt32Array = PackedInt32Array()
 var _busy_count: int = 0
 var _counter: int = 0
 var _anchor: Vector2 = Vector2.ZERO
+var _box_scale: float = 1.0
+var _bounds: Rect2 = Rect2()
 var _enabled: bool = true
 var _paused: bool = false
+## The label of the gold text still merging, its time left, the sum so far, whether a boss is in
+## it, and where it would go before the bounds: a longer sum is fitted again from there.
+var _merge_slot: int = NO_MERGE
+var _merge_left: float = 0.0
+var _merge_total: BigNumber
+var _merge_boss: bool = false
+var _merge_origin: Vector2 = Vector2.ZERO
+var _merge_travel: Vector2 = Vector2.ZERO
 
 
 ## Builds the pool: [constant POOL_SIZE] hidden labels, the only ones this layer will ever have.
@@ -89,6 +109,7 @@ func _init() -> void:
 	_origin.resize(POOL_SIZE)
 	_travel.resize(POOL_SIZE)
 	_order.resize(POOL_SIZE)
+	_font_sizes.resize(POOL_SIZE)
 	for i in POOL_SIZE:
 		var label: Label = Label.new()
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -105,18 +126,18 @@ func _init() -> void:
 
 func _process(delta: float) -> void:
 	var step: float = clampf(delta, 0.0, MAX_FRAME_SECONDS)
+	if _merge_slot != NO_MERGE:
+		_merge_left -= step
+		if _merge_left <= 0.0:
+			_merge_slot = NO_MERGE
 	for i in POOL_SIZE:
 		if _busy[i] == 0:
 			continue
 		_age[i] += step
-		var t: float = _age[i] / _life[i]
-		if t >= 1.0:
+		if _age[i] >= _life[i]:
 			_release(i)
 			continue
-		var eased: float = 1.0 - (1.0 - t) * (1.0 - t)
-		var label: Label = _labels[i]
-		label.position = _origin[i] - LABEL_SIZE / 2.0 + _travel[i] * eased
-		label.modulate.a = 1.0 if t < FADE_START else (1.0 - t) / (1.0 - FADE_START)
+		_place(i)
 	if _busy_count == 0:
 		set_process(false)
 
@@ -124,6 +145,30 @@ func _process(delta: float) -> void:
 ## Where the texts start: the center of the monster, in this layer's coordinates.
 func set_target_point(point: Vector2) -> void:
 	_anchor = point
+
+
+## Keeps every next text whole inside [param bounds] (in this layer's coordinates), from its start
+## to the end of its travel, so that it never covers the buttons around the monster. An empty
+## rectangle means no limit, the default.
+func set_bounds(bounds: Rect2) -> void:
+	_bounds = bounds
+
+
+## [param point] moved as little as possible so that a text of half size [param half] centered on
+## it stays whole inside [param bounds]; a text too big for an axis is centered on that axis.
+static func keep_inside(point: Vector2, half: Vector2, bounds: Rect2) -> Vector2:
+	var low: Vector2 = bounds.position + half
+	var high: Vector2 = bounds.end - half
+	var center: Vector2 = bounds.get_center()
+	return Vector2(
+			clampf(point.x, low.x, high.x) if low.x <= high.x else center.x,
+			clampf(point.y, low.y, high.y) if low.y <= high.y else center.y)
+
+
+## Size of the monster relative to its drawing units ([method EnemyView.box_scale]): the offsets and
+## the travels of the next texts follow it. The font sizes do not.
+func set_box_scale(factor: float) -> void:
+	_box_scale = factor
 
 
 ## The "Effets visuels" setting: off clears every text and ignores new events.
@@ -174,24 +219,87 @@ func show_hit(damage: BigNumber, source: int) -> void:
 		_:
 			return
 	var jitter: Vector2 = Vector2(HIT_JITTER_X[_counter % HIT_JITTER_X.size()], 0.0)
-	_start(text, font_size, color, _anchor + HIT_START_OFFSET + jitter, HIT_TRAVEL, HIT_SECONDS)
+	var origin: Vector2 = _anchor + (HIT_START_OFFSET + jitter) * _box_scale
+	_start(text, font_size, color, origin, HIT_TRAVEL * _box_scale, HIT_SECONDS)
 
 
-## Shows the gold of a kill. Made to be connected to [signal FloorManager.kill_rewarded]:
+## Shows the gold of a kill, or adds it to the gold text still merging (see
+## [constant GOLD_MERGE_SECONDS]). Made to be connected to [signal FloorManager.kill_rewarded]:
 ## [param gold] is the reward really granted, [param was_boss] makes the text bigger.
 func show_gold(_stage: int, gold: BigNumber, was_boss: bool) -> void:
 	if not _is_active():
 		return
-	var font_size: int = FONT_SIZE_GOLD_BOSS if was_boss else FONT_SIZE_GOLD
-	_start(tr("+%s or") % gold.format(), font_size, COLOR_GOLD, _anchor + GOLD_START_OFFSET, GOLD_TRAVEL, GOLD_SECONDS)
+	if _merge_slot != NO_MERGE:
+		_add_to_merge(gold, was_boss)
+		return
+	_merge_total = gold
+	_merge_boss = was_boss
+	_merge_origin = _anchor + GOLD_START_OFFSET * _box_scale
+	_merge_travel = GOLD_TRAVEL * _box_scale
+	_merge_slot = _start(_gold_text(), _gold_font_size(), COLOR_GOLD, _merge_origin, _merge_travel, GOLD_SECONDS)
+	_merge_left = GOLD_MERGE_SECONDS
 
 
 func _is_active() -> bool:
 	return _enabled and not _paused
 
 
-# Puts a text in the first free label, else takes over the oldest one.
-func _start(text: String, font_size: int, color: Color, origin: Vector2, travel: Vector2, life: float) -> void:
+func _gold_text() -> String:
+	return tr("+%s or") % _merge_total.format()
+
+
+func _gold_font_size() -> int:
+	return FONT_SIZE_GOLD_BOSS if _merge_boss else FONT_SIZE_GOLD
+
+
+func _add_to_merge(gold: BigNumber, was_boss: bool) -> void:
+	_merge_total = _merge_total.add(gold)
+	_merge_boss = _merge_boss or was_boss
+	var text: String = _gold_text()
+	var font_size: int = _gold_font_size()
+	var slot: int = _merge_slot
+	_fit(slot, text, font_size, _merge_origin, _merge_travel)
+	_labels[slot].text = text
+	_set_font_size(slot, font_size)
+	_place(slot)
+
+
+# An override rebuilds the label's theme cache: this runs on every kill of a fast fight.
+func _set_font_size(slot: int, font_size: int) -> void:
+	if _font_sizes[slot] != font_size:
+		_font_sizes[slot] = font_size
+		_labels[slot].add_theme_font_size_override("font_size", font_size)
+
+
+# Moves label [param i] along its path, by its age.
+func _place(i: int) -> void:
+	var t: float = _age[i] / _life[i]
+	var eased: float = 1.0 - (1.0 - t) * (1.0 - t)
+	var label: Label = _labels[i]
+	label.position = _origin[i] - LABEL_SIZE / 2.0 + _travel[i] * eased
+	label.modulate.a = 1.0 if t < FADE_START else (1.0 - t) / (1.0 - FADE_START)
+
+
+# Sets the path of [param slot] so that the text stays whole inside the bounds all along it.
+func _fit(slot: int, text: String, font_size: int, origin: Vector2, travel: Vector2) -> void:
+	if _bounds.has_area():
+		var half: Vector2 = _half_size(text, font_size)
+		var end: Vector2 = keep_inside(origin + travel, half, _bounds)
+		origin = keep_inside(origin, half, _bounds)
+		travel = end - origin
+	_origin[slot] = origin
+	_travel[slot] = travel
+
+
+# Half the size a text takes on screen, its outline included.
+func _half_size(text: String, font_size: int) -> Vector2:
+	var font: Font = _labels[0].get_theme_font("font")
+	var text_size: Vector2 = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	return text_size / 2.0 + Vector2.ONE * float(OUTLINE_SIZE)
+
+
+# Puts a text in the first free label, else takes over the oldest one, and returns that label.
+func _start(text: String, font_size: int, color: Color, origin: Vector2, travel: Vector2, life: float) -> int:
 	var slot: int = -1
 	var oldest: int = 0
 	for i in POOL_SIZE:
@@ -202,6 +310,8 @@ func _start(text: String, font_size: int, color: Color, origin: Vector2, travel:
 			oldest = i
 	if slot < 0:
 		slot = oldest
+	if slot == _merge_slot:
+		_merge_slot = NO_MERGE
 	if _busy[slot] == 0:
 		_busy[slot] = 1
 		_busy_count += 1
@@ -209,19 +319,21 @@ func _start(text: String, font_size: int, color: Color, origin: Vector2, travel:
 	_order[slot] = _counter
 	_age[slot] = 0.0
 	_life[slot] = life
-	_origin[slot] = origin
-	_travel[slot] = travel
+	_fit(slot, text, font_size, origin, travel)
 	var label: Label = _labels[slot]
 	label.text = text
-	label.add_theme_font_size_override("font_size", font_size)
+	_set_font_size(slot, font_size)
 	label.add_theme_color_override("font_color", color)
 	label.modulate = Color.WHITE
-	label.position = origin - LABEL_SIZE / 2.0
+	label.position = _origin[slot] - LABEL_SIZE / 2.0
 	label.visible = true
 	set_process(true)
+	return slot
 
 
 func _release(i: int) -> void:
+	if i == _merge_slot:
+		_merge_slot = NO_MERGE
 	if _busy[i] == 0:
 		return
 	_busy[i] = 0

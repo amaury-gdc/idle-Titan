@@ -10,22 +10,30 @@ config_version=5
 
 [application]
 
-config/name="Claude-Code-Game-Studios"
+config/name="Catitans"
 config/version="0.1.0"
 run/main_scene="res://src/ui/main_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0.0392157, 0.0509804, 0.0901961, 1)
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
+window/stretch/aspect="expand"
+window/stretch/scale_mode="fractional"
 
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 
+[gui]
+
+common/default_scroll_deadzone=10
+theme/custom="res://src/ui/main_theme.tres"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.0392157, 0.0509804, 0.0901961, 1)

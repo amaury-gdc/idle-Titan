@@ -3,15 +3,15 @@
 [ext_resource type="Script" path="res://src/ui/skill_bar.gd" id="1_bar"]
 
 [node name="SkillBar" type="VBoxContainer"]
-offset_right = 190.0
-offset_bottom = 270.0
 theme_override_constants/separation = 8
 script = ExtResource("1_bar")
 
-[node name="Buttons" type="VBoxContainer" parent="."]
+[node name="Buttons" type="BoxContainer" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 8
+vertical = true
 
 [node name="BuffLabel" type="Label" parent="."]
 unique_name_in_owner = true

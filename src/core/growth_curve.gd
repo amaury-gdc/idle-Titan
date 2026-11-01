@@ -8,8 +8,9 @@ extends RefCounted
 ## and independent of any per-step rounding (applying multiply_decimal step by
 ## step would truncate at every step and drift).
 ##
-## Cost: one power + one division on numbers of about steps * 0.12 limbs; meant
-## to be called once per stage or purchase, not per frame. Single-thread only.
+## Cost: one power on numbers of about steps * 0.23 limbs for a "1.08" factor, then
+## a linear floor by the power of ten; meant to be called once per stage or
+## purchase, not per frame. Single-thread only.
 ##
 ## Usage:
 ## [codeblock]
@@ -21,7 +22,7 @@ extends RefCounted
 ## True if [param growth] is "123" or "1.25": ASCII digits, at most one dot,
 ## digits on both sides of the dot (same grammar as [method BigNumber.multiply_decimal]).
 static func is_valid_factor(growth: String) -> bool:
-	return _parse_factor(growth).size() == 2
+	return parse_factor(growth).size() == 2
 
 
 ## Returns floor(base * growth^steps), exact. Returns null (and pushes an error)
@@ -31,18 +32,19 @@ static func value_at(base: BigNumber, growth: String, steps: int) -> BigNumber:
 	if steps < 0:
 		push_error("GrowthCurve.value_at: negative steps")
 		return null
-	var parsed: Array = _parse_factor(growth)
+	var parsed: Array = parse_factor(growth)
 	if parsed.size() != 2:
 		push_error("GrowthCurve.value_at: invalid growth factor '%s'" % growth)
 		return null
 	var numerator: BigNumber = parsed[0]
 	var scale: int = parsed[1]
 	var scaled: BigNumber = base.multiply(numerator.power(steps))
-	return scaled.divide(BigNumber.from_int(10).power(scale * steps))
+	return scaled.divide_by_power_of_ten(scale * steps)
 
 
-# Returns [numerator: BigNumber, scale: int] or [] when invalid.
-static func _parse_factor(growth: String) -> Array:
+## Returns [param growth] as the exact fraction [numerator: BigNumber, scale: int],
+## meaning numerator / 10^scale, or [] when invalid. "1.08" gives [108, 2], "2" gives [2, 0].
+static func parse_factor(growth: String) -> Array:
 	var parts: PackedStringArray = growth.split(".")
 	if parts.size() > 2:
 		return []

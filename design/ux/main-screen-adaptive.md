@@ -1,6 +1,6 @@
 # UX Spec: Écran principal adaptatif
 
-> **Status**: In Review, décisions D1 à D8 en attente d'Amaury
+> **Status**: Approved par Amaury le 2026-11-01, décisions D1 à D8 acceptées telles que recommandées ; `/ux-review` : NOT ASSESSED (aucun palier d'accessibilité défini)
 > **Author**: Amaury + ux-designer, ui-programmer, accessibility-specialist, godot-specialist, art-director, qa-tester
 > **Last Updated**: 2026-11-01
 > **Journey Phase(s)**: toutes (écran unique du jeu) ; pas de carte de parcours
@@ -56,14 +56,16 @@ Racine du jeu, seul écran. Onglets Compagnons, Objets, Talents dans la zone de 
 
 | Forme | Base | Plancher | Exemple → taille logique (1 u en px CSS) |
 |---|---|---|---|
-| Portrait | 390x640 | 0,875 px CSS par u | 390x844 → 390x844 (1) ; 768x1024 → 480x640 (1,6) ; fenêtre de 320 de large → 366 u de large (0,875) |
-| Paysage | 1280x720 | 0,875 px CSS par u | 1280x720 → 1280x720 (1) ; 1920x1080 → 1280x720 (1,5) ; 2560x1080 → 1707x720 (1,5) ; 844x390 → 964x446 (0,875) |
+| Portrait | 390x640 | 0,88 px CSS par u | 390x844 → 390x844 (1) ; 768x1024 → 600x800 (1,28) ; fenêtre de 320 de large → 363 u de large (0,88) |
+| Paysage | 1280x720 | 0,88 px CSS par u | 1280x720 → 1280x720 (1) ; 1920x1080 → 1280x720 (1,5) ; 2560x1080 → 1707x720 (1,5) ; 844x390 → 959x443 (0,88) |
 
 Écarté : une base fixe (1280x720 donne du texte à 0,3 sur téléphone ; 720x720 impose des cibles de 81 u, trop grosses sur PC, donc des paliers par appareil).
 
-**Deux règles qui découlent du plancher, valables partout** : toute cible fait au moins 50 u (44 px CSS à 0,875) et tout texte au moins 16 u (14 px CSS à 0,875).
+**Deux règles qui découlent du plancher, valables partout** : toute cible fait au moins 50 u (44 px CSS à 0,88) et tout texte au moins 16 u (14 px CSS à 0,88).
 
-**Détection** : rapport largeur/hauteur de la fenêtre lu sur `get_window().size_changed`. Passage en portrait sous 0,90, en paysage au-dessus de 1,00, démarrage à 0,95. L'hystérésis évite les bascules ; elle ne déclenche rien avec les barres de navigateur, loin de ces seuils. La forme est appliquée en synchrone dans `_ready`, sans clignotement d'une mauvaise disposition.
+Échelle du portrait plafonnée à 1,28 : une tablette 768x1024 donne environ 600x800 u, et plus de lignes de liste.
+
+**Détection** : rapport largeur/hauteur de la fenêtre lu sur `get_window().size_changed`. Passage en portrait sous 1,10, en paysage au-dessus de 1,20, démarrage à 1,15 (revue indépendante : à 900x900, le paysage laissait un monstre petit et des zones vides). L'hystérésis évite les bascules ; elle ne déclenche rien avec les barres de navigateur, loin de ces seuils. La forme est appliquée en synchrone dans `_ready`, sans clignotement d'une mauvaise disposition.
 
 **Orientation** : jamais de verrouillage ni de message « tournez votre téléphone ». Écran en paysage → disposition paysage, jeu continu, conforme à ta préférence.
 
@@ -117,7 +119,7 @@ Paysage 1280x720 et plus. Même structure à 844x390 et 2560x1080 : seule l'éch
 | Zone de gestion | Bas, tout le reste | Droite 40 % | Fond `#212130` |
 | Onglets | Bas de l'écran | Bas de la colonne de droite | Même composant |
 
-Largeur de gestion : une seule version de liste, qui s'adapte à sa propre largeur. Sous 640 u : détail qui remplace la liste, arbre sur une branche à la fois. À partir de 640 u : liste et détail côte à côte, arbre complet.
+Largeur de gestion : une seule version de liste, qui s'adapte à sa propre largeur. Sous 640 u : détail qui remplace la liste, arbre sur une branche à la fois. À partir de 640 u : liste et détail côte à côte. L'arbre complet demande en plus 480 u de haut et assez de largeur pour ses branches, sinon il reste sur une branche ; son détail est une bande sous l'arbre, trois colonnes de nœuds ne laissant aucune place à côté.
 
 **Monstre et ancrage.** Boîte carrée `MB` = plus grand carré de l'emplacement réservé, plafonnée à 640 u, jamais plus que 55 % de la largeur de zone. Aujourd'hui, 300 unités de dessin. `EnemyView` applique le facteur `MB/300` au dessin et à la zone de clic (`draw_set_transform`, pas `scale`, réservé à `play_hit`). Contrat stable pour les futurs chats : `clicked`, `set_stage`, `play_hit`, centre d'ancrage en coordonnées globales, rayon de clic. Couche de textes et sphères au-dessus de tout, position recalculée à chaque `resized`, via le centre du rectangle non tourné, jamais `position`. Marges dans la boîte : 20 % en haut, 10 % sur les côtés. Trajets des textes multipliés par `MB/300`.
 
@@ -134,7 +136,7 @@ Largeur de gestion : une seule version de liste, qui s'adapte à sa propre large
 | Bandeau d'action | Bouton ou chrono | Défier, ou BOSS + chrono + Abandonner | Oui | Existant |
 | Monstre | Zone cliquable | `EnemyView` | Oui | Existant |
 | Barre de PV | Barre ancrée | PV | Non | Ancres au lieu de `size.x` |
-| Compétences | 3 boutons | Nom, état, recharge | Oui, appui long | Existant + nouveau |
+| Compétences | 3 boutons | Nom, état (« Disponible », « En cours : 15 s », « Dans 60 s ») | Oui, appui long | Existant + nouveau |
 | Défi automatique | Bascule | OUI/NON | Oui | Existant |
 | Version | Texte 16 u | `v0.1.0` | Non | Reste visible dans un coin (ta demande d'origine) |
 | Onglets | 3 boutons bascule (`ButtonGroup`) | Libellé, point, compteur | Oui | Nouveau |
@@ -142,10 +144,10 @@ Largeur de gestion : une seule version de liste, qui s'adapte à sa propre large
 | Lignes compagnon | Ligne + bouton | Nom, niveau, DPS, coût | Oui | Existant adapté |
 | Objets | Emplacements, sac, détail | Comparaison | Oui | Refonte, story B |
 | Talents | Branches, détail | Nœuds | Oui | Refonte, story B |
-| Butin | Message non bloquant, 4 s | Objet reçu | Non | Sous le bandeau d'action, au-dessus du monstre ; ne capte aucun clic |
+| Butin | Message non bloquant, 4 s | Objet reçu | Non | Dans la partie libre du bandeau d'action, sinon sous lui, sans couvrir les sphères ; ne capte aucun clic |
 | Astuce boss | Bandeau bas du monstre | 2 à 3 lignes | Non | Existant déplacé |
 
-Disparaissent de l'écran : « Dégâts de clic » (dans le détail DPS) et la ligne des buffs (les boutons affichent déjà « Actif : 12 s »).
+Disparaissent de l'écran : « Dégâts de clic » (dans le détail DPS) et la ligne des buffs (les boutons affichent déjà « En cours : 15 s »).
 
 ### Information Hierarchy
 
@@ -159,7 +161,7 @@ Disparaissent de l'écran : « Dégâts de clic » (dans le détail DPS) et la l
 
 Jetons issus des couleurs actuelles, 2 ors fusionnés : fonds `#0A0D17`, `#171A29` ; panneaux `#212130`, `#40404D` ; bord `#BFBFCC` ; or `#FFD640` ; PV `#D93333` sur `#471A1A` ; DPS `#FF9E73` ; prêt `#218040` + bord `#80F299` ; actif `#8C6B0D` + bord or ; désactivé `#2B2B33`.
 
-Texte : 5 tailles au lieu de 15, soit 16, 20, 24, 32, 48 u. Portrait : étage et or 20, DPS, corps et secondaire 16, le secondaire se distinguant par sa couleur. Paysage : étage et or 32, DPS 24, corps 20, secondaire 16. Un seul contour de 6 u. Un seul `Theme` partagé.
+Texte : 5 tailles au lieu de 15, soit 16, 20, 24, 32, 48 u. Portrait : étage et or 20, DPS, corps et secondaire 16, le secondaire se distinguant par sa couleur. Paysage : étage et or 32, DPS 24, corps 20, secondaire 16 ; le corps des panneaux Objets et Talents reste à 16, pour la densité. Un seul contour de 6 u. Un seul `Theme` partagé.
 
 ---
 
@@ -178,7 +180,7 @@ Texte : 5 tailles au lieu de 15, soit 16, 20, 24, 32, 48 u. Portrait : étage et
 | Sac vide, aucun talent achetable | Données vides | Texte d'état dans l'onglet |
 | Changement de forme | Rotation, redimensionnement | Mêmes nœuds : onglet, défilement, détail et focus conservés |
 | Onglet navigateur caché | `visibilitychange` | Effets effacés, sauvegarde |
-| Réglages, retour d'absence | Ouverture | Largeur : le plus petit de 720 u et de la largeur moins 32 u. Hauteur limitée à la fenêtre, contenu défilant : Réglages (600 u aujourd'hui) ne tient pas dans les 446 u du paysage téléphone |
+| Réglages, retour d'absence | Ouverture | Largeur : le plus petit de 720 u et de la largeur moins 32 u. Hauteur limitée à la fenêtre, contenu défilant : Réglages (600 u aujourd'hui) ne tient pas dans les 443 u du paysage téléphone |
 
 ---
 
@@ -327,7 +329,7 @@ Français seul pour l'instant, tout passe par `tr()`. Aucun libellé en majuscul
 
 ## Open Questions
 
-Décisions d'Amaury :
+Décisions d'Amaury, toutes acceptées le 2026-11-01 selon la recommandation :
 
 - **D1. Pause.** Aujourd'hui Talents et Objets arrêtent le jeu, chrono de boss compris. Recommandation : les onglets ne mettent pas en pause, sinon l'idle s'arrête quand un onglet reste ouvert. C'est un changement de comportement à accepter, malgré « logique inchangée ». Seuls Réglages et le retour d'absence attendent.
 - **D2. Raccourcis.** 1/2/3 n'existent pas aujourd'hui, et le monstre n'est pas attaquable au clavier. Recommandation : ajouter 1/2/3, et rendre le monstre focalisable (Espace ou Entrée, sans répétition en maintien). Manette : pas de prise en charge dédiée, malgré `ui-code.md`.
@@ -340,8 +342,9 @@ Décisions d'Amaury :
 
 Points ouverts techniques :
 
-- Mesure à faire d'abord : coût réel de `cost_of_level` pour Max dans l'export web ; l'estimation de plusieurs secondes de blocage n'est pas mesurée. Elle décide aussi si le coût de Max peut s'afficher en continu sur les 8 lignes.
-- Plancher de 0,875 et seuils de forme (0,90 et 1,00) : valeurs de départ, à ajuster sur téléphone réel.
+- Mesuré dans l'export web le 2026-11-01 : un prix coûte 39 ms au niveau 400, 150 ms au niveau 1000 ; 100 niveaux coûtent 2,8 s à partir du niveau 400, 13,9 s à partir du niveau 1000. Max n'est pas faisable sans accélérer le calcul : division par une puissance de 10 en décalage de chiffres, et somme incrémentale, à résultats exacts identiques (story 010).
+- Plancher de 0,88 et seuils de forme (1,10 et 1,20) : valeurs de départ, à ajuster sur téléphone réel.
+- Point de notification : compteur seulement sur Talents, où il existe ; Compagnons et Objets montrent la pastille seule.
 - Saccade à la première préparation des tailles de texte, et effet d'un redimensionnement sur le cache de glyphes : à mesurer.
 - Encoche : l'export ne lit pas les zones sûres ; le fond de la page comble l'espace, sans `viewport-fit=cover`.
 - `SaveText` sur téléphone sans clavier virtuel : la copie à vérifier.

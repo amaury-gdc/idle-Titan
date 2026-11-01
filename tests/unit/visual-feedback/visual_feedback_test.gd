@@ -298,6 +298,9 @@ func test_layer_gold_text_shows_the_reward_and_is_bigger_for_a_boss() -> void:
 	var gold: BigNumber = BigNumber.from_int(UNIQUE_DAMAGE)
 
 	layer.show_gold(NORMAL_STAGE, gold, false)
+	# Past the merge window: two golds in a row would make one text (story 011).
+	for i in ceili(FloatingTextLayer.GOLD_MERGE_SECONDS / FloatingTextLayer.MAX_FRAME_SECONDS) + 1:
+		layer._process(FloatingTextLayer.MAX_FRAME_SECONDS)
 	layer.show_gold(BOSS_STAGE, gold, true)
 
 	assert_str(_label(layer, 0).text).is_equal("+%s or" % gold.format())

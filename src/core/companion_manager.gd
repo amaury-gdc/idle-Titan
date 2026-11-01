@@ -24,8 +24,14 @@ extends RefCounted
 ## companions.tick(delta)
 ## [/codeblock]
 
-## Gold was spent and [param id] is now at [param new_level] (a first purchase gives 1).
+## Gold was spent on one level through [method buy_or_upgrade] and [param id] is now at
+## [param new_level] (a first purchase gives 1). A batch does not emit it: see
+## [signal companions_bought].
 signal companion_leveled_up(id: String, new_level: int)
+## One [method buy_levels] succeeded and [param id] is now at [param new_level]. Emitted
+## once per batch, in place of [signal companion_leveled_up], so a listener connected
+## to both redraws once whatever the batch size.
+signal companions_bought(id: String, new_level: int)
 ## [param id] attacked on its own and dealt [param damage] (already applied to the enemy).
 signal companion_attacked(id: String, damage: BigNumber)
 
@@ -34,6 +40,13 @@ signal companion_attacked(id: String, damage: BigNumber)
 ## trigger a flood of attacks. Offline progress is a separate feature (brief
 ## "Hors-ligne"), not handled here. Infrastructure safety bound, not balance.
 const MAX_TICK_SECONDS: float = 5.0
+## Most levels one [method affordable_levels] scan counts, so a huge gold value cannot
+## make it run without end. 1000 levels of the cheapest companion, from level 0, cost
+## about 3e35 gold (cost_growth 1.08, base_cost 10). The wall stands before stage 130,
+## where one kill pays about 3e14; a kill only pays 3e35 near stage 330. So this
+## cannot change a purchase in play, and past it a second purchase buys the rest.
+## Infrastructure safety bound, not balance.
+const MAX_SCAN_LEVELS: int = 1000
 
 var _state: GameState
 var _combat: Combat
@@ -88,6 +101,58 @@ func can_buy(id: String) -> bool:
 	if _combat.companion(id) == null:
 		return false
 	return _state.gold.compare(next_cost(id)) >= 0
+
+
+## Exact gold cost of the next [param count] levels of [param id], the sum of what
+## [param count] calls of [method buy_or_upgrade] would spend. 0 when count <= 0.
+## [param id] must be in the roster.
+func cost_of_levels(id: String, count: int) -> BigNumber:
+	return _combat.companion(id).cost_of_levels_from(level(id) + 1, count)
+
+
+## How many next levels of [param id] the gold on hand covers, at most [param max_count]
+## and never more than [constant MAX_SCAN_LEVELS]. 0 for an unknown id or when
+## max_count <= 0. The result can be passed to [method buy_levels] as is.
+func affordable_levels(id: String, max_count: int = MAX_SCAN_LEVELS) -> int:
+	var companion: Companion = _combat.companion(id)
+	if companion == null:
+		return 0
+	return companion.affordable_levels_from(level(id) + 1, _state.gold, mini(max_count, MAX_SCAN_LEVELS))
+
+
+## What [method affordable_levels] counts, with the exact cost of those levels, from one walk:
+## {"count": int, "total": BigNumber}. An unknown id gives a count of 0.
+func affordable_walk(id: String, max_count: int = MAX_SCAN_LEVELS) -> Dictionary:
+	var companion: Companion = _combat.companion(id)
+	if companion == null:
+		return {"count": 0, "total": BigNumber.new()}
+	return companion.affordable_walk_from(level(id) + 1, _state.gold, mini(max_count, MAX_SCAN_LEVELS))
+
+
+## The tier levels of [param id], which must be in the roster. Read-only: do not modify.
+func tier_levels(id: String) -> Array[int]:
+	return _combat.companion(id).tier_levels()
+
+
+## Buys the next [param count] levels of [param id] as one transaction, spending
+## exactly [method cost_of_levels]. Returns true on success. Unknown id, count <= 0 or
+## gold short of the whole sum: returns false and nothing changes. Emits
+## [signal companions_bought] once on success, and no [signal companion_leveled_up].
+## [codeblock]
+## if companions.buy_levels("archer", companions.affordable_levels("archer")):
+##     print(companions.level("archer"))
+## [/codeblock]
+func buy_levels(id: String, count: int) -> bool:
+	if count <= 0 or _combat.companion(id) == null:
+		return false
+	var total: BigNumber = cost_of_levels(id, count)
+	if _state.gold.compare(total) < 0:
+		return false
+	_state.gold = _state.gold.subtract(total)
+	var new_level: int = level(id) + count
+	_state.companion_levels[id] = new_level
+	companions_bought.emit(id, new_level)
+	return true
 
 
 ## Buys [param id] (level 0 to 1) or raises it by one level, spending [method next_cost]

@@ -15,7 +15,8 @@ extends Control
 ## The sphere colours come from the "color" field of companions_roster.json (see
 ## assets/data/data_schema.md); a missing or invalid one gives [constant DEFAULT_COLOR]. Each
 ## companion has a fixed slot in a grid, in roster order, so a sphere never moves when another
-## companion is bought.
+## companion is bought. The main screen replaces the default grid with the slots of its layout
+## through [method set_slots], at each change of size or shape; the rest of the API is the same.
 ##
 ## Two switches stop the animation: [method set_enabled] (the "Effets visuels" setting, off draws
 ## nothing at all) and [method set_paused] (hidden tab, modal screen: the balls are cleared and
@@ -68,6 +69,9 @@ var _ball_count: int = 0
 var _anchor: Vector2 = Vector2.ZERO
 var _enabled: bool = true
 var _paused: bool = false
+## Positions set by [method set_slots]; empty means the default grid.
+var _slots: PackedVector2Array = PackedVector2Array()
+var _orb_radius: float = ORB_RADIUS
 
 
 func _init() -> void:
@@ -106,15 +110,16 @@ func _draw() -> void:
 		if _owned[i] == 0:
 			continue
 		var center: Vector2 = _orb_position(i)
-		draw_circle(center, ORB_RADIUS + OUTLINE_WIDTH, OUTLINE_COLOR)
-		draw_circle(center, ORB_RADIUS, _colors[i])
-		draw_circle(center + Vector2(-ORB_RADIUS, -ORB_RADIUS) * 0.35, ORB_RADIUS * 0.35, HIGHLIGHT_COLOR)
+		draw_circle(center, _orb_radius + OUTLINE_WIDTH, OUTLINE_COLOR)
+		draw_circle(center, _orb_radius, _colors[i])
+		draw_circle(center + Vector2(-_orb_radius, -_orb_radius) * 0.35, _orb_radius * 0.35, HIGHLIGHT_COLOR)
+	var ball_radius: float = BALL_RADIUS * _orb_radius / ORB_RADIUS
 	for i in BALL_POOL_SIZE:
 		if _ball_busy[i] == 0:
 			continue
 		var position_now: Vector2 = _ball_from[i].lerp(_anchor, _ball_age[i] / BALL_FLIGHT_SECONDS)
-		draw_circle(position_now, BALL_RADIUS + OUTLINE_WIDTH * 0.5, OUTLINE_COLOR)
-		draw_circle(position_now, BALL_RADIUS, _ball_color[i])
+		draw_circle(position_now, ball_radius + OUTLINE_WIDTH * 0.5, OUTLINE_COLOR)
+		draw_circle(position_now, ball_radius, _ball_color[i])
 
 
 ## Reads the companions of the roster data (the Variant [method DataLoader.load_json] returns): the
@@ -145,6 +150,14 @@ func setup(roster: Variant) -> void:
 ## Where the balls fly to: the center of the monster, in this node's coordinates.
 func set_target_point(point: Vector2) -> void:
 	_anchor = point
+
+
+## Where the spheres stand, in this node's coordinates, and their radius: one fixed slot per
+## companion in roster order. An empty [param slots] goes back to the default grid.
+func set_slots(slots: PackedVector2Array, radius: float = ORB_RADIUS) -> void:
+	_slots = slots
+	_orb_radius = radius
+	queue_redraw()
 
 
 ## Shows the sphere of [param id] when [param level] is 1 or more, hides it otherwise. An unknown id
@@ -219,4 +232,6 @@ func _is_active() -> bool:
 
 @warning_ignore("integer_division")
 func _orb_position(i: int) -> Vector2:
+	if not _slots.is_empty():
+		return _slots[i % _slots.size()]
 	return ORB_GRID_ORIGIN + Vector2(float(i % ORB_GRID_COLUMNS), float(i / ORB_GRID_COLUMNS)) * ORB_GRID_SPACING

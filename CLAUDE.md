@@ -55,6 +55,10 @@ Every task follows: **Question -> Options -> Decision -> Draft -> Approval**
 - Agents MUST show drafts or summaries before requesting approval
 - Multi-file changes require explicit approval for the full changeset
 - No commits without user instruction
+- Change project files with the Write and Edit tools only, never with a script
+  (Python, sed, heredoc, shell redirection): a script skips the write checks. It
+  binds subagents too, so repeat it in their brief. Exceptions: the helpers in
+  `.claude/scripts/` a skill names, and engine output (import, export)
 - A skipped or dismissed question is not an answer: act on nothing, re-ask in
   plain text and wait
 - Started outside this file's folder? Warn first: hooks, deny rules and the

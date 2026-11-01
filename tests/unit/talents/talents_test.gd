@@ -521,6 +521,6 @@ func test_long_node_text_does_not_widen_its_button() -> void:
 	screen.setup(tree)
 
 	# Assert
-	var buttons: Array[Node] = screen.get_node("Panel/Content/Branches").find_children("*", "Button", true, false)
+	var buttons: Array[Node] = screen.get_node("%Branches").find_children("*", "Button", true, false)
 	assert_int(buttons.size()).is_equal(1)
 	assert_float((buttons[0] as Button).get_combined_minimum_size().x).is_equal(TalentScreen.NODE_MIN_SIZE.x)

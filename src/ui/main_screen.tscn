@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
@@ -10,95 +10,9 @@
 [ext_resource type="PackedScene" path="res://src/ui/save_screen.tscn" id="8_save"]
 [ext_resource type="Script" path="res://src/ui/companion_orbs.gd" id="9_orbs"]
 [ext_resource type="Script" path="res://src/ui/floating_text_layer.gd" id="10_texts"]
-
-[sub_resource type="StyleBoxFlat" id="auto_off"]
-bg_color = Color(0.25, 0.25, 0.3, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.75, 0.75, 0.8, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="auto_off_hover"]
-bg_color = Color(0.34, 0.34, 0.4, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.9, 0.9, 0.95, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="auto_on"]
-bg_color = Color(0.13, 0.5, 0.25, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.5, 0.95, 0.6, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="challenge_normal"]
-bg_color = Color(0.72, 0.16, 0.14, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="challenge_hover"]
-bg_color = Color(0.88, 0.22, 0.18, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="challenge_pressed"]
-bg_color = Color(0.52, 0.11, 0.1, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="offline_panel"]
-content_margin_left = 24.0
-content_margin_top = 16.0
-content_margin_right = 24.0
-content_margin_bottom = 16.0
-bg_color = Color(0.04, 0.05, 0.09, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 0.84, 0.25, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="loot_toast"]
-content_margin_left = 8.0
-content_margin_top = 6.0
-content_margin_right = 8.0
-content_margin_bottom = 6.0
-bg_color = Color(0.04, 0.05, 0.09, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.84, 0.25, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+[ext_resource type="Script" path="res://src/ui/game_zone.gd" id="11_zone"]
+[ext_resource type="Script" path="res://src/ui/management_tabs.gd" id="12_tabs"]
+[ext_resource type="Script" path="res://src/ui/hint_bubble.gd" id="13_bubble"]
 
 [node name="MainScreen" type="Control"]
 layout_mode = 3
@@ -117,100 +31,170 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.09, 0.1, 0.16, 1)
+color = Color(0.0392157, 0.0509804, 0.0901961, 1)
 
-[node name="TopBar" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 100.0
-grow_horizontal = 2
-mouse_filter = 2
-color = Color(0.04, 0.05, 0.09, 1)
-
-[node name="Row" type="HBoxContainer" parent="TopBar"]
+[node name="Layout" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_right = -20.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+theme_override_constants/separation = 0
 
-[node name="StageLabel" type="Label" parent="TopBar/Row"]
+[node name="Header" type="PanelContainer" parent="Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"HeaderPanel"
+
+[node name="Row" type="HBoxContainer" parent="Layout/Header"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="StageCell" type="BoxContainer" parent="Layout/Header/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.8
-theme_override_font_sizes/font_size = 48
+mouse_filter = 2
+alignment = 1
+
+[node name="StageLabel" type="Label" parent="Layout/Header/Row/StageCell"]
+unique_name_in_owner = true
+layout_mode = 2
 text = "Étage 1"
-horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="TopBar/Row"]
+[node name="ScoreLabel" type="Label" parent="Layout/Header/Row/StageCell"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.8, 1)
+text = "record 1"
+vertical_alignment = 1
+
+[node name="GoldCell" type="BoxContainer" parent="Layout/Header/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
+alignment = 1
+
+[node name="GoldCaption" type="Label" parent="Layout/Header/Row/GoldCell"]
+unique_name_in_owner = true
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
-theme_override_font_sizes/font_size = 48
-text = "Or : 0"
-horizontal_alignment = 1
+text = "Or"
 vertical_alignment = 1
 
-[node name="ClickDamageLabel" type="Label" parent="TopBar/Row"]
+[node name="GoldLabel" type="Label" parent="Layout/Header/Row/GoldCell"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.2
-theme_override_font_sizes/font_size = 32
-text = "Dégâts de clic : 1"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
+text = "0"
 vertical_alignment = 1
 
-[node name="Enemy" type="Control" parent="."]
+[node name="DpsButton" type="Button" parent="Layout/Header/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"DpsButton"
+
+[node name="DpsCell" type="BoxContainer" parent="Layout/Header/Row/DpsButton"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -430.0
-offset_top = -190.0
-offset_right = -130.0
-offset_bottom = 110.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
+alignment = 1
+
+[node name="DpsCaption" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
+text = "DPS"
+vertical_alignment = 1
+
+[node name="DpsLabel" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
+text = "0"
+vertical_alignment = 1
+
+[node name="SaveButton" type="Button" parent="Layout/Header/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_vertical = 4
+text = "Réglages"
+
+[node name="Split" type="BoxContainer" parent="Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="GameZone" type="Container" parent="Layout/Split"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 6.0
+script = ExtResource("11_zone")
+
+[node name="AbandonButton" type="Button" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Abandonner"
+
+[node name="BossTimer" parent="Layout/Split/GameZone" instance=ExtResource("4_boss")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ChallengeButton" type="Button" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"ChallengeButton"
+text = "Défier le boss"
+
+[node name="Enemy" type="Control" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 2
 script = ExtResource("2_enemy")
 
-[node name="HpBar" type="ColorRect" parent="."]
+[node name="HpBar" type="ColorRect" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.278431, 0.101961, 0.101961, 1)
+
+[node name="HpFill" type="ColorRect" parent="Layout/Split/GameZone/HpBar"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -580.0
-offset_top = 150.0
-offset_right = 20.0
-offset_bottom = 194.0
-grow_horizontal = 2
+anchors_preset = 9
+anchor_bottom = 1.0
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.28, 0.1, 0.1, 1)
+color = Color(0.85098, 0.2, 0.2, 1)
 
-[node name="HpFill" type="ColorRect" parent="HpBar"]
-unique_name_in_owner = true
-layout_mode = 0
-offset_right = 600.0
-offset_bottom = 44.0
-mouse_filter = 2
-color = Color(0.85, 0.2, 0.2, 1)
-
-[node name="HpLabel" type="Label" parent="HpBar"]
+[node name="HpLabel" type="Label" parent="Layout/Split/GameZone/HpBar"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -219,266 +203,139 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 8
-theme_override_font_sizes/font_size = 28
+theme_override_constants/outline_size = 6
 text = "15 / 15"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="DpsLabel" type="Label" parent="."]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -580.0
-offset_top = 200.0
-offset_right = 20.0
-offset_bottom = 245.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 0
-theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
-theme_override_font_sizes/font_size = 24
-text = "DPS : 0"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="BossHintLabel" type="Label" parent="."]
+[node name="BossHintLabel" type="Label" parent="Layout/Split/GameZone"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -580.0
-offset_top = 245.0
-offset_right = 20.0
-offset_bottom = 272.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
-theme_override_font_sizes/font_size = 20
+layout_mode = 2
+theme_type_variation = &"HintLabel"
+theme_override_font_sizes/font_size = 16
 text = "Trop fort ! Farme, renforce tes compagnons, puis défie-le."
 horizontal_alignment = 1
 vertical_alignment = 1
+autowrap_mode = 3
 
-[node name="BossTimer" parent="." instance=ExtResource("4_boss")]
+[node name="SkillBar" parent="Layout/Split/GameZone" instance=ExtResource("5_skills")]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -580.0
-offset_top = -250.0
-offset_right = 20.0
-offset_bottom = -194.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 2
 
-[node name="AbandonButton" type="Button" parent="."]
+[node name="VersionLabel" type="Label" parent="Layout/Split/GameZone"]
 unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -620.0
-offset_top = -186.0
-offset_right = -435.0
-offset_bottom = -146.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_off_hover")
-text = "Abandonner le boss"
-
-[node name="ChallengeButton" type="Button" parent="."]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -580.0
-offset_top = -250.0
-offset_right = 20.0
-offset_bottom = -194.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("challenge_normal")
-theme_override_styles/hover = SubResource("challenge_hover")
-theme_override_styles/pressed = SubResource("challenge_pressed")
-text = "Défier le boss"
-
-[node name="ScoreLabel" type="Label" parent="."]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 345.0
-offset_top = -90.0
-offset_right = -475.0
-offset_bottom = -30.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_font_sizes/font_size = 30
-text = "Score (étage atteint) : 1"
-horizontal_alignment = 1
+layout_mode = 2
+theme_override_colors/font_color = Color(0.74902, 0.74902, 0.8, 1)
+theme_override_font_sizes/font_size = 16
 vertical_alignment = 1
 
-[node name="AutoChallengeToggle" type="Button" parent="."]
+[node name="AutoChallengeToggle" type="Button" parent="Layout/Split/GameZone"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -84.0
-offset_right = 340.0
-offset_bottom = -36.0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 24
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_on")
+layout_mode = 2
+theme_type_variation = &"ToggleButton"
 toggle_mode = true
-text = "Défi automatique : NON"
+text = "Défi auto : NON"
 
-[node name="TalentsButton" type="Button" parent="."]
+[node name="ManagementZone" type="PanelContainer" parent="Layout/Split"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -310.0
-offset_top = -84.0
-offset_right = -10.0
-offset_bottom = -36.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 24
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_off_hover")
-text = "Talents (points : 0)"
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 4.0
+mouse_filter = 2
+theme_type_variation = &"ManagementPanel"
 
-[node name="InventoryButton" type="Button" parent="."]
+[node name="ManagementTabs" type="VBoxContainer" parent="Layout/Split/ManagementZone"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -470.0
-offset_top = -84.0
-offset_right = -320.0
-offset_bottom = -36.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 24
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_off_hover")
-text = "Inventaire"
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+script = ExtResource("12_tabs")
 
-[node name="VersionLabel" type="Label" parent="."]
+[node name="CompanionPanel" parent="Layout/Split/ManagementZone/ManagementTabs" instance=ExtResource("3_panel")]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = -30.0
-offset_right = 212.0
-offset_bottom = -6.0
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.6, 0.6, 0.66, 1)
-theme_override_font_sizes/font_size = 14
-vertical_alignment = 1
+layout_mode = 2
+size_flags_vertical = 3
 
-[node name="EffectsToggle" type="Button" parent="."]
+[node name="InventoryScreen" parent="Layout/Split/ManagementZone/ManagementTabs" instance=ExtResource("7_inventory")]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 222.0
-offset_top = -31.0
-offset_right = 402.0
-offset_bottom = -5.0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_on")
-toggle_mode = true
-text = "Effets visuels : OUI"
+layout_mode = 2
+size_flags_vertical = 3
 
-[node name="SaveButton" type="Button" parent="."]
+[node name="TalentScreen" parent="Layout/Split/ManagementZone/ManagementTabs" instance=ExtResource("6_talents")]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -150.0
-offset_top = -31.0
-offset_right = -10.0
-offset_bottom = -5.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_off_hover")
-text = "Sauvegarde"
+layout_mode = 2
+size_flags_vertical = 3
 
-[node name="CompanionPanel" parent="." instance=ExtResource("3_panel")]
+[node name="TabBar" type="HBoxContainer" parent="Layout/Split/ManagementZone/ManagementTabs"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="CompanionsTabButton" type="Button" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar"]
 unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TabButton"
+
+[node name="CompanionsDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/CompanionsTabButton"]
+unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -600.0
-offset_top = 110.0
-offset_right = -10.0
-offset_bottom = 630.0
+offset_left = -20.0
+offset_top = 8.0
+offset_right = -6.0
+offset_bottom = 22.0
 grow_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"DotPanel"
 
-[node name="SkillBar" parent="." instance=ExtResource("5_skills")]
+[node name="InventoryButton" type="Button" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar"]
 unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TabButton"
+
+[node name="InventoryDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/InventoryButton"]
+unique_name_in_owner = true
+visible = false
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -630.0
-offset_top = -136.0
-offset_right = -440.0
-offset_bottom = 134.0
-grow_horizontal = 2
-grow_vertical = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -20.0
+offset_top = 8.0
+offset_right = -6.0
+offset_bottom = 22.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"DotPanel"
+
+[node name="TalentsButton" type="Button" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TabButton"
+
+[node name="TalentsDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -20.0
+offset_top = 8.0
+offset_right = -6.0
+offset_bottom = 22.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"DotPanel"
 
 [node name="CompanionOrbs" type="Control" parent="."]
 unique_name_in_owner = true
@@ -491,31 +348,6 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("9_orbs")
 
-[node name="LootToast" type="PanelContainer" parent="."]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -125.0
-offset_top = -126.0
-offset_right = 30.0
-offset_bottom = -92.0
-grow_horizontal = 2
-grow_vertical = 1
-mouse_filter = 2
-theme_override_styles/panel = SubResource("loot_toast")
-
-[node name="LootMessage" type="Label" parent="LootToast"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-horizontal_alignment = 1
-autowrap_mode = 3
-
 [node name="FloatingTextLayer" type="Control" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
@@ -527,34 +359,49 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("10_texts")
 
+[node name="LootToast" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+mouse_filter = 2
+theme_type_variation = &"ToastPanel"
+
+[node name="LootMessage" type="Label" parent="LootToast"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="HintBubble" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+mouse_filter = 2
+theme_type_variation = &"ToastPanel"
+script = ExtResource("13_bubble")
+
+[node name="Label" type="Label" parent="HintBubble"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
 [node name="ErrorLabel" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -500.0
-offset_top = -60.0
-offset_right = 500.0
-offset_bottom = 60.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_right = -16.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
-
-[node name="TalentScreen" parent="." instance=ExtResource("6_talents")]
-unique_name_in_owner = true
-layout_mode = 1
-
-[node name="InventoryScreen" parent="." instance=ExtResource("7_inventory")]
-unique_name_in_owner = true
-layout_mode = 1
 
 [node name="SaveScreen" parent="." instance=ExtResource("8_save")]
 unique_name_in_owner = true
@@ -575,39 +422,35 @@ color = Color(0, 0, 0, 0.45)
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -360.0
-offset_top = -130.0
-offset_right = 360.0
-offset_bottom = 130.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("offline_panel")
+theme_type_variation = &"ModalPanel"
 
-[node name="Content" type="VBoxContainer" parent="OfflinePanel"]
+[node name="OfflineScroll" type="ScrollContainer" parent="OfflinePanel"]
 layout_mode = 2
+follow_focus = true
+horizontal_scroll_mode = 0
+
+[node name="Content" type="VBoxContainer" parent="OfflinePanel/OfflineScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 14
 alignment = 1
 
-[node name="OfflineTitle" type="Label" parent="OfflinePanel/Content"]
+[node name="OfflineTitle" type="Label" parent="OfflinePanel/OfflineScroll/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 32
 text = "Bon retour !"
 horizontal_alignment = 1
 
-[node name="OfflineMessage" type="Label" parent="OfflinePanel/Content"]
+[node name="OfflineMessage" type="Label" parent="OfflinePanel/OfflineScroll/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="OfflineCloseButton" type="Button" parent="OfflinePanel/Content"]
+[node name="OfflineCloseButton" type="Button" parent="OfflinePanel/OfflineScroll/Content"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 52)
 layout_mode = 2
@@ -619,7 +462,4 @@ focus_neighbor_bottom = NodePath(".")
 focus_next = NodePath(".")
 focus_previous = NodePath(".")
 theme_override_font_sizes/font_size = 24
-theme_override_styles/normal = SubResource("auto_off")
-theme_override_styles/hover = SubResource("auto_off_hover")
-theme_override_styles/pressed = SubResource("auto_off_hover")
 text = "Continuer"

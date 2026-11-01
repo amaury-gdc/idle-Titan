@@ -1,23 +1,34 @@
 extends Control
-## Main screen of Idle Titans (stories 002, 003, 004, 004b): stage, gold, click damage,
-## the enemy, its HP bar, the boss banner or the "Défier le boss" button of farm mode,
-## the "Défi automatique" toggle, the score (best stage reached, kept after a boss
-## fallback), the companion panel and the message shown on return after an absence.
-## The skill bar (story 005) sits in the free column left of the enemy. The talent tree
-## (story 006) and the inventory (story 007) open over everything: while one is open the game
-## waits, as it does behind the return message, and the keyboard focus cannot leave it.
-## The loot message sits in the free column right of the enemy: it comes during the fight, so
-## it lives here and not in the inventory screen, takes no mouse and no focus, and hides by
-## itself. The game version sits in the bottom left corner, so that a player's feedback can name
-## it; the "Sauvegarde" button opens the [SaveScreen].
+## Main screen of Idle Titans (stories 002, 003, 004, 004b, 010): a header (stage, best stage, gold,
+## DPS, "Réglages"), a [GameZone] (enemy, HP bar, boss banner or "Défier le boss", skills, the
+## "Défi automatique" toggle, the version) and a [ManagementTabs] zone (the tab bar over the companion
+## list, the [InventoryScreen] and the [TalentScreen]). The game never waits for a tab (story 011,
+## D1): only "Réglages", which opens the [SaveScreen], and the return message stop it, and they are
+## the two modal windows left. The loot message comes during the fight, so it lives here and not in
+## the inventory, takes no mouse and no focus, and hides by itself.
+##
+## Adaptive layout (story 010, design/ux/main-screen-adaptive.md): [AdaptiveLayout] decides the
+## shape from the window size in CSS pixels; this script applies it synchronously, in [method _ready]
+## and on each [signal Viewport.size_changed]. There is one tree: a shape change only moves the
+## same nodes, so the focus and the scroll survive it. Portrait and landscape differ by the
+## direction of Split, the blocks of the [GameZone] and the font sizes.
 ##
 ## Visual feedback (story 009, display only): a [FloatingTextLayer] shows the damage of the
 ## player's hits (a critical hit is a bigger number ending with "!", which replaces the former
 ## "Critique !" text) and the gold of a kill; [CompanionOrbs] draws one sphere per owned companion
 ## beside the enemy and a ball thrown at it on each attack. Both read the [FloorManager] and
-## [CompanionManager] signals and change nothing. The "Effets visuels" button (bottom left, next to
-## the version) turns them off; the choice lives in [DisplaySettings], a file of its own, never in
-## the save. Hidden tab and modal screens stop and clear them.
+## [CompanionManager] signals and change nothing. The "Effets visuels" toggle of "Réglages" turns them
+## off, with the monster squash; the choice lives in [DisplaySettings], a file of its own, never in
+## the save, and until the player makes one it follows the browser's prefers-reduced-motion. Hidden
+## tab and modal screens stop and clear them. Both layers stay full-rect overlays at the root: they
+## aim at [method EnemyView.anchor_global], converted to their own space whenever the enemy or any of
+## its ancestors moves.
+##
+## Input (story 010): 1, 2 and 3 activate the skills, by key position so that they work on any
+## keyboard layout; the [SaveScreen] text field is inside a modal, and every modal stops them. A
+## [HintBubble] shows what hovering shows on a PC, on a long press, on keyboard focus and on the DPS
+## button. The cost of the companion rows is redrawn on a change of gold, 4 times a second at most,
+## with [NotificationDots] reading the same change.
 ## Composition root: loads data and saves, builds the [Combat] / [BossFight] /
 ## [FloorManager] / [CompanionManager] / [SkillManager] / [OfflineIncome] / [TalentTree] /
 ## [Inventory] / [ModifierHub] core, feeds it frame time, forwards clicks to it and redraws on
@@ -49,10 +60,40 @@ const ITEMS_PATH: String = "res://assets/data/items.json"
 ## Used only when core_curves.json has no valid autosave_interval_seconds
 ## (infrastructure setting, not a gameplay value).
 const FALLBACK_AUTOSAVE_SECONDS: float = 10.0
-## Time between two redraws of the DPS line (display setting, not a gameplay value).
+## Time between two redraws of the DPS line and of the costs (display setting, not a gameplay value).
 const DPS_REFRESH_SECONDS: float = 0.25
+## Physical keys of the skills, in the order of the bar.
+const SKILL_KEYS: Array[int] = [KEY_1, KEY_2, KEY_3]
 ## Time the loot message stays on screen (display setting, not a gameplay value).
 const LOOT_MESSAGE_SECONDS: float = 4.0
+## Widest loot message (display setting, not a gameplay value).
+const LOOT_MAX_WIDTH: float = 340.0
+## Under this width the loot message drops its title (display setting, not a gameplay value).
+const LOOT_TITLE_MIN_WIDTH: float = 220.0
+## Measures of the toast: its side margins and borders, a line of 16 u, and what its height adds
+## to the lines (ToastPanel in the theme).
+const LOOT_SIDE_MARGINS: float = 16.0
+const LOOT_LINE_HEIGHT: float = 26.0
+const LOOT_VERTICAL_MARGINS: float = 9.0
+## Window metadata keeping the shape across a scene reload: a save reset must not flip the layout
+## of a window standing in the dead zone.
+const SHAPE_META: StringName = &"adaptive_shape"
+## Height of the return message when the window allows it; its content scrolls otherwise.
+const OFFLINE_PANEL_HEIGHT: float = 300.0
+## Longest value a header cell must hold without moving its neighbours (spec, Localization).
+const HEADER_LONGEST_VALUE: String = "999,9 Qa"
+const HEADER_LONGEST_STAGE: int = 999
+## Space between a caption and its value in a one-line header cell (display setting).
+const HEADER_CELL_GAP: int = 6
+## Room around the text of the "Réglages" button (display setting).
+const HEADER_BUTTON_MARGIN: float = 12.0
+## Room around the text of the DPS button (display setting).
+const HEADER_DPS_MARGIN: float = 8.0
+## The font sizes of the spec, in logical units.
+const FONT_16: int = 16
+const FONT_20: int = 20
+const FONT_24: int = 24
+const FONT_32: int = 32
 const SECONDS_PER_MINUTE: int = 60
 const SECONDS_PER_HOUR: int = 3600
 
@@ -80,11 +121,35 @@ var _tab_hidden: bool = false
 var _document: JavaScriptObject
 # Kept alive here: the browser listener stops working if this object is freed.
 var _tab_visibility_callback: JavaScriptObject
+var _shape: AdaptiveLayout.Shape = AdaptiveLayout.Shape.UNDECIDED
+# Changing the content scale makes the window report a new size: see _sync_window.
+var _syncing_window: bool = false
+var _dots: NotificationDots = NotificationDots.new()
+# Reference to the gold value last drawn: every change of gold is a new BigNumber.
+var _gold_drawn: BigNumber
+var _talent_points_seen: int = -1
+# The loot message being shown, line by line: its title depends on where it goes.
+var _loot_lines: PackedStringArray = PackedStringArray()
+# Its sale in a few words, for a narrow slot; empty when nothing was sold to make room.
+var _loot_short_sale: String = ""
+# First-run answer for the visual effects: see _setup_visual_effects.
+var _effects_when_never_set: bool = true
+# Whether the last input was a key: a focus moved for a mouse user keeps its ring hidden.
+var _keyboard_used: bool = false
 
+@onready var _layout: Control = %Layout
+@onready var _split: BoxContainer = %Split
+@onready var _game_zone: GameZone = %GameZone
+@onready var _tabs: ManagementTabs = %ManagementTabs
+@onready var _stage_cell: BoxContainer = %StageCell
+@onready var _gold_cell: BoxContainer = %GoldCell
+@onready var _dps_cell: BoxContainer = %DpsCell
+@onready var _gold_caption: Label = %GoldCaption
+@onready var _dps_caption: Label = %DpsCaption
 @onready var _stage_label: Label = %StageLabel
 @onready var _gold_label: Label = %GoldLabel
-@onready var _click_label: Label = %ClickDamageLabel
-@onready var _hp_bar: ColorRect = %HpBar
+@onready var _dps_button: Button = %DpsButton
+@onready var _bubble: HintBubble = %HintBubble
 @onready var _hp_fill: ColorRect = %HpFill
 @onready var _hp_label: Label = %HpLabel
 @onready var _dps_label: Label = %DpsLabel
@@ -98,16 +163,13 @@ var _tab_visibility_callback: JavaScriptObject
 @onready var _abandon_button: Button = %AbandonButton
 @onready var _auto_toggle: Button = %AutoChallengeToggle
 @onready var _boss_hint_label: Label = %BossHintLabel
-@onready var _talents_button: Button = %TalentsButton
 @onready var _talent_screen: TalentScreen = %TalentScreen
-@onready var _inventory_button: Button = %InventoryButton
 @onready var _inventory_screen: InventoryScreen = %InventoryScreen
 @onready var _version_label: Label = %VersionLabel
 @onready var _save_button: Button = %SaveButton
 @onready var _save_screen: SaveScreen = %SaveScreen
 @onready var _orbs: CompanionOrbs = %CompanionOrbs
 @onready var _texts: FloatingTextLayer = %FloatingTextLayer
-@onready var _effects_toggle: Button = %EffectsToggle
 @onready var _loot_toast: PanelContainer = %LootToast
 @onready var _loot_message: Label = %LootMessage
 @onready var _offline_blocker: ColorRect = %OfflineBlocker
@@ -117,7 +179,13 @@ var _tab_visibility_callback: JavaScriptObject
 
 
 func _ready() -> void:
-	_version_label.text = tr("Version %s") % _game_version()
+	_version_label.text = tr("v%s") % _game_version()
+	_save_button.text = tr("Réglages")
+	# Before anything else and without waiting a frame: no wrong layout may ever be shown.
+	_sync_window()
+	get_window().size_changed.connect(_sync_window)
+	resized.connect(_fit_overlays)
+	_fit_overlays()
 	var curves: Variant = DataLoader.load_json(CURVES_PATH)
 	var roster: Variant = DataLoader.load_json(ROSTER_PATH)
 	var combat: Combat = Combat.from_data(curves, roster)
@@ -166,34 +234,43 @@ func _ready() -> void:
 	_enemy.clicked.connect(_on_enemy_clicked)
 	_companions = CompanionManager.new(_game, combat, _floors)
 	_companions.companion_leveled_up.connect(_on_companion_leveled_up)
+	_companions.companions_bought.connect(_on_companion_leveled_up)
 	_setup_visual_effects(roster)
 	_companion_panel.buy_requested.connect(_on_companion_buy_requested)
-	_companion_panel.setup(_companions)
+	_companion_panel.mode_changed.connect(_on_buy_mode_changed)
+	_companion_panel.set_mode(_display.buy_mode())
+	_companion_panel.setup(_companions, func() -> BigNumber: return _game.gold)
+	_gold_drawn = _game.gold
 	_skill_bar.activate_requested.connect(_on_skill_requested)
 	_skill_bar.setup(_skills)
+	_skill_bar.watch_with(_bubble)
+	_dps_button.pressed.connect(_on_dps_pressed)
+	_dps_button.focus_exited.connect(_on_dps_unfocused)
+	_tabs.tab_selected.connect(_on_tab_selected)
+	_abandon_button.focus_exited.connect(_on_action_unfocused.bind(_abandon_button))
+	_challenge_button.focus_exited.connect(_on_action_unfocused.bind(_challenge_button))
 	_talents.changed.connect(_on_talents_changed)
 	_talent_screen.buy_requested.connect(_on_talent_buy_requested)
 	_talent_screen.reset_requested.connect(_on_talent_reset_requested)
-	_talent_screen.closed.connect(_on_talents_closed)
 	_talent_screen.setup(_talents)
-	_talents_button.pressed.connect(_on_talents_pressed)
 	_refresh_talents_button()
 	_inventory.changed.connect(_on_inventory_changed)
 	_inventory.loot_received.connect(_on_loot_received)
 	_inventory_screen.equip_requested.connect(_on_equip_requested)
-	_inventory_screen.closed.connect(_on_inventory_closed)
 	_inventory_screen.setup(_inventory)
-	_inventory_button.pressed.connect(_on_inventory_pressed)
+	_tabs.link_focus(_auto_toggle, _dps_button)
 	_save_screen.copy_requested.connect(_on_save_copy_requested)
 	_save_screen.reset_confirmed.connect(_on_save_reset_confirmed)
+	_save_screen.effects_toggled.connect(_on_effects_toggled)
 	_save_screen.closed.connect(_on_save_screen_closed)
 	_save_screen.setup(_game_version())
 	_save_button.pressed.connect(_on_save_button_pressed)
 	_start_message_timers()
 	_start_autosave(curves)
-	_enemy.set_stage(_game.stage, _floors.is_boss_fight())
+	_show_stage(_game.stage)
 	_refresh()
 	_refresh_boss()
+	_observe_companions()
 	_on_farming_changed(_floors.is_farming())
 	_offline_close_button.pressed.connect(_on_offline_closed)
 	if not offline_gain.is_empty():
@@ -202,8 +279,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# The game waits behind the return message, the talent tree and the inventory: a boss
-	# countdown must not run out on them.
+	# The game waits behind the return message and "Réglages", never behind a tab (D1).
 	if _companions == null:
 		return
 	_sync_effects_pause()
@@ -221,6 +297,34 @@ func _process(delta: float) -> void:
 	if _dps_refresh_left <= 0.0:
 		_dps_refresh_left = DPS_REFRESH_SECONDS
 		_refresh_dps()
+		_refresh_costs()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		_keyboard_used = true
+	elif event is InputEventMouseButton or event is InputEventScreenTouch:
+		_keyboard_used = false
+
+
+# Escape closes the detail of the open tab, and does nothing else here. The modal screens come
+# first: "Réglages" handles Escape itself, and the return message leaves what lies behind alone.
+func _unhandled_input(event: InputEvent) -> void:
+	if _companions == null or _game_waits() or not event.is_action_pressed("ui_cancel"):
+		return
+	if _tabs.close_open_detail():
+		get_viewport().set_input_as_handled()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key: InputEventKey = event as InputEventKey
+	if key == null or not key.pressed or key.echo or _skills == null or _game_waits():
+		return
+	var index: int = SKILL_KEYS.find(key.physical_keycode)
+	if index < 0 or index >= _skills.skills().size():
+		return
+	_on_skill_requested(_skills.skills()[index].id)
+	get_viewport().set_input_as_handled()
 
 
 func _exit_tree() -> void:
@@ -240,20 +344,114 @@ func _show_error(error: String) -> void:
 	push_error("Main screen: " + error)
 	_error_label.text = error
 	_error_label.visible = true
-	_enemy.visible = false
-	_boss_timer.visible = false
-	_auto_toggle.visible = false
-	_effects_toggle.visible = false
-	_companion_panel.visible = false
-	_skill_bar.visible = false
-	_dps_label.visible = false
-	_talents_button.visible = false
-	_inventory_button.visible = false
-	_save_button.visible = false
+	# Header, game zone and tabs: the message stands alone.
+	_layout.visible = false
 
 
 func _game_version() -> String:
 	return str(ProjectSettings.get_setting("application/config/version", "?"))
+
+
+# Reads the window and applies the shape and the scale. Changing the content scale makes the window
+# signal a new size at once, hence the guard; everything here gives the same answer a second time.
+func _sync_window() -> void:
+	if _syncing_window:
+		return
+	_syncing_window = true
+	var css_size: Vector2 = Vector2(get_window().size) / _device_pixel_ratio()
+	# After a reload this node knows no shape yet, but the window remembers the last one.
+	var previous: AdaptiveLayout.Shape = _shape
+	if previous == AdaptiveLayout.Shape.UNDECIDED:
+		previous = get_window().get_meta(SHAPE_META, AdaptiveLayout.Shape.UNDECIDED)
+	var shape: AdaptiveLayout.Shape = AdaptiveLayout.decide_shape(css_size, previous)
+	if shape != _shape:
+		_shape = shape
+		get_window().set_meta(SHAPE_META, shape)
+		_bubble.cancel()
+		_apply_shape()
+	_bubble.set_css_per_unit(AdaptiveLayout.css_per_unit(css_size, shape))
+	var logical_height: float = AdaptiveLayout.logical_size(css_size, shape).y
+	_game_zone.set_layout(shape, AdaptiveLayout.portrait_monster_row(logical_height))
+	var content: Vector2i = AdaptiveLayout.content_size(css_size, shape)
+	if get_window().content_scale_size != content:
+		get_window().content_scale_size = content
+	_syncing_window = false
+
+
+# get_window().size is in physical pixels on the web, and 1 CSS pixel is that many of them.
+func _device_pixel_ratio() -> float:
+	if not OS.has_feature("web"):
+		return 1.0
+	var ratio: Variant = JavaScriptBridge.eval("window.devicePixelRatio", true)
+	return float(ratio) if (ratio is float or ratio is int) and float(ratio) > 0.0 else 1.0
+
+
+# Everything that differs between the shapes and is not a rectangle of the game zone.
+func _apply_shape() -> void:
+	var portrait: bool = _shape == AdaptiveLayout.Shape.PORTRAIT
+	_split.vertical = portrait
+	_game_zone.size_flags_vertical = Control.SIZE_FILL if portrait else Control.SIZE_EXPAND_FILL
+	for cell: BoxContainer in [_stage_cell, _gold_cell, _dps_cell]:
+		cell.vertical = portrait
+		cell.add_theme_constant_override("separation", 0 if portrait else HEADER_CELL_GAP)
+	_gold_caption.text = tr("Or") if portrait else tr("Or :")
+	_dps_caption.text = tr("DPS") if portrait else tr("DPS :")
+	var title_size: int = FONT_20 if portrait else FONT_32
+	var dps_size: int = FONT_16 if portrait else FONT_24
+	var body_size: int = FONT_16 if portrait else FONT_20
+	_set_font_size([_stage_label, _gold_label], title_size)
+	_set_font_size([_gold_caption], FONT_16 if portrait else title_size)
+	_set_font_size([_dps_caption, _dps_label], dps_size)
+	_set_font_size([_score_label], FONT_16)
+	_set_font_size([_save_button, _hp_label, _abandon_button, _auto_toggle], body_size)
+	_set_font_size([_challenge_button], body_size)
+	_reserve_header_widths()
+	_skill_bar.set_compact(portrait)
+	if _floors != null:
+		_refresh()
+
+
+func _set_font_size(controls: Array, font_size: int) -> void:
+	for control: Control in controls:
+		control.add_theme_font_size_override("font_size", font_size)
+
+
+# Each value keeps the room of its longest text, so that a growing number never pushes its
+# neighbours. Measured, not guessed: the widths follow the font sizes of the shape.
+func _reserve_header_widths() -> void:
+	_stage_label.custom_minimum_size.x = _text_width(_stage_label, tr("Étage %d") % HEADER_LONGEST_STAGE)
+	_score_label.custom_minimum_size.x = _text_width(_score_label, _record_text(HEADER_LONGEST_STAGE))
+	_gold_label.custom_minimum_size.x = _text_width(_gold_label, HEADER_LONGEST_VALUE)
+	_dps_label.custom_minimum_size.x = _text_width(_dps_label, HEADER_LONGEST_VALUE)
+	# The labels sit inside the button: it cannot take its width from them by itself.
+	var dps_width: float = _dps_label.custom_minimum_size.x + HEADER_DPS_MARGIN
+	if _shape != AdaptiveLayout.Shape.PORTRAIT:
+		dps_width += _text_width(_dps_caption, _dps_caption.text) + HEADER_CELL_GAP
+	_dps_button.custom_minimum_size.x = dps_width
+	_save_button.custom_minimum_size.x = _text_width(_save_button, _save_button.text) + HEADER_BUTTON_MARGIN
+
+
+func _text_width(control: Control, text: String) -> float:
+	var font: Font = control.get_theme_font("font")
+	var font_size: int = control.get_theme_font_size("font_size")
+	return ceilf(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+
+
+func _record_text(stage: int) -> String:
+	var record: String = tr("record %d") % stage
+	return record if _shape == AdaptiveLayout.Shape.PORTRAIT else tr("· %s") % record
+
+
+# The overlays that take their size from the screen and not from a container.
+func _fit_overlays() -> void:
+	var rect: Rect2 = AdaptiveLayout.modal_rect(size, OFFLINE_PANEL_HEIGHT)
+	_offline_panel.position = rect.position
+	_offline_panel.size = rect.size
+
+
+func _show_stage(stage: int) -> void:
+	_enemy.set_stage(stage, _floors.is_boss_fight())
+	_game_zone.set_stage_tint(EnemyView.stage_color(stage))
 
 
 func _start_message_timers() -> void:
@@ -304,6 +502,7 @@ func _on_tab_visibility_changed(_args: Array) -> void:
 	_tab_hidden = _document.hidden
 	_sync_effects_pause()
 	if _tab_hidden:
+		_bubble.reset()
 		_save()
 		return
 	var gain: Dictionary = _grant_offline_gold()
@@ -315,9 +514,8 @@ func _on_tab_visibility_changed(_args: Array) -> void:
 
 
 func _show_offline_gain(gain: Dictionary) -> void:
-	# A web return can come while the tree or the inventory is open: the message goes first.
-	_talent_screen.close()
-	_inventory_screen.close()
+	# A web return can come while "Réglages" is open: the message goes first. Tabs stay as they are.
+	_bubble.cancel()
 	_save_screen.close()
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
@@ -333,6 +531,8 @@ func _show_offline_gain(gain: Dictionary) -> void:
 func _on_offline_closed() -> void:
 	_offline_blocker.visible = false
 	_offline_panel.visible = false
+	# The focus was in the panel: a keyboard player would otherwise have it nowhere.
+	_tabs.focus_active(not _keyboard_used)
 
 
 @warning_ignore("integer_division")
@@ -347,17 +547,7 @@ func _format_duration(seconds: int) -> String:
 
 
 func _game_waits() -> bool:
-	return _offline_panel.visible or _talent_screen.visible or _inventory_screen.visible or _save_screen.visible
-
-
-func _on_talents_pressed() -> void:
-	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
-	_talent_screen.open()
-
-
-func _on_talents_closed() -> void:
-	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
-	_talents_button.grab_focus()
+	return _offline_panel.visible or _save_screen.visible
 
 
 func _on_talent_buy_requested(id: String) -> void:
@@ -376,28 +566,87 @@ func _on_talents_changed() -> void:
 	_refresh_dps()
 
 
+# A node can only become buyable when the unspent points change: buying and resetting change them.
 func _refresh_talents_button() -> void:
-	_talents_button.text = tr("Talents (points : %d)") % _talents.available_points()
-
-
-func _on_inventory_pressed() -> void:
-	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
-	_inventory_screen.open()
-
-
-func _on_inventory_closed() -> void:
-	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
-	_inventory_button.grab_focus()
+	var points: int = _talents.available_points()
+	if points == _talent_points_seen:
+		return
+	_talent_points_seen = points
+	_tabs.set_talent_points(points)
+	var buyable: PackedStringArray = PackedStringArray()
+	for talent: Variant in _talents.nodes():
+		if _talents.can_buy(talent.id):
+			buyable.append(talent.id)
+	_dots.observe_talents(buyable)
+	_show_dots()
 
 
 func _on_save_button_pressed() -> void:
+	_bubble.cancel()
 	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_DISABLED
 	_save_screen.open()
 
 
 func _on_save_screen_closed() -> void:
 	focus_behavior_recursive = Control.FOCUS_BEHAVIOR_INHERITED
-	_save_button.grab_focus()
+	_save_button.grab_focus(not _keyboard_used)
+
+
+func _on_tab_selected(tab: int) -> void:
+	_bubble.cancel()
+	_dots.set_open_tab(tab)
+	_show_dots()
+	match tab:
+		ManagementTabs.Tab.INVENTORY:
+			_inventory_screen.refresh()
+		ManagementTabs.Tab.TALENTS:
+			_talent_screen.refresh()
+
+
+func _show_dots() -> void:
+	for tab: int in ManagementTabs.Tab.values():
+		_tabs.set_dot(tab, _dots.is_lit(tab))
+
+
+# Asks each companion's next goal of the gold: enough scanning for the goal and no more.
+func _observe_companions() -> void:
+	var goals: Dictionary = {}
+	for companion: Companion in _companions.companions():
+		var id: String = companion.id
+		var level: int = _companions.level(id)
+		var goal: int = NotificationDots.next_goal(level, _companions.tier_levels(id))
+		var levels_needed: int = goal - level
+		var reached: bool = goal > 0 and _companions.affordable_levels(id, levels_needed) >= levels_needed
+		goals[id] = goal if reached else 0
+	_dots.observe_companions(goals)
+	_show_dots()
+
+
+# Costs and dots follow the gold at the pace of _process, never each frame.
+func _refresh_costs() -> void:
+	if _game.gold == _gold_drawn:
+		return
+	_gold_drawn = _game.gold
+	_companion_panel.refresh()
+	_observe_companions()
+
+
+# Abandon or Défier vanished under the keyboard focus: the player would be nowhere.
+func _on_action_unfocused(button: Button) -> void:
+	if not button.is_visible_in_tree():
+		_tabs.focus_active.call_deferred(not _keyboard_used)
+
+
+func _on_dps_pressed() -> void:
+	if _bubble.is_showing_for(_dps_button):
+		_bubble.dismiss()
+		return
+	_bubble.show_for(_dps_button, _dps_button.tooltip_text)
+
+
+func _on_dps_unfocused() -> void:
+	if _bubble.is_showing_for(_dps_button):
+		_bubble.dismiss()
 
 
 func _on_save_copy_requested() -> void:
@@ -428,22 +677,30 @@ func _on_inventory_changed() -> void:
 
 
 func _on_loot_received(item: Item, sold: Array[Item], gold_gained: BigNumber) -> void:
-	_loot_message.text = _loot_text(item, sold, gold_gained)
+	_loot_lines = _loot_text(item, sold, gold_gained)
+	_loot_short_sale = ""
+	if not sold.is_empty() and not sold.has(item):
+		# Whole on its line: a narrow toast breaks after the colon, never inside the amount.
+		_loot_short_sale = tr("Sac plein : %s") % CompanionPanel.keep_together(tr("+%s or") % gold_gained.format())
 	_loot_message.add_theme_color_override("font_color", _inventory_screen.rarity_color(item.rarity))
 	_loot_toast.visible = true
+	_place_loot_toast()
 	_loot_timer.start()
+	if not sold.has(item):
+		_dots.note_item_kept()
+		_show_dots()
 
 
-func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> String:
+func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray([tr("Butin !"), _inventory_screen.describe(item)])
 	var gold: String = gold_gained.format()
 	if sold.has(item):
 		lines.append(tr("Vendu aussitôt : +%s or") % gold)
 	elif sold.size() == 1:
-		lines.append(tr("Sac plein, vendu : %s, +%s or") % [_inventory_screen.describe(sold[0]), gold])
+		lines.append(tr("Sac plein, vendu (%s), +%s or") % [_inventory_screen.describe(sold[0]), gold])
 	elif sold.size() > 1:
 		lines.append(tr("Sac plein, %d objets vendus, +%s or") % [sold.size(), gold])
-	return "\n".join(lines)
+	return lines
 
 
 # Wires the floating texts and the companion spheres to the core signals and applies the saved
@@ -456,18 +713,76 @@ func _setup_visual_effects(roster: Variant) -> void:
 	_floors.hit_landed.connect(_texts.show_hit)
 	_floors.kill_rewarded.connect(_texts.show_gold)
 	_companions.companion_attacked.connect(_orbs.on_companion_attacked)
-	_enemy.item_rect_changed.connect(_on_enemy_rect_changed)
-	_on_enemy_rect_changed()
-	_effects_toggle.set_pressed_no_signal(_display.visual_effects())
+	# The enemy can stand still in its parent while the parent moves: a shape change does that.
+	var moving: Control = _enemy
+	while moving != null:
+		moving.item_rect_changed.connect(_sync_effects_layout)
+		moving = moving.get_parent_control()
+	_game_zone.sort_children.connect(_sync_effects_layout)
+	# The room of the loot message depends on what stands in the action band, and on its height.
+	_challenge_button.visibility_changed.connect(_place_loot_toast)
+	_boss_timer.visibility_changed.connect(_place_loot_toast)
+	_loot_toast.resized.connect(_place_loot_toast)
+	# A wrapped label finds its height after the layout, and a Control never shrinks by itself.
+	_loot_message.minimum_size_changed.connect(_place_loot_toast)
+	_sync_effects_layout()
+	_effects_when_never_set = not _prefers_reduced_motion()
 	_apply_visual_effects()
-	_effects_toggle.toggled.connect(_on_effects_toggled)
 
 
-# Both effects aim at the center of the enemy, wherever the layout put it.
-func _on_enemy_rect_changed() -> void:
-	var center: Vector2 = _enemy.position + _enemy.size / 2.0
-	_texts.set_target_point(center)
-	_orbs.set_target_point(center)
+# Both effects aim at the center of the enemy, wherever the layout put it: the global anchor,
+# converted into each layer's own space, and never a local position of another parent.
+func _sync_effects_layout() -> void:
+	var anchor: Vector2 = _enemy.anchor_global()
+	var anchor_in_texts: Vector2 = _texts.get_global_transform().affine_inverse() * anchor
+	_texts.set_target_point(anchor_in_texts)
+	_texts.set_box_scale(_enemy.box_scale())
+	# The monster area, from the unscaled size: a squash must not change where the texts may go.
+	_texts.set_bounds(Rect2(anchor_in_texts - _enemy.size / 2.0, _enemy.size))
+	var to_orbs: Transform2D = _orbs.get_global_transform().affine_inverse()
+	_orbs.set_target_point(to_orbs * anchor)
+	var slots: PackedVector2Array = (to_orbs * _game_zone.get_global_transform()) * _game_zone.orb_slots()
+	_orbs.set_slots(slots, GameZone.orb_radius(_enemy.box_size()))
+	_place_loot_toast()
+
+
+# In the room the game zone gives (see GameZone.loot_slot_for): the free band when the message fits
+# there, otherwise the same place as with an occupied band. In a narrow slot the title goes, the
+# rarity colour and the item saying it, and the longest sale takes its short form. Whatever the
+# width, the first version that fits the height of the slot is shown: the message never reaches the
+# HP bar.
+func _place_loot_toast() -> void:
+	if _loot_lines.is_empty():
+		return
+	var versions: PackedStringArray = InventoryScreen.loot_versions(_loot_lines, _loot_short_sale)
+	var slot: Rect2 = _game_zone.loot_slot(true)
+	var free_fits: bool = _loot_height(versions[0], minf(slot.size.x, LOOT_MAX_WIDTH)) <= slot.size.y
+	if not _game_zone.band_free() or not free_fits:
+		slot = _game_zone.loot_slot(false)
+	var width: float = minf(slot.size.x, LOOT_MAX_WIDTH)
+	var text: String = versions[-1]
+	var narrow: bool = slot.size.x < LOOT_TITLE_MIN_WIDTH
+	for i in range(InventoryScreen.loot_first_version(versions, _loot_short_sale, narrow), versions.size()):
+		if _loot_height(versions[i], width) <= slot.size.y:
+			text = versions[i]
+			break
+	_loot_message.text = text
+	_loot_message.max_lines_visible = InventoryScreen.loot_max_lines(slot.size.y, LOOT_LINE_HEIGHT, LOOT_VERTICAL_MARGINS)
+	var to_root: Transform2D = get_global_transform().affine_inverse() * _game_zone.get_global_transform()
+	var corner: Vector2 = to_root * slot.position
+	_loot_toast.custom_minimum_size.x = width
+	_loot_toast.position = Vector2(corner.x + (slot.size.x - width) / 2.0, corner.y)
+	_loot_toast.size = Vector2(width, 0.0)
+
+
+# Height of the toast for [param text] at [param width], before it is there to be measured: its
+# size only follows at the next layout, too late to choose where it goes.
+func _loot_height(text: String, width: float) -> float:
+	var font: Font = _loot_message.get_theme_font("font")
+	var font_size: int = _loot_message.get_theme_font_size("font_size")
+	var inner: float = width - LOOT_SIDE_MARGINS
+	var text_height: float = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, inner, font_size).y
+	return roundf(text_height / font.get_height(font_size)) * LOOT_LINE_HEIGHT + LOOT_VERTICAL_MARGINS
 
 
 func _on_effects_toggled(enabled: bool) -> void:
@@ -476,10 +791,21 @@ func _on_effects_toggled(enabled: bool) -> void:
 
 
 func _apply_visual_effects() -> void:
-	var enabled: bool = _display.visual_effects()
+	var enabled: bool = _visual_effects_on()
 	_texts.set_enabled(enabled)
 	_orbs.set_enabled(enabled)
-	_effects_toggle.text = tr("Effets visuels : OUI") if enabled else tr("Effets visuels : NON")
+	_save_screen.set_effects(enabled)
+
+
+func _visual_effects_on() -> bool:
+	return _display.visual_effects(_effects_when_never_set)
+
+
+func _prefers_reduced_motion() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	# A String, because a JavaScript boolean does not come back equal to true here (seen in the export).
+	return JavaScriptBridge.eval("window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduce' : ''", true) == "reduce"
 
 
 # Modal screens and a hidden tab stop the effects and clear what was running, so that nothing
@@ -495,7 +821,8 @@ func _sync_effects_pause() -> void:
 
 func _on_enemy_clicked() -> void:
 	_click_dps.record(_floors.click())
-	_enemy.play_hit()
+	if _visual_effects_on():
+		_enemy.play_hit()
 
 
 func _on_enemy_damaged(_damage: BigNumber, _remaining: BigNumber) -> void:
@@ -503,10 +830,12 @@ func _on_enemy_damaged(_damage: BigNumber, _remaining: BigNumber) -> void:
 
 
 func _on_stage_started(stage: int, _max_hp: BigNumber) -> void:
-	_enemy.set_stage(stage, _floors.is_boss_fight())
+	_show_stage(stage)
 	_refresh()
-	_companion_panel.refresh()
 	_refresh_talents_button()
+	# A new best stage changes the points and the text of the tree; most stage changes do neither.
+	if _tabs.selected() == ManagementTabs.Tab.TALENTS:
+		_talent_screen.refresh_if_stale()
 
 
 func _on_farming_changed(farming: bool) -> void:
@@ -536,11 +865,15 @@ func _on_auto_toggled(enabled: bool) -> void:
 
 
 func _refresh_auto_toggle() -> void:
-	_auto_toggle.text = tr("Défi automatique : OUI") if _floors.auto_challenge() else tr("Défi automatique : NON")
+	_auto_toggle.text = tr("Défi auto : OUI") if _floors.auto_challenge() else tr("Défi auto : NON")
 
 
-func _on_companion_buy_requested(id: String) -> void:
-	_companions.buy_or_upgrade(id)
+func _on_companion_buy_requested(id: String, count: int) -> void:
+	_companions.buy_levels(id, count)
+
+
+func _on_buy_mode_changed(mode: int) -> void:
+	_display.set_buy_mode(mode)
 
 
 func _on_skill_requested(id: String) -> void:
@@ -560,11 +893,11 @@ func _on_companion_leveled_up(id: String, new_level: int) -> void:
 func _refresh() -> void:
 	var stage: int = _floors.current_stage()
 	_stage_label.text = tr("Étage %d") % stage
-	_gold_label.text = tr("Or : %s") % _game.gold.format()
-	_refresh_click_damage()
-	_score_label.text = tr("Score (étage atteint) : %d") % _floors.best_stage()
+	_gold_label.text = _game.gold.format()
+	_score_label.text = _record_text(_floors.best_stage())
 	_hp_label.text = "%s / %s" % [_floors.current_hp().format(), _floors.max_hp().format()]
-	_hp_fill.size.x = _hp_bar.size.x * _floors.hp_ratio()
+	# keep_offset: the bar must follow the anchor, not stay where it was.
+	_hp_fill.set_anchor(SIDE_RIGHT, _floors.hp_ratio(), true)
 
 
 func _refresh_boss() -> void:
@@ -575,15 +908,11 @@ func _refresh_boss() -> void:
 		_boss_timer.hide_fight()
 
 
-func _refresh_click_damage() -> void:
-	_click_label.text = tr("Dégâts de clic : %s") % _floors.buffed_damage(_floors.click_damage()).format()
-
-
 func _refresh_dps() -> void:
 	var clicks_without_buff: BigNumber = _click_dps.rate()
 	_floors.set_click_dps(clicks_without_buff)
 	var from_companions: BigNumber = _floors.buffed_damage(_companions.total_power())
 	var from_clicks: BigNumber = _floors.buffed_damage(clicks_without_buff)
-	_dps_label.text = tr("DPS : %s") % from_companions.add(from_clicks).format()
-	_dps_label.tooltip_text = tr("Compagnons : %s\nClics : %s") % [from_companions.format(), from_clicks.format()]
-	_refresh_click_damage()
+	_dps_label.text = from_companions.add(from_clicks).format()
+	var click_damage: BigNumber = _floors.buffed_damage(_floors.click_damage())
+	_dps_button.tooltip_text = tr("Compagnons : %s\nDPS des clics : %s\nDégâts de clic : %s") % [from_companions.format(), from_clicks.format(), click_damage.format()]

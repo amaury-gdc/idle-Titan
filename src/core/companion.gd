@@ -16,6 +16,12 @@ extends RefCounted
 ## as "1.5" do not drift. Costs and damages of the last queried level are memoized
 ## (pure functions of the level), so repeated reads each frame allocate nothing.
 ##
+## Each level's cost is floored on its own, so the sum of N levels has no closed
+## form: a geometric sum would differ. Sums therefore walk the unfloored numerator
+## base_cost * numerator^(L - 1) over 10^(scale * (L - 1)) one level at a time (one
+## multiplication, one floor per level). The numerator of the last queried level is
+## kept, so a purchase or a scan from the same level never recomputes the power.
+##
 ## Single-thread only. Build with [method from_entry] and check [method is_valid].
 ##
 ## Usage:
@@ -27,6 +33,10 @@ extends RefCounted
 ## else:
 ##     push_error(companion.get_error())
 ## [/codeblock]
+
+## Largest forward jump the kept numerator walks instead of recomputing the power:
+## past it, the power is the cheaper of the two. Performance bound, not balance.
+const NUMERATOR_WALK_LIMIT: int = 64
 
 ## Stable id, the key used in [member GameState.companion_levels].
 var id: String = ""
@@ -40,6 +50,9 @@ var _base_cost: BigNumber = BigNumber.new()
 var _base_damage: BigNumber = BigNumber.new()
 var _cost_growth: String = "1"
 var _interval_ms: int = 1000
+## _cost_growth as the exact fraction _growth_numerator / 10^_growth_scale.
+var _growth_numerator: BigNumber = BigNumber.from_int(1)
+var _growth_scale: int = 0
 ## Tier unlock levels, strictly increasing.
 var _tier_levels: Array[int] = []
 ## Tier multipliers as exact fractions numerator / 10^scale (same index as _tier_levels).
@@ -47,6 +60,9 @@ var _tier_numerators: Array[BigNumber] = []
 var _tier_scales: Array[int] = []
 var _cost_memo_level: int = -1
 var _cost_memo: BigNumber = null
+## base_cost * numerator^(level - 1) for level _numerator_level, unfloored.
+var _numerator_level: int = -1
+var _numerator: BigNumber = null
 var _damage_memo_level: int = -1
 var _damage_memo: BigNumber = null
 var _dps_memo_level: int = -1
@@ -76,9 +92,63 @@ func get_error() -> String:
 ## L+1 the upgrade from L). Example: base_cost "10", growth "1.15": level 1 costs 10, level 2 costs 11.
 func cost_of_level(level: int) -> BigNumber:
 	if _cost_memo_level != level:
-		_cost_memo = GrowthCurve.value_at(_base_cost, _cost_growth, maxi(level, 1) - 1)
+		var target: int = maxi(level, 1)
+		_cost_memo = _numerator_at(target).divide_by_power_of_ten(_growth_scale * (target - 1))
 		_cost_memo_level = level
 	return _cost_memo
+
+
+## Exact total gold cost of the [param count] levels starting at [param level] (>= 1,
+## lower is read as 1), each floored on its own: the same value as adding
+## [method cost_of_level] for level, level + 1, and so on. 0 when count <= 0.
+## Example: base_cost "10", growth "1.15": from level 1, count 2 costs 21.
+func cost_of_levels_from(level: int, count: int) -> BigNumber:
+	var total: BigNumber = BigNumber.new()
+	if count <= 0:
+		return total
+	var first: int = maxi(level, 1)
+	var numerator: BigNumber = _numerator_at(first)
+	var exponent: int = _growth_scale * (first - 1)
+	for i in count:
+		if i > 0:
+			numerator = numerator.multiply(_growth_numerator)
+			exponent += _growth_scale
+		total = total.add(numerator.divide_by_power_of_ten(exponent))
+	return total
+
+
+## How many consecutive levels starting at [param level] (>= 1, lower is read as 1)
+## [param gold] covers, from 0 to [param max_count]. The scan stops at the first level
+## the gold cannot cover. Example: base_cost "10", growth "1.15", gold 21, from level
+## 1: returns 2 (10 + 11).
+func affordable_levels_from(level: int, gold: BigNumber, max_count: int) -> int:
+	return affordable_walk_from(level, gold, max_count)["count"]
+
+
+## The same scan as [method affordable_levels_from], which also keeps the sum it walked:
+## {"count": int, "total": BigNumber}, where total is the exact cost of those count levels (0 when
+## count is 0). One walk, so a caller needing both never pays for a second one.
+func affordable_walk_from(level: int, gold: BigNumber, max_count: int) -> Dictionary:
+	var kept: BigNumber = BigNumber.new()
+	if max_count <= 0:
+		return {"count": 0, "total": kept}
+	var first: int = maxi(level, 1)
+	var numerator: BigNumber = _numerator_at(first)
+	var exponent: int = _growth_scale * (first - 1)
+	for i in max_count:
+		if i > 0:
+			numerator = numerator.multiply(_growth_numerator)
+			exponent += _growth_scale
+		var total: BigNumber = kept.add(numerator.divide_by_power_of_ten(exponent))
+		if total.compare(gold) > 0:
+			return {"count": i, "total": kept}
+		kept = total
+	return {"count": max_count, "total": kept}
+
+
+## The levels that unlock a tier, strictly increasing. Read-only: do not modify.
+func tier_levels() -> Array[int]:
+	return _tier_levels
 
 
 ## Damage of one attack at [param level], tiers included. 0 for level <= 0.
@@ -101,6 +171,19 @@ func damage_per_second_at_level(level: int) -> BigNumber:
 		_dps_memo = damage_at_level(level).multiply(BigNumber.from_int(1000)).divide(BigNumber.from_int(_interval_ms))
 		_dps_memo_level = level
 	return _dps_memo
+
+
+# Unfloored cost numerator of [param level] (>= 1), kept for the next call: a small
+# step forward walks from the kept value, anything else recomputes the power.
+func _numerator_at(level: int) -> BigNumber:
+	var steps: int = level - _numerator_level
+	if _numerator == null or steps < 0 or steps > NUMERATOR_WALK_LIMIT:
+		_numerator = _base_cost.multiply(_growth_numerator.power(level - 1))
+	else:
+		for i in steps:
+			_numerator = _numerator.multiply(_growth_numerator)
+	_numerator_level = level
+	return _numerator
 
 
 func _compute_damage(level: int) -> BigNumber:
@@ -130,6 +213,10 @@ func _load(entry: Dictionary, default_cost_growth: String) -> void:
 	_base_cost = _read_big(entry, "base_cost")
 	_base_damage = _read_big(entry, "base_damage")
 	_read_cost_growth(entry, default_cost_growth)
+	var fraction: Array = GrowthCurve.parse_factor(_cost_growth)
+	if fraction.size() == 2:
+		_growth_numerator = fraction[0]
+		_growth_scale = fraction[1]
 	_read_interval(entry)
 	_read_tiers(entry)
 
