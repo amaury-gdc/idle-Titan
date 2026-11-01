@@ -5,6 +5,8 @@ extends GdUnitTestSuite
 
 const THEME_PATH: String = "res://src/ui/main_theme.tres"
 const MIN_CONTRAST: float = 4.5
+## WCAG 2.1 AA for what is not text.
+const MIN_NON_TEXT_CONTRAST: float = 3.0
 
 var _theme: Theme
 
@@ -51,6 +53,11 @@ func test_buy_state_is_told_by_a_border_too() -> void:
 	var disabled: StyleBoxFlat = _theme.get_stylebox("disabled", "Button")
 	assert_int(enabled.border_width_top).is_greater(0)
 	assert_int(disabled.border_width_top).is_equal(0)
+
+
+func test_tier_bar_fill_stands_out_of_its_background() -> void:
+	var fill: Color = _background("fill", "TierBar")
+	assert_float(_contrast(fill, _background("background", "TierBar"))).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
 func test_disabled_text_carrying_a_cost_reads() -> void:

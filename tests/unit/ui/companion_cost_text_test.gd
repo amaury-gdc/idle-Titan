@@ -23,7 +23,6 @@ func _quote(affordable: bool) -> BuyQuote:
 	var quote: BuyQuote = BuyQuote.new()
 	quote.count = 74
 	quote.cost = BigNumber.from_int(COST)
-	quote.missing = BigNumber.from_int(COST)
 	quote.affordable = affordable
 	return quote
 
@@ -47,7 +46,7 @@ func test_longest_cost_holds_on_one_line_of_a_compact_button() -> void:
 	panel.size = Vector2(PANE_AT_320, 200)
 	panel._add_row("scout")
 	var button: Button = panel._rows[0]["button"]
-	var text: String = "Améliorer x10 : %s" % CompanionPanel.keep_together(CompanionPanel.LONGEST_COST)
+	var text: String = "Améliorer x%d : %s" % [CompanionPanel.LONGEST_COUNT, CompanionPanel.keep_together(CompanionPanel.LONGEST_COST)]
 	var font: Font = button.get_theme_font("font")
 
 	# Act
@@ -75,7 +74,5 @@ func test_cost_stays_whole_on_its_line() -> void:
 	assert_str(lines[-1]).is_equal(cost)
 
 
-func test_missing_amount_stays_whole_on_its_line() -> void:
-	var text: String = _panel._button_text(5, _quote(false))
-	var missing: String = BigNumber.from_int(COST).format().replace(" ", " ")
-	assert_bool(text.ends_with(missing)).is_true()
+func test_unaffordable_text_is_the_same_as_the_affordable_one() -> void:
+	assert_str(_panel._button_text(5, _quote(false))).is_equal(_panel._button_text(5, _quote(true)))

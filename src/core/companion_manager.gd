@@ -134,6 +134,17 @@ func tier_levels(id: String) -> Array[int]:
 	return _combat.companion(id).tier_levels()
 
 
+## The first tier above the current level of [param id], which must be in the roster:
+## see [method Companion.next_tier_from]. Reading only, no rule depends on it.
+## [codeblock]
+## var tier: Dictionary = companions.next_tier("archer")
+## if tier["level"] > 0:
+##     print("level %d: x%s" % [tier["level"], tier["multiplier"]])
+## [/codeblock]
+func next_tier(id: String) -> Dictionary:
+	return _combat.companion(id).next_tier_from(level(id))
+
+
 ## Buys the next [param count] levels of [param id] as one transaction, spending
 ## exactly [method cost_of_levels]. Returns true on success. Unknown id, count <= 0 or
 ## gold short of the whole sum: returns false and nothing changes. Emits

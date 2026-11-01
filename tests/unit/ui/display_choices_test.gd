@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 ## Unit tests for the choices kept in [DisplaySettings] by story 010: "never set" for the effects,
-## so that prefers-reduced-motion can decide the first run, and the x1 / x10 / Max choice.
-## Story: production/epics/idle-titans/story-010-adaptive-layout.md.
+## so that prefers-reduced-motion can decide the first run, and the x1 / x10 / Max / Palier choice.
+## Stories: production/epics/idle-titans/story-010-adaptive-layout.md, story-013-companion-touch-ups.md.
 
 const SETTINGS_PATH: String = "user://display_choices_test.cfg"
 
@@ -58,8 +58,18 @@ func test_buy_mode_survives_a_reload() -> void:
 	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.MAX)
 
 
+func test_buy_mode_tier_survives_a_reload() -> void:
+	DisplaySettings.new(SETTINGS_PATH).set_buy_mode(BuyQuote.Mode.TIER)
+	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.TIER)
+
+
+func test_buy_mode_stored_before_the_tier_segment_stays_valid() -> void:
+	_write("2", DisplaySettings.KEY_BUY_MODE)
+	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.MAX)
+
+
 func test_buy_mode_out_of_range_is_the_default() -> void:
-	_write("3", DisplaySettings.KEY_BUY_MODE)
+	_write("4", DisplaySettings.KEY_BUY_MODE)
 	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.ONE)
 
 

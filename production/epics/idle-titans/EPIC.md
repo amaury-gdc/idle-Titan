@@ -39,4 +39,5 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 | 009 | Retours visuels (hors brief MVP) | Visual/Feel | Complete | N/A |
 | 010 | Disposition adaptative, onglets et onglet Compagnons (hors brief MVP) | UI | Complete | N/A |
 | 011 | Onglets Objets et Talents (hors brief MVP) | UI | Complete | N/A |
-| 012 | Transition entre monstres (hors brief MVP) | Visual/Feel | Ready | N/A |
+| 012 | Transition entre monstres (hors brief MVP) | Visual/Feel | Complete | N/A |
+| 013 | Retouches compagnons (hors brief MVP) | UI | Complete | N/A |

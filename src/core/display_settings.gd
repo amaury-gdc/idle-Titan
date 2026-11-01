@@ -4,7 +4,7 @@ extends RefCounted
 ## the game saves: it is NOT part of [GameState], [PermanentState] or the text of "Copier ma
 ## sauvegarde", and "Réinitialiser ma sauvegarde" does not touch it. It holds "Effets visuels"
 ## (floating numbers, companion spheres and balls, monster squash), on by default, and the x1 /
-## x10 / Max choice of the companion list (story 010), x1 by default.
+## x10 / Max / Palier choice of the companion list (stories 010, 013), x1 by default.
 ## An absent, unreadable or malformed file means the default. The path can be injected for tests.
 ## Single-thread only.
 ##
@@ -28,7 +28,7 @@ const KEY_VISUAL_EFFECTS: String = "visual_effects"
 const KEY_BUY_MODE: String = "buy_mode"
 ## Stored values of the buy mode go from 0 to this, excluded: a [enum BuyQuote.Mode], kept as a
 ## number here so that this file depends on nothing in the interface.
-const BUY_MODE_COUNT: int = 3
+const BUY_MODE_COUNT: int = 4
 
 var _path: String
 var _config: ConfigFile = ConfigFile.new()

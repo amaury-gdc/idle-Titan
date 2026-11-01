@@ -140,7 +140,7 @@ Largeur de gestion : une seule version de liste, qui s'adapte à sa propre large
 | Défi automatique | Bascule | OUI/NON | Oui | Existant |
 | Version | Texte 16 u | `v0.1.0` | Non | Reste visible dans un coin (ta demande d'origine) |
 | Onglets | 3 boutons bascule (`ButtonGroup`) | Libellé, point, compteur | Oui | Nouveau |
-| Sélecteur | 3 segments | x1, x10, Max | Oui | Nouveau |
+| Sélecteur | 4 segments | x1, x10, Max, Palier | Oui | Nouveau |
 | Lignes compagnon | Ligne + bouton | Nom, niveau, DPS, coût | Oui | Existant adapté |
 | Objets | Emplacements, sac, détail | Comparaison | Oui | Refonte, story B |
 | Talents | Branches, détail | Nœuds | Oui | Refonte, story B |
@@ -196,7 +196,7 @@ Tactile, souris, clavier. Manette selon D2.
 | Détail DPS | Toucher | Clic | Focus + Entrée | Bulle | Compagnons, clics, dégâts de clic |
 | Défier, Abandonner, Défi auto | Toucher | Clic | Focus + Entrée | État | Existant |
 | Onglet | Toucher | Clic | Flèches sur la barre, Tab vers le contenu | Barre or, libellé or | Change le contenu, éteint son point |
-| x1 / x10 / Max | Toucher | Clic | Flèches | Fond or, texte sombre | Change le coût des lignes (D3) |
+| x1 / x10 / Max / Palier | Toucher | Clic | Flèches | Fond or, texte sombre | Change le coût des lignes (D3) |
 | Acheter compagnon | Toucher | Clic | Entrée | Coût, niveau | Achat (lot unique) |
 | Liste | Glisser | Molette | Flèches, suivi du focus | Défilement | Un glissé n'achète jamais |
 | Objet ou talent | Toucher | Clic | Entrée | Détail | Action dans le détail (D5) |
@@ -281,7 +281,7 @@ Aucun palier d'accessibilité n'est défini. Référence de travail : WCAG 2.1 A
 | Talent achetable | 3,73:1, survol 3,00:1 | Idem |
 | Compétence active | 4,11:1 | Idem |
 | Texte désactivé porteur d'un coût | 3,53 à 4,30:1 | Gris à 0,62, environ 5 à 6,4:1 |
-| Achat possible ou non | Couleur seule, 2,80:1 entre fonds | Bord + texte « manque X » |
+| Achat possible ou non | Couleur seule, 2,80:1 entre fonds | Bord épais sur le bouton achetable seulement (story 013) |
 | Point de notification | 2,22:1 sur gris | Pastille or à bord sombre + compteur dans le libellé |
 
 Information au survol seul remplacée : détail de compétence (appui long et focus), DPS (toucher), « Requiert : X » (imprimé sur le nœud verrouillé). Le texte des boutons reste lu au survol sur PC, sans exclusivité.
@@ -333,7 +333,7 @@ Décisions d'Amaury, toutes acceptées le 2026-11-01 selon la recommandation :
 
 - **D1. Pause.** Aujourd'hui Talents et Objets arrêtent le jeu, chrono de boss compris. Recommandation : les onglets ne mettent pas en pause, sinon l'idle s'arrête quand un onglet reste ouvert. C'est un changement de comportement à accepter, malgré « logique inchangée ». Seuls Réglages et le retour d'absence attendent.
 - **D2. Raccourcis.** 1/2/3 n'existent pas aujourd'hui, et le monstre n'est pas attaquable au clavier. Recommandation : ajouter 1/2/3, et rendre le monstre focalisable (Espace ou Entrée, sans répétition en maintien). Manette : pas de prise en charge dédiée, malgré `ui-code.md`.
-- **D3. x10 et Max.** Recommandation : x10 strict, désactivé avec « manque X » si l'or manque ; Max affiche la quantité réelle. Exige d'ajouter un achat par lot dans le cœur du jeu, à coûts identiques. Coût de Max à mesurer d'abord.
+- **D3. x10 et Max.** Recommandation : x10 strict, désactivé si l'or manque ; Max affiche la quantité réelle. Exige d'ajouter un achat par lot dans le cœur du jeu, à coûts identiques. Coût de Max à mesurer d'abord. Story 013 : plus de « manque X », le coût seul ; ajout de Palier, tout ou rien jusqu'au prochain palier ; chaque ligne compagnon passe à 3 lignes de texte, la barre à droite du texte de palier sur toute la largeur de la ligne, et le seuil de lignes visibles à 320x568 passe de 2,5 à 2.
 - **D4. Point de notification.** « Quand une action est possible » resterait allumé en permanence dans un idle. Recommandation : sur événement (nouveau compagnon ou palier, nouveau nœud achetable, nouvel objet gardé), éteint à la visite, jamais sur l'onglet ouvert, avec compteur de points de talents.
 - **D5. Détail tactile.** Recommandation : toucher ouvre le détail, puis bouton Acheter ou Équiper. Confirmation avant la remise à zéro des talents.
 - **D6. Plusieurs doigts.** Recommandation : chaque doigt compte comme un clic, à prendre en compte dans le réglage du mur.

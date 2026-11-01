@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=52 format=3]
+[gd_resource type="Theme" load_steps=55 format=3]
 
 [sub_resource type="StyleBoxFlat" id="focus_ring"]
 draw_center = false
@@ -239,6 +239,23 @@ content_margin_left = 8.0
 content_margin_top = 4.0
 content_margin_right = 8.0
 content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxEmpty" id="companion_list_margins"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxFlat" id="tier_bar_back"]
+bg_color = Color(0.25098, 0.25098, 0.301961, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.74902, 0.74902, 0.8, 1)
+
+[sub_resource type="StyleBoxFlat" id="tier_bar_fill"]
+bg_color = Color(1, 0.839216, 0.25098, 1)
 
 [sub_resource type="StyleBoxFlat" id="hint_box"]
 content_margin_left = 8.0
@@ -721,6 +738,8 @@ ChallengeButton/base_type = &"Button"
 ChallengeButton/styles/hover = SubResource("challenge_hover")
 ChallengeButton/styles/normal = SubResource("challenge_normal")
 ChallengeButton/styles/pressed = SubResource("challenge_pressed")
+CompanionListPanel/base_type = &"PanelContainer"
+CompanionListPanel/styles/panel = SubResource("companion_list_margins")
 DangerButton/base_type = &"Button"
 DangerButton/styles/hover = SubResource("danger_normal")
 DangerButton/styles/normal = SubResource("danger_normal")
@@ -760,6 +779,9 @@ ToastPanel/styles/panel = SubResource("toast_panel")
 ToggleButton/base_type = &"Button"
 ToggleButton/styles/hover_pressed = SubResource("ready_hover")
 ToggleButton/styles/pressed = SubResource("ready_normal")
+TierBar/base_type = &"ProgressBar"
+TierBar/styles/background = SubResource("tier_bar_back")
+TierBar/styles/fill = SubResource("tier_bar_fill")
 TooltipLabel/colors/font_color = Color(1, 1, 1, 1)
 TooltipLabel/font_sizes/font_size = 16
 TooltipPanel/styles/panel = SubResource("toast_panel")

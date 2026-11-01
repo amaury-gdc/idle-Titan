@@ -1,0 +1,7 @@
+Reviewed-Content-Hash: src/core/companion.gd 657cddb3864b00654e4e0f1190e392d3260895fb
+Reviewed-Content-Hash: src/core/companion_manager.gd c59603ff20e44fe2d5f3b5983a312ddcb1eba62b
+Reviewed-Content-Hash: src/core/display_settings.gd b7621e32caf22e23452dde1e67fb1ab715b82476
+Reviewed-Content-Hash: src/ui/buy_quote.gd 3d9a5512d88e719cda40e9a2ff4eeca7aec88873
+Reviewed-Content-Hash: src/ui/companion_panel.gd 5b16516dd373bbde6fdf4a53226e72af1fa2b501
+Reviewed-Content-Hash: src/ui/companion_panel.tscn f02b669b81f9acecd5d66e550ae96709434982a2
+Reviewed-Content-Hash: src/ui/main_theme.tres a48aa123b184da8fad839357b7a7266e5659068b

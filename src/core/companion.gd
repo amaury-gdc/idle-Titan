@@ -58,11 +58,18 @@ var _tier_levels: Array[int] = []
 ## Tier multipliers as exact fractions numerator / 10^scale (same index as _tier_levels).
 var _tier_numerators: Array[BigNumber] = []
 var _tier_scales: Array[int] = []
+## Tier multipliers as shown to the player, French comma and no trailing zero (same index).
+var _tier_labels: Array[String] = []
 var _cost_memo_level: int = -1
 var _cost_memo: BigNumber = null
 ## base_cost * numerator^(level - 1) for level _numerator_level, unfloored.
 var _numerator_level: int = -1
 var _numerator: BigNumber = null
+## The last sum of levels: the list quotes the same one on every change of gold (story 013, up to
+## 50 levels per companion).
+var _sum_memo_level: int = -1
+var _sum_memo_count: int = -1
+var _sum_memo: BigNumber = null
 var _damage_memo_level: int = -1
 var _damage_memo: BigNumber = null
 var _dps_memo_level: int = -1
@@ -107,6 +114,8 @@ func cost_of_levels_from(level: int, count: int) -> BigNumber:
 	if count <= 0:
 		return total
 	var first: int = maxi(level, 1)
+	if _sum_memo_level == first and _sum_memo_count == count:
+		return _sum_memo
 	var numerator: BigNumber = _numerator_at(first)
 	var exponent: int = _growth_scale * (first - 1)
 	for i in count:
@@ -114,6 +123,9 @@ func cost_of_levels_from(level: int, count: int) -> BigNumber:
 			numerator = numerator.multiply(_growth_numerator)
 			exponent += _growth_scale
 		total = total.add(numerator.divide_by_power_of_ten(exponent))
+	_sum_memo_level = first
+	_sum_memo_count = count
+	_sum_memo = total
 	return total
 
 
@@ -149,6 +161,20 @@ func affordable_walk_from(level: int, gold: BigNumber, max_count: int) -> Dictio
 ## The levels that unlock a tier, strictly increasing. Read-only: do not modify.
 func tier_levels() -> Array[int]:
 	return _tier_levels
+
+
+## The first tier above [param level], read from the data, which assumes no rhythm:
+## {"level": int, "multiplier": String, "previous": int}. "multiplier" is displayable as is ("2",
+## "1,5"); "previous" is the last tier reached, 0 when none. Past the last tier, or without any
+## tier, "level" is 0 and "multiplier" is empty; "previous" then tells the two apart.
+## Example: tiers at 10 and 25, from level 10: {"level": 25, "multiplier": "2", "previous": 10}.
+func next_tier_from(level: int) -> Dictionary:
+	var previous: int = 0
+	for i in _tier_levels.size():
+		if _tier_levels[i] > level:
+			return {"level": _tier_levels[i], "multiplier": _tier_labels[i], "previous": previous}
+		previous = _tier_levels[i]
+	return {"level": 0, "multiplier": "", "previous": previous}
 
 
 ## Damage of one attack at [param level], tiers included. 0 for level <= 0.
@@ -281,6 +307,15 @@ func _read_tiers(entry: Dictionary) -> void:
 		_tier_levels.append(previous_level)
 		_tier_numerators.append(numerator)
 		_tier_scales.append(parts[1].length() if parts.size() == 2 else 0)
+		_tier_labels.append(_multiplier_label(numerator, _tier_scales[-1]))
+
+
+# numerator / 10^scale as the player reads it: 15 at scale 1 gives "1,5", 200 at scale 2 gives "2".
+func _multiplier_label(numerator: BigNumber, scale: int) -> String:
+	var digits: String = numerator.to_decimal_string().pad_zeros(scale + 1)
+	var whole: String = digits.substr(0, digits.length() - scale)
+	var decimals: String = digits.substr(digits.length() - scale).rstrip("0")
+	return whole if decimals.is_empty() else "%s,%s" % [whole, decimals]
 
 
 # Keeps the first error only, prefixed with the file name.

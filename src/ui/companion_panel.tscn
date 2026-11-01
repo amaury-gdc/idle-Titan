@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://src/ui/companion_panel.gd" id="1_panel"]
 
 [node name="CompanionPanel" type="PanelContainer"]
-theme_type_variation = &"ListPanel"
+theme_type_variation = &"CompanionListPanel"
 script = ExtResource("1_panel")
 
 [node name="Frame" type="MarginContainer" parent="."]
@@ -16,7 +16,7 @@ theme_override_constants/margin_bottom = 0
 
 [node name="Column" type="VBoxContainer" parent="Frame"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 2
 
 [node name="Selector" type="HBoxContainer" parent="Frame/Column"]
 layout_mode = 2
@@ -39,6 +39,14 @@ theme_type_variation = &"SegmentButton"
 toggle_mode = true
 
 [node name="MaxSegment" type="Button" parent="Frame/Column/Selector"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"SegmentButton"
+toggle_mode = true
+
+[node name="TierSegment" type="Button" parent="Frame/Column/Selector"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2

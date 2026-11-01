@@ -1,6 +1,6 @@
 extends GdUnitTestSuite
-## Unit tests for the amounts of the x1 / x10 / Max selector: strict x10, real Max, what is missing,
-## and that a quote spends exactly what it says.
+## Unit tests for the amounts of the x1 / x10 / Max selector: strict x10, real Max, and that a quote
+## spends exactly what it says. The Palier segment: buy_quote_tier_test.gd.
 ## Story: production/epics/idle-titans/story-010-adaptive-layout.md, D3 of
 ## design/ux/main-screen-adaptive.md.
 
@@ -65,11 +65,10 @@ func test_x1_quotes_the_next_level() -> void:
 	assert_bool(quote.affordable).is_true()
 
 
-func test_x1_short_of_gold_tells_what_is_missing() -> void:
+func test_x1_short_of_gold_is_not_affordable() -> void:
 	_state.gold = _companions.next_cost(ID).subtract(_one())
 	var quote: BuyQuote = _quote(BuyQuote.Mode.ONE)
 	assert_bool(quote.affordable).is_false()
-	_assert_same(quote.missing, _one())
 
 
 func test_x10_with_exact_gold_is_affordable() -> void:
@@ -78,7 +77,6 @@ func test_x10_with_exact_gold_is_affordable() -> void:
 	assert_int(quote.count).is_equal(BuyQuote.TEN_COUNT)
 	_assert_same(quote.cost, _state.gold)
 	assert_bool(quote.affordable).is_true()
-	assert_bool(quote.missing.is_zero()).is_true()
 
 
 func test_x10_one_gold_short_is_strict_and_keeps_the_total() -> void:
@@ -88,7 +86,6 @@ func test_x10_one_gold_short_is_strict_and_keeps_the_total() -> void:
 	assert_int(quote.count).is_equal(BuyQuote.TEN_COUNT)
 	assert_bool(quote.affordable).is_false()
 	_assert_same(quote.cost, total)
-	_assert_same(quote.missing, _one())
 
 
 func test_max_counts_the_real_levels_and_their_cost() -> void:
@@ -107,7 +104,6 @@ func test_max_at_zero_quotes_the_next_cost_and_is_disabled() -> void:
 	assert_int(quote.count).is_equal(0)
 	assert_bool(quote.affordable).is_false()
 	_assert_same(quote.cost, next)
-	_assert_same(quote.missing, _one())
 
 
 func test_max_quote_spends_exactly_what_it_shows() -> void:

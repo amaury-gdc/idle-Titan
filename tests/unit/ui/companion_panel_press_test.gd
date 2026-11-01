@@ -95,12 +95,11 @@ func test_button_text_says_the_verb_for_an_upgrade() -> void:
 	assert_str(_button().text).is_equal("Améliorer x10 : %s" % CompanionPanel.keep_together(_companions.cost_of_levels(ID, 10).format()))
 
 
-func test_button_text_puts_what_is_missing_on_a_second_line() -> void:
+func test_button_text_short_of_gold_is_one_line_without_what_is_missing() -> void:
 	_state.gold = BigNumber.new()
 	_panel.set_mode(BuyQuote.Mode.TEN)
-	var lines: PackedStringArray = _button().text.split("\n")
-	assert_int(lines.size()).is_equal(2)
-	assert_str(lines[1]).starts_with("manque ")
+	assert_str(_button().text).not_contains("\n")
+	assert_str(_button().text).not_contains("manque")
 
 
 func test_button_text_at_max_zero_names_max_and_the_next_cost() -> void:
