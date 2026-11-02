@@ -1,7 +1,8 @@
 class_name Companion
 extends RefCounted
 ## One companion's definition and its formulas, built from one entry of
-## companions_roster.json (schema 2, see assets/data/data_schema.md).
+## companions_roster.json (schema 2, see assets/data/data_schema.md). The optional
+## "click_share" key (economy rework story 015) is only parsed here, see [method click_share].
 ## Implements design/game-brief.md "Core loop" and MVP feature 3 (story 003).
 ## Holds no run state: the level is always passed in.
 ##
@@ -60,6 +61,8 @@ var _tier_numerators: Array[BigNumber] = []
 var _tier_scales: Array[int] = []
 ## Tier multipliers as shown to the player, French comma and no trailing zero (same index).
 var _tier_labels: Array[String] = []
+## "click_share" as the exact fraction [numerator: BigNumber, scale: int], or [] when the entry has none.
+var _click_share: Array = []
 var _cost_memo_level: int = -1
 var _cost_memo: BigNumber = null
 ## base_cost * numerator^(level - 1) for level _numerator_level, unfloored.
@@ -158,6 +161,15 @@ func affordable_walk_from(level: int, gold: BigNumber, max_count: int) -> Dictio
 	return {"count": max_count, "total": kept}
 
 
+## This companion's share of its damage per second that feeds the click (the optional roster
+## key "click_share", economy rework story 015), as the exact fraction
+## [numerator: BigNumber, scale: int] meaning numerator / 10^scale, between 0 and 1.
+## [] when the entry has no click_share. Example: "0.45" gives [45, 2]; "1" gives [1, 0].
+## [method Combat.click_damage] sums these shares; it is the only reader.
+func click_share() -> Array:
+	return _click_share
+
+
 ## The levels that unlock a tier, strictly increasing. Read-only: do not modify.
 func tier_levels() -> Array[int]:
 	return _tier_levels
@@ -245,6 +257,7 @@ func _load(entry: Dictionary, default_cost_growth: String) -> void:
 		_growth_scale = fraction[1]
 	_read_interval(entry)
 	_read_tiers(entry)
+	_read_click_share(entry)
 
 
 func _read_big(entry: Dictionary, key: String) -> BigNumber:
@@ -308,6 +321,18 @@ func _read_tiers(entry: Dictionary) -> void:
 		_tier_numerators.append(numerator)
 		_tier_scales.append(parts[1].length() if parts.size() == 2 else 0)
 		_tier_labels.append(_multiplier_label(numerator, _tier_scales[-1]))
+
+
+# Optional "click_share": a decimal string from 0 to 1 included ("0.45", "1", "0").
+func _read_click_share(entry: Dictionary) -> void:
+	if not entry.has("click_share"):
+		return
+	var v: Variant = entry["click_share"]
+	var fraction: Array = GrowthCurve.parse_factor(v) if v is String else []
+	if fraction.size() != 2 or (fraction[0] as BigNumber).compare(BigNumber.from_int(10).power(fraction[1])) > 0:
+		_fail("'%s' click_share must be a decimal string from 0 to 1, such as \"0.45\"" % id)
+		return
+	_click_share = fraction
 
 
 # numerator / 10^scale as the player reads it: 15 at scale 1 gives "1,5", 200 at scale 2 gives "2".

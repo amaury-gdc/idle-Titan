@@ -29,6 +29,7 @@ same for `boss_curves.json`.
 | `companions[].base_damage` | digit string (damage per attack) | yes | Damage at level 1, before tiers. |
 | `companions[].cost_growth` | decimal string (unitless factor) | no | Per-level cost multiplier. Default when absent: `cost_growth` of core_curves.json. |
 | `companions[].attack_interval_seconds` | number (seconds, >= 0.001) | yes | Time between two automatic attacks; resolution 1 ms in the power formula. |
+| `companions[].click_share` | decimal string from `"0"` to `"1"` included (unitless fraction of this companion's damage per second) | no, but all or none | Part of this companion's damage per second added to a click (story 015, `design/economy-rework.md` "Clic"). Read with schema 2, no version bump. Every companion must have it or none: a mix makes `Combat` refuse the roster. When all have it, the click uses the formula below and `click_companion_power_factor` is no longer required (and ignored if present). Absent everywhere: the former factor formula. Not set in the file today. Example: `"0.45"`. |
 | `companions[].tiers` | array of object | yes | Level tiers, may be empty. |
 | `companions[].tiers[].level` | integer >= 2, strictly increasing | yes | Level at which the tier applies. |
 | `companions[].tiers[].damage_multiplier` | decimal string (unitless factor > 0) | yes | Multiplies the companion's damage from that level on; tiers stack by product. |
@@ -44,6 +45,12 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
   different intervals: it measures what they really add to the fight, so a fast
   weak companion and a slow strong one with the same output feed the click equally.
   `click_companion_power_factor` is therefore a share of DPS.
+- Click with `click_share` on every companion: `click_damage_base + floor(sum over bought
+  companions of click_share_i * dps_i)`, where `dps_i` is the companion's damage per second
+  above (already floored, no talents). ONE floor over the whole sum, exact: the shares are
+  brought to a common power of ten, summed, divided once. Example: two companions of 1 dps with
+  shares "0.5" and "0.5" add 1, not 0. A roster with no companion has no share and keeps the
+  factor formula.
 
 ## core_curves.json
 
@@ -52,11 +59,14 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 | `schema_version` | int | yes | Currently 3 (2 added the combat keys below; 3 added the `offline_*` keys). `Combat` reads 2 and 3 and refuses any other value, because 3 only added keys it does not read; `OfflineIncome` requires 3, so the game stops on a version 2 file. |
 | `cost_growth` | decimal string (unitless factor) | only if a companion has no own `cost_growth` | Default per-level cost multiplier (1.08 = +8% per level). Value in file: "1.08". |
 | `enemy_hp_base` | digit string (HP) | yes | HP of the stage-1 enemy. Value in file: "22". |
-| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | yes | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. Value in file: "1.325". |
+| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. It is one segment from stage 1 (see `enemy_hp_segments`). Value in file: "1.325". |
+| `enemy_hp_segments` | array of object, not empty | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | HP growth by stages (story 015, `design/economy-rework.md` "PV par paliers"). Read with schema 2 or 3, no version bump. Both keys together, or neither, make `Combat` refuse the file. Not set in the file today. |
+| `enemy_hp_segments[].from_stage` | integer, first entry 1, strictly increasing, at most 100000 | yes | First stage of the segment. The cap (`Combat.MAX_SEGMENT_FROM_STAGE`) is a load-time safety bound, not balance: each anchor is computed at load. |
+| `enemy_hp_segments[].growth` | decimal string (unitless factor) | yes | Per-stage HP multiplier of the segment. |
 | `gold_per_kill_base` | digit string (gold) | yes | Gold for killing the stage-1 enemy. Default in file: "3". |
 | `gold_per_kill_growth` | decimal string (unitless factor) | yes | Per-stage gold multiplier. Gold(stage) = floor(`gold_per_kill_base` * growth^(stage-1)), exact. Value in file: "1.28". |
 | `click_damage_base` | digit string (damage per click) | yes | Click damage before any companion share. Default in file: "1". |
-| `click_companion_power_factor` | decimal string (unitless fraction of companion power) | yes | Share of total companion power (damage per second) added to a click: click = base + floor(power * factor). "0.1" = 10%. Companion power is 0 until companions are bought. Value in file: "0.1". |
+| `click_companion_power_factor` | decimal string (unitless fraction of companion power) | only if no companion has a `click_share` | Share of total companion power (damage per second) added to a click: click = base + floor(power * factor). "0.1" = 10%. Companion power is 0 until companions are bought. Value in file: "0.1". |
 | `autosave_interval_seconds` | number (seconds, > 0) | no | Period of the main screen autosave. If missing or not a positive number the code uses 10 (constant `FALLBACK_AUTOSAVE_SECONDS` in `src/ui/main_screen.gd`). Value in file: 5. |
 | `offline_efficiency` | decimal string (unitless fraction) | yes | Share of what the companions would earn by farming the current stage that an absence pays. See the formula below. Value in file: "0.1". |
 | `offline_max_hours` | number (hours, > 0) | yes | Cap of the absence time counted (brief: 12 h). Value in file: 12. |
@@ -76,6 +86,14 @@ Saved field: `last_saved_unix` (int, Unix seconds, default 0 = unknown) in the g
 stamped by `SaveManager` on every game save and cleared by `GameState.reset()`. The game
 save has no version number: an older save has no such key, loads with 0, stays valid and
 earns nothing on its first return. A negative, non-numeric or absurd value also gives 0.
+
+Enemy HP with segments `{from_stage f_k, growth g_k}` (the scalar is the single segment
+`{1, enemy_hp_growth}`): `HP(s) = max(1, floor(A_k * g_k^(s - f_k)))` for the last segment k with
+`f_k <= s`, where `A_1 = enemy_hp_base` and `A_(k+1) = floor(A_k * g_k^(f_(k+1) - f_k))`. The
+anchors `A_k` are computed once when the file is loaded, exact. Junction: `HP(f_(k+1))` is still
+reached with `g_k` (it equals `A_(k+1)`), and `HP(f_(k+1) + 1)` is the first value with
+`g_(k+1)`, so the curve never jumps or drops at a junction. Example, base 10, segments
+`{1, "2"}` and `{4, "3"}`: HP(4) = 80, HP(5) = 240.
 
 Growth factors are applied exactly as floor(base * numerator^n / 10^(scale*n)) by
 `GrowthCurve` (`src/core/growth_curve.gd`), not by repeated truncation, so the
