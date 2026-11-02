@@ -51,6 +51,8 @@ var _error: String = ""
 ## 0 means "no boss stage" (only for [code]BossFight.new()[/code]; from_data requires >= 2).
 var _every_stages: int = 0
 var _timer_seconds: float = 0.0
+## Seconds the talents add to every fight (story 019), 0 for none.
+var _bonus_seconds: float = 0.0
 var _hp_multiplier: String = "1"
 var _gold_base: BigNumber = BigNumber.new()
 var _gold_growth: String = "1"
@@ -102,9 +104,18 @@ func safe_boss_hp(boss_hp: BigNumber) -> BigNumber:
 	return boss_hp.multiply_decimal(_challenge_margin)
 
 
-## Duration of one boss fight, in seconds (0 for [code]BossFight.new()[/code]).
+## Duration of one boss fight, in seconds: the data plus [method set_bonus_seconds] (0 for
+## [code]BossFight.new()[/code] without bonus).
 func timer_seconds() -> float:
-	return _timer_seconds
+	return _timer_seconds + _bonus_seconds
+
+
+## Adds [param seconds] (>= 0, story 019 "Sursis") to the countdown of every fight that begins from now
+## on; the saved data is untouched. A running fight keeps the time it has, cut to the new duration if
+## that is shorter.
+func set_bonus_seconds(seconds: float) -> void:
+	_bonus_seconds = maxf(seconds, 0.0)
+	_time_left = minf(_time_left, timer_seconds())
 
 
 ## True while a boss fight is running (between [method begin] and the end of the countdown or [method stop]).
@@ -120,7 +131,7 @@ func time_left() -> float:
 ## Starts a fight: full countdown. Calling it again restarts the countdown.
 func begin() -> void:
 	_active = true
-	_time_left = _timer_seconds
+	_time_left = timer_seconds()
 
 
 ## Ends the fight without expiry (boss killed, or the stage is not a boss stage).

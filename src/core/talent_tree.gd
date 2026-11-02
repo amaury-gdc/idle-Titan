@@ -45,15 +45,18 @@ extends RefCounted
 ## of a [code]stat[/code] add up and [method factor] gives the factor ("1.40" for +40%) as the decimal
 ## string [method FloorManager.set_talent_modifiers] and [method BigNumber.multiply_decimal]
 ## take. [code]skill_unlock[/code] and [code]skill_mod[/code] are read through [method skill_unlocked] and
-## [method skill_override] (by [ModifierHub] and [SkillManager]). The other types are validated
-## and carried, see [method owned_effects], but nothing applies them yet (story 019 and after).
-## [method apply_to] pushes the stat factors to the [FloorManager] and the [OfflineIncome]; call
+## [method skill_override] (by [ModifierHub] and [SkillManager]); the other types have a reader
+## ([method skill_passive], [method rhythm], [method boss_timer_bonus_seconds], [method offline_cap_hours],
+## [method synergy], [method champion_percent], [method owned_effects] for [code]loot_shift[/code]) that
+## [ModifierHub] pushes to the game (story 019). [method apply_to] pushes the stat factors to the [FloorManager] and the [OfflineIncome]; call
 ## it after building and after [signal changed].
 ##
 ## Reset: [method try_reset] is refused during a boss fight and during the real-time wait since
 ## the last reset ([member PermanentState.talent_reset_unix]), except that the wait does not
-## apply when the spent points exceed the earned ones. [method reset] is the unconditional
-## version, with no rule and no wait.
+## apply when the spent points exceed the earned ones. A last reset dated in the future (clock set
+## back) is pulled back to now by [method reset_seconds_left], [method reset_block] and
+## [method try_reset], so a countdown goes down from the first query (story 019). [method reset] is
+## the unconditional version, with no rule and no wait.
 ##
 ## Version: when talents.json has a [code]tree_version[/code] the player has not acknowledged
 ## ([member PermanentState.talent_tree_seen]), [method apply_tree_version] hands every point
@@ -111,16 +114,36 @@ const SUPPORTED_SCHEMA: int = 1
 ## The tiered format (schema 2).
 const TIERED_SCHEMA: int = 2
 ## Stat names an effect may have. click_damage: damage of a click; companion_damage: damage
-## of the companions' attacks; gold: gold of every kill; offline_gold: gold of an absence.
+## of the companions' attacks; gold: gold of every kill; offline_gold: gold of an absence;
+## boss_damage: every hit during a boss fight; crit_chance: chance of a critical click, in points;
+## click_share: percent added to the share of the companions in a click (50 gives x1.5);
+## attack_speed: percent of attack speed of the companions; cost_discount: percent off every
+## companion level and awakening; farm_gold: percent of gold added to the kills of farm mode.
 const STAT_CLICK_DAMAGE: String = "click_damage"
 const STAT_COMPANION_DAMAGE: String = "companion_damage"
 const STAT_GOLD: String = "gold"
 const STAT_OFFLINE_GOLD: String = "offline_gold"
-const STATS: PackedStringArray = [STAT_CLICK_DAMAGE, STAT_COMPANION_DAMAGE, STAT_GOLD, STAT_OFFLINE_GOLD]
+const STAT_BOSS_DAMAGE: String = "boss_damage"
+const STAT_CRIT_CHANCE: String = "crit_chance"
+const STAT_CLICK_SHARE: String = "click_share"
+const STAT_ATTACK_SPEED: String = "attack_speed"
+const STAT_COST_DISCOUNT: String = "cost_discount"
+const STAT_FARM_GOLD: String = "farm_gold"
+const STATS: PackedStringArray = [
+	STAT_CLICK_DAMAGE, STAT_COMPANION_DAMAGE, STAT_GOLD, STAT_OFFLINE_GOLD, STAT_BOSS_DAMAGE, STAT_CRIT_CHANCE,
+	STAT_CLICK_SHARE, STAT_ATTACK_SPEED, STAT_COST_DISCOUNT, STAT_FARM_GOLD,
+]
 ## Effect types (value of the [code]type[/code] key).
 const EFFECT_STAT: String = "stat"
 const EFFECT_SKILL_UNLOCK: String = "skill_unlock"
 const EFFECT_SKILL_MOD: String = "skill_mod"
+const EFFECT_SKILL_PASSIVE: String = "skill_passive"
+const EFFECT_RHYTHM: String = "rhythm"
+const EFFECT_BOSS_TIMER: String = "boss_timer"
+const EFFECT_OFFLINE_CAP: String = "offline_cap_hours"
+const EFFECT_SYNERGY: String = "synergy"
+const EFFECT_CHAMPION: String = "champion"
+const EFFECT_LOOT_SHIFT: String = "loot_shift"
 ## Fields of a skill a [code]skill_mod[/code] replaces: its amount (the decimal string of skills.json,
 ## "dps_seconds" or "multiplier"), its duration and its cooldown.
 const SKILL_AMOUNT: String = "amount"
@@ -292,6 +315,26 @@ func points_at_stage(stage: int) -> int:
 	return total
 
 
+## The lowest stage whose [method points_at_stage] reaches [param points], walking the bands once
+## (0 for [param points] <= 0). With bands [{up_to: 100, per: 5}, {per: 20}], 20 gives 100 and 21 gives
+## 120.
+func stage_for_points(points: int) -> int:
+	if points <= 0:
+		return 0
+	var from: int = 0
+	var before: int = 0
+	for band: Dictionary in _bands:
+		var per: int = band["per"]
+		var up_to: int = band["up_to"]
+		@warning_ignore("integer_division")
+		var in_band: int = (up_to - from) / per if up_to > 0 else points
+		if points <= before + in_band:
+			return from + (points - before) * per
+		before += in_band
+		from = up_to
+	return 0
+
+
 ## Points earned so far: [method points_at_stage] of the best stage ever reached.
 func earned_points() -> int:
 	return points_at_stage(best_stage())
@@ -398,7 +441,8 @@ func reset() -> int:
 
 ## What would stop a reset at Unix time [param now_unix]: a boss fight ([param in_boss_fight])
 ## first, then the wait since the last reset, which does not apply when more points are spent than
-## earned (a retuned tree must always be escapable).
+## earned (a retuned tree must always be escapable). Not a pure query: it goes through
+## [method reset_seconds_left], which pulls a last reset dated in the future back to now.
 func reset_block(now_unix: int, in_boss_fight: bool) -> ResetBlock:
 	if in_boss_fight:
 		return ResetBlock.BOSS
@@ -409,16 +453,18 @@ func reset_block(now_unix: int, in_boss_fight: bool) -> ResetBlock:
 
 ## Seconds of wait left before the next reset at Unix time [param now_unix], from 0 to
 ## [method reset_cooldown_seconds]. A last reset dated after [param now_unix] (the clock was set
-## back) counts as [param now_unix], so the wait never exceeds one cooldown. A pure query: the stamp
-## itself is pulled back by [method try_reset].
+## back) is pulled back to [param now_unix] in the save, here and not only in [method try_reset]: the
+## wait then runs out one cooldown later and a countdown that only asks this query goes down at once,
+## instead of staying at one full cooldown until the player presses Reset (story 019). The stamp only
+## ever moves back, so asking again changes nothing more.
 func reset_seconds_left(now_unix: int) -> int:
-	var stamp: int = mini(_permanent.talent_reset_unix, now_unix)
-	return clampi(stamp + _reset_cooldown - now_unix, 0, _reset_cooldown)
+	_permanent.talent_reset_unix = mini(_permanent.talent_reset_unix, now_unix)
+	return clampi(_permanent.talent_reset_unix + _reset_cooldown - now_unix, 0, _reset_cooldown)
 
 
-## The reset of the game. First pulls a last reset dated after [param now_unix] (clock set back)
-## back to it, so that the wait then runs out one cooldown later and a wrong clock cannot lock the
-## reset for good. Then does nothing and returns false while [method version_notice_due], when
+## The reset of the game. Like [method reset_seconds_left], first pulls a last reset dated after
+## [param now_unix] (clock set back) back to it, so that the wait then runs out one cooldown later and a
+## wrong clock cannot lock the reset for good. Then does nothing and returns false while [method version_notice_due], when
 ## [method reset_block] says so or when nothing is bought (no wait starts); else removes every
 ## bought node, stamps [param now_unix] as the last reset and returns true. Emits [signal changed].
 func try_reset(now_unix: int, in_boss_fight: bool) -> bool:
@@ -514,6 +560,60 @@ func skill_override(skill_id: String, field: String) -> Variant:
 		if effect["skill"] == skill_id and effect["field"] == field:
 			found = effect["value"]
 	return found
+
+
+## The decimal-string multiplier a bought node makes [param skill_id] permanent with
+## ([code]skill_passive[/code], the last one in data order wins), or "" when none does. A passive skill
+## has no button to press, no cooldown and no [code]skill_mod[/code]: it always gives that multiplier.
+func skill_passive(skill_id: String) -> String:
+	var found: String = ""
+	for effect: Dictionary in owned_effects(EFFECT_SKILL_PASSIVE):
+		if effect["skill"] == skill_id:
+			found = effect["multiplier"]
+	return found
+
+
+## The click rhythm the bought nodes give: the last [code]rhythm[/code] effect in data order (the top
+## node replaces the base one), {"clicks": int, "dps_seconds": String, "min_gap_seconds": float}, or {}
+## when none is bought.
+func rhythm() -> Dictionary:
+	var found: Dictionary = {}
+	for effect: Dictionary in owned_effects(EFFECT_RHYTHM):
+		found = effect
+	return found
+
+
+## Seconds the bought [code]boss_timer[/code] nodes add to every boss countdown (0 for none).
+func boss_timer_bonus_seconds() -> float:
+	var total: float = 0.0
+	for effect: Dictionary in owned_effects(EFFECT_BOSS_TIMER):
+		total += float(effect["seconds"])
+	return total
+
+
+## The offline cap in hours the bought nodes give (the highest), or 0 when none is bought.
+func offline_cap_hours() -> float:
+	var found: float = 0.0
+	for effect: Dictionary in owned_effects(EFFECT_OFFLINE_CAP):
+		found = maxf(found, float(effect["hours"]))
+	return found
+
+
+## The synergy of the bought nodes, the last in data order: {"percent_per_companion": int, "level": int,
+## "max_percent": int}, or {} for none.
+func synergy() -> Dictionary:
+	var found: Dictionary = {}
+	for effect: Dictionary in owned_effects(EFFECT_SYNERGY):
+		found = effect
+	return found
+
+
+## Percent the strongest companion gets from the bought [code]champion[/code] nodes (0 for none).
+func champion_percent() -> int:
+	var total: int = 0
+	for effect: Dictionary in owned_effects(EFFECT_CHAMPION):
+		total += int(effect["percent"])
+	return total
 
 
 ## The decimal-string factor of a total of [param percentage] percent: "1" for 0, "1.40" for 40,

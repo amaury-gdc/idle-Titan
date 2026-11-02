@@ -1,7 +1,7 @@
 # Story 019: Arbre v2, effets, contenu et écran
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: L
@@ -50,7 +50,11 @@
 
 ## Files
 
-- À remplir à la fin.
+- `assets/data/talents.json` (30 nœuds, schéma 2, tree_version 1), `assets/data/data_schema.md`, `design/talent-tree-v2.md` (Négociation hors éveil, 69 points)
+- `src/core/talent_tree.gd`, `modifier_hub.gd`, `floor_manager.gd`, `boss_fight.gd`, `combat.gd`, `companion.gd`, `companion_manager.gd`, `offline_income.gd`, `loot_table.gd`, `skill_manager.gd`
+- `src/ui/main_screen.gd`, `main_screen.tscn`, `talent_screen.gd`, `skill_bar.gd`, `talent_card_text.gd` (créé)
+- `tools/simulate_progress.gd`, `tools/sim_measures.gd`, `.godot/global_script_class_cache.cfg` (généré)
+- Tests créés : `tests/unit/talents/talent_effects_test.gd`, `talents_real_file_test.gd`, `talent_hub_test.gd`, `tests/unit/ui/talent_wiring_test.gd`, `talent_screen_v2_test.gd`, `talent_glyphs_test.gd` ; adaptés : `talent_refund_test.gd`, `talent_tree_v2_test.gd`, `talents_test.gd`, `talent_pane_test.gd`
 
 ## QA Test Cases
 

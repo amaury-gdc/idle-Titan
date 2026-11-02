@@ -1,8 +1,8 @@
 extends GdUnitTestSuite
 ## Integration tests of the talent tree version through the saves (story 018): PermanentState v6
 ## fields, the refund of an old save written on disk, the version message that stays due across
-## reloads and a ".bak", an old 0.2.1 tab writing over the save, and the real talents.json that
-## keeps loading as schema 1. Writes test-only files under user:// and removes them.
+## reloads and a ".bak", an old 0.2.1 tab writing over the save, and the real talents.json (schema 2
+## since story 019) that refunds a 0.2.1 save. Writes test-only files under user:// and removes them.
 ## Story: production/epics/idle-titans/story-018-talent-tree-format.md
 
 const GAME_PATH: String = "user://test_talent_refund_game.json"
@@ -212,20 +212,21 @@ func test_old_tab_writing_over_the_save_brings_the_refund_back() -> void:
 	assert_int(tree.spent_points()).is_equal(0)
 
 
-func test_real_talents_file_still_loads_as_schema_1_without_version() -> void:
-	# Arrange: the content of the new tree arrives in story 019
+func test_real_talents_file_refunds_a_0_2_1_save_once() -> void:
+	# Arrange: since story 019 the real file is the versioned tree of design/talent-tree-v2.md
 	var permanent: PermanentState = PermanentState.from_dict(JSON.parse_string(SAVE_0_2_1))
-
-	# Act
 	var tree: TalentTree = TalentTree.from_data(DataLoader.load_json("res://assets/data/talents.json"), permanent, _game)
 
-	# Assert: same points, no refund, no locked skill
+	# Act
+	var due: bool = tree.apply_tree_version()
+
+	# Assert: every old point back, the new bands (20 points at 100, then 1 per 20), locked skills
 	assert_str(tree.get_error()).is_empty()
-	assert_int(tree.tree_version()).is_equal(0)
-	assert_bool(tree.apply_tree_version()).is_false()
-	assert_bool(tree.is_owned("click_1")).is_true()
-	assert_int(tree.stages_per_point()).is_equal(5)
-	assert_int(tree.earned_points()).is_equal(24)
-	for skill_id: String in ["big_hit", "damage_buff", "gold_bonus"]:
-		assert_bool(tree.skill_unlocked(skill_id)).is_true()
+	assert_int(tree.tree_version()).is_equal(TREE_VERSION)
+	assert_bool(due).is_true()
+	assert_bool(permanent.talents.is_empty()).is_true()
+	assert_int(tree.earned_points()).is_equal(21)
+	assert_bool(tree.skill_unlocked("big_hit")).is_true()
+	assert_bool(tree.skill_unlocked("damage_buff")).is_false()
+	assert_bool(tree.skill_unlocked("gold_bonus")).is_false()
 

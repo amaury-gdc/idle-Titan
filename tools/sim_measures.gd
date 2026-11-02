@@ -115,6 +115,25 @@ static func next_ordered_talent(talents: TalentTree, order: PackedStringArray) -
 	return ""
 
 
+## One line on the story 019 effects in play (simulator end of run): rhythm, boss countdown, synergy,
+## champion, attack speed, cost discount, offline cap, the passive skills of [param skills] (null
+## allowed) and the bought tops.
+static func talent_effects_text(talents: TalentTree, floors: FloorManager, offline: OfflineIncome, skills: SkillManager) -> String:
+	var passives: Array[String] = []
+	if skills != null:
+		for skill: Skill in skills.skills():
+			if skills.is_passive(skill.id):
+				passives.append("%s x%s" % [skill.id, skills.effective_amount(skill)])
+	var tops: Array[String] = []
+	for def: TalentTree.TalentDef in talents.nodes():
+		if not def.exclusive_group.is_empty() and talents.is_owned(def.id):
+			tops.append(def.id)
+	return "rhythm every %d clicks; boss countdown %.0f s; synergy %d%%; champion %s; attack speed x%.2f; costs -%d%%; offline cap %.0f h; passive %s; tops %s" % [
+			floors.rhythm_clicks(), floors.boss_timer_seconds(), floors.synergy_percent(),
+			floors.strongest_companion_id() if talents.champion_percent() > 0 else "none",
+			floors.attack_speed_factor(), floors.cost_discount_percent(), float(offline.max_seconds()) / 3600.0, str(passives), str(tops)]
+
+
 ## Id of the affordable companion whose next level gives the most damage per gold, the first in
 ## roster order on a tie, or "" when none is affordable.
 static func best_ratio_id(companions: CompanionManager) -> String:

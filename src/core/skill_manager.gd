@@ -74,6 +74,12 @@ var _modifiers: ModifierHub
 var _skills: Array[Skill] = []
 ## Skill id (String) -> [Skill].
 var _by_id: Dictionary = {}
+## Ids (String -> true) of the skills the talents lock, cached by _refresh_flags.
+var _locked: Dictionary = {}
+## Id (String) -> multiplier (decimal String) of the unlocked skills a talent makes passive, cached
+## by _refresh_flags.
+var _passive: Dictionary = {}
+var _talent_version: int = 0
 ## Factor on every cooldown started from now on (1.0 = the data).
 var _cooldown_modifier: float = 1.0
 
@@ -145,28 +151,48 @@ func effective_duration(skill_to_check: Skill) -> float:
 
 ## Strength of [param skill] now, as a decimal string (seconds of damage of a burst, factor of a
 ## buff): the value of the talents, else of the data.
+## A passive skill ([method is_passive]) gives the multiplier of its passive node instead, whatever its
+## [code]skill_mod[/code] say (story 019 "Instinct de meute" cancels "Frénésie durable" and "ardente").
 func effective_amount(skill_to_check: Skill) -> String:
+	var passive: String = _passive.get(skill_to_check.id, "")
+	if not passive.is_empty():
+		return passive
 	var value: Variant = _override(skill_to_check, TalentTree.SKILL_AMOUNT)
 	return skill_to_check.amount if value == null else String(value)
 
 
 ## Damage the burst [param skill] deals now, before the damage buff:
 ## floor((companion_power + click_damage) * dps_seconds), both with their talents, dps_seconds
-## from [method effective_amount].
+## from [method effective_amount] (see [method FloorManager.damage_over]).
 func burst_damage(burst: Skill) -> BigNumber:
-	var per_second: BigNumber = _floors.companion_power().add(_floors.click_damage())
-	return per_second.multiply_decimal(effective_amount(burst))
+	return _floors.damage_over(effective_amount(burst))
 
 
 ## False when [param id] is unknown or the talents lock it (derived from the bought nodes).
+## Read from flags cached on every change of the hub (see [method _refresh_flags]): the skill bar asks
+## every frame.
 func is_unlocked(id: String) -> bool:
-	return _by_id.has(id) and (_modifiers == null or _modifiers.skill_unlocked(id))
+	return _by_id.has(id) and not _locked.has(id)
 
 
-## True when [param id] exists, is unlocked and is READY.
+## True when a bought node makes [param id] passive (story 019 "Instinct de meute", a
+## [code]skill_passive[/code] effect): its effect runs all the time at [method effective_amount], it
+## cannot be activated and has no timer. The button stays in its place, marked "Passif" by the UI.
+## Derived from the bought nodes, never saved. False for an unknown id or a locked skill.
+func is_passive(id: String) -> bool:
+	return _passive.has(id)
+
+
+## A number that changes each time the talents may have changed the skills (locks, passives, values):
+## a display compares it with the one it drew to rebuild its texts only then.
+func talent_version() -> int:
+	return _talent_version
+
+
+## True when [param id] exists, is unlocked, is not passive and is READY.
 func can_activate(id: String) -> bool:
 	var found: Skill = _by_id.get(id)
-	return found != null and is_unlocked(id) and found.state() == Skill.State.READY
+	return found != null and is_unlocked(id) and not is_passive(id) and found.state() == Skill.State.READY
 
 
 ## Activates [param id]: starts its cooldown and applies its effect (a burst deals its
@@ -254,12 +280,31 @@ func _load(data: Variant) -> void:
 # the buffs. Called after the load and on every change of the hub. The cooldown cap leaves the
 # cooldown modifier out: it only applies to cooldowns started afterwards.
 func _follow_talents() -> void:
+	_refresh_flags()
 	for followed: Skill in _skills:
-		if is_unlocked(followed.id):
+		if is_unlocked(followed.id) and not is_passive(followed.id):
 			followed.restore(followed.cooldown_left(), followed.active_left(), _cooldown_cap(followed), effective_duration(followed))
 		else:
 			followed.restore(0.0, 0.0, 0.0, 0.0)
 	_push_multipliers()
+
+
+# Asks the hub once per skill which are locked and which are passive (an unlocked skill only), so
+# that is_unlocked, is_passive and effective_amount scan no talent. Called by _follow_talents, on
+# the load and on every change of the hub.
+func _refresh_flags() -> void:
+	_talent_version += 1
+	_locked.clear()
+	_passive.clear()
+	if _modifiers == null:
+		return
+	for flagged: Skill in _skills:
+		if not _modifiers.skill_unlocked(flagged.id):
+			_locked[flagged.id] = true
+			continue
+		var multiplier: String = _modifiers.skill_passive(flagged.id)
+		if not multiplier.is_empty():
+			_passive[flagged.id] = multiplier
 
 
 # The cooldown of the talents, else of the data, without the modifier.
@@ -278,12 +323,12 @@ func _override(skill_to_check: Skill, field: String) -> Variant:
 	return null if _modifiers == null else _modifiers.skill_override(skill_to_check.id, field)
 
 
-# Tells the FloorManager the factors of the buffs running now ("1" when none).
+# Tells the FloorManager the factors of the buffs running now, passive ones included ("1" when none).
 func _push_multipliers() -> void:
 	var damage: String = "1"
 	var gold: String = "1"
 	for running: Skill in _skills:
-		if running.state() != Skill.State.ACTIVE:
+		if running.state() != Skill.State.ACTIVE and not is_passive(running.id):
 			continue
 		if running.effect == Skill.Effect.DAMAGE_MULTIPLIER:
 			damage = effective_amount(running)

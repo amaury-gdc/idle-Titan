@@ -20,7 +20,7 @@ Plafonds à 25 points : dégâts ×2 et or ×1,4 par rapport à l'arbre actuel, 
 
 ## Nœuds
 
-30 nœuds, 60 points : un joueur renonce à plus de la moitié de l'arbre.
+30 nœuds, 69 points : un joueur renonce à plus de la moitié de l'arbre.
 
 | id | Branche | P | Nom | Coût | Prérequis | Effet | Type |
 |---|---|---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Plafonds à 25 points : dégâts ×2 et or ×1,4 par rapport à l'arbre actuel, 
 | eco_purse | Économie | 1 | Bourse | 1 | - | Or +3 % | stat |
 | economy_offline | Économie | 2 | Rentes | 2 | - | Or hors-ligne +25 % | stat |
 | eco_flair | Économie | 2 | Flair | 2 | - | 10 points de poids Commun → Rare | code |
-| eco_haggle | Économie | 3 | Négociation | 3 | - | Coûts -5 %, éveils compris | code |
+| eco_haggle | Économie | 3 | Négociation | 3 | - | Coûts de niveau -5 %, éveil exclu | code |
 | gold_long | Économie | 3 | Bonus durable | 2 | gold_unlock | 20 → 30 s | compétence |
 | gold_cd | Économie | 4 | Bonus rapide | 3 | gold_unlock | Recharge 120 → 80 s | compétence |
 | eco_vigil | Économie | 4 | Longue veille | 3 | - | Plafond hors-ligne 12 → 16 h | code |

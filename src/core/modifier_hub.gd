@@ -7,8 +7,13 @@ extends RefCounted
 ## of each stat are SUMMED over both sources (two +10% give +20%, not +21%), then one factor
 ## per stat is pushed. Do not call [method TalentTree.apply_to] when a hub exists.
 ##
-## Merged stats (talents + items): click_damage, companion_damage, gold, offline_gold.
-## Item-only stats: global_damage, boss_damage, boss_gold, crit_damage, crit_chance.
+## Merged stats (talents + items): click_damage, companion_damage, gold, offline_gold, boss_damage,
+## crit_chance (story 019). Item-only stats: global_damage, boss_gold, crit_damage. Talent-only stats
+## (story 019): click_share, attack_speed, cost_discount, farm_gold.
+## The other talent effects of story 019 are pushed here too: [method FloorManager.set_talent_effects],
+## [method FloorManager.set_companion_effects], [method FloorManager.set_rhythm],
+## [method OfflineIncome.set_talent_cap_hours] and, with an inventory, [method LootTable.set_weight_shifts].
+## A critical hit needs the inventory: without it the chance is 0, "Œil vif" included.
 ## Critical hit: chance = clamp(base + crit_chance, 0, max), damage bonus = base +
 ## crit_damage, as percentages (bases and max come from items.json, see [LootTable]); the
 ## factor pushed is 1 + bonus / 100.
@@ -93,7 +98,35 @@ func refresh() -> void:
 			factor(Item.STAT_GLOBAL_DAMAGE), factor(Item.STAT_BOSS_DAMAGE), factor(Item.STAT_BOSS_GOLD),
 			crit_chance_percent(), TalentTree.factor_from_percent(crit_bonus_percent()))
 	_offline.set_talent_factor(factor(Item.STAT_OFFLINE_GOLD))
+	_push_talent_effects()
 	changed.emit()
+
+
+## The decimal-string multiplier that makes the skill [param skill_id] passive, or "" (see
+## [method TalentTree.skill_passive]).
+func skill_passive(skill_id: String) -> String:
+	return "" if _talents == null else _talents.skill_passive(skill_id)
+
+
+# The effects of story 019 that only the talents give: talent-only stats, rhythm, companions, boss
+# countdown, offline cap and loot weights. Without talents, all of them are pushed as "none".
+func _push_talent_effects() -> void:
+	var rhythm: Dictionary = {} if _talents == null else _talents.rhythm()
+	var synergy: Dictionary = {} if _talents == null else _talents.synergy()
+	_floors.set_talent_effects(
+			factor(TalentTree.STAT_CLICK_SHARE), factor(TalentTree.STAT_FARM_GOLD), percent(TalentTree.STAT_COST_DISCOUNT),
+			percent(TalentTree.STAT_ATTACK_SPEED), 0.0 if _talents == null else _talents.boss_timer_bonus_seconds())
+	_floors.set_companion_effects(
+			int(synergy.get("percent_per_companion", 0)), int(synergy.get("level", 0)), int(synergy.get("max_percent", 0)),
+			0 if _talents == null else _talents.champion_percent())
+	_floors.set_rhythm(int(rhythm.get("clicks", 0)), String(rhythm.get("dps_seconds", "1")), float(rhythm.get("min_gap_seconds", 0.0)))
+	_offline.set_talent_cap_hours(0.0 if _talents == null else _talents.offline_cap_hours())
+	if _inventory != null and _inventory.is_valid():
+		# Typed default, then the talents: an untyped [] in a ternary fails the typed assignment.
+		var shifts: Array[Dictionary] = []
+		if _talents != null:
+			shifts = _talents.owned_effects(TalentTree.EFFECT_LOOT_SHIFT)
+		_inventory.table().set_weight_shifts(shifts)
 
 
 ## False when the talents lock the skill [param skill_id] (see [method TalentTree.skill_unlocked]).

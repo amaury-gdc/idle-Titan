@@ -83,6 +83,8 @@ var _rarity_by_id: Dictionary = {}
 var _type_by_id: Dictionary = {}
 ## Tiers in data order: {"from_stage": int, "drop_percent": int, "weights": Array[int] (one per rarity)}.
 var _tiers: Array[Dictionary] = []
+## Weight moves of the talents (story 019), see [method set_weight_shifts].
+var _shifts: Array[Dictionary] = []
 
 
 ## Parses and validates items.json (as returned by [method DataLoader.load_json], null
@@ -181,10 +183,20 @@ func tier_at(stage: int) -> Dictionary:
 		found = tier
 	if found.is_empty():
 		return {}
+	var shifted: Array[int] = _shifted(found["weights"])
 	var weights: Dictionary = {}
 	for i in _rarities.size():
-		weights[_rarities[i].id] = int((found["weights"] as Array)[i])
+		weights[_rarities[i].id] = shifted[i]
 	return {"from_stage": found["from_stage"], "drop_percent": found["drop_percent"], "weights": weights}
+
+
+## Moves rarity weight in every boss tier (story 019 "Flair"), replacing the previous call: each entry
+## {"from": rarity id, "to": rarity id, "weight": int} moves that much weight from one rarity to the other,
+## but never more than the "from" rarity has, so no weight goes negative and the sum stays the same (a
+## tier with 0 on "from" is unchanged). Unknown rarity ids are ignored. Applied by [method tier_at] and
+## [method roll_boss_loot]; the data is untouched.
+func set_weight_shifts(shifts: Array[Dictionary]) -> void:
+	_shifts = shifts
 
 
 ## Rolls the loot of the boss of [param stage]: an [Item] with uid 0 ([Inventory] gives it its
@@ -202,7 +214,7 @@ func roll_boss_loot(stage: int) -> Item:
 	var percent: int = tier["drop_percent"]
 	if percent <= 0 or (percent < 100 and _pick(100) >= percent):
 		return null
-	var rarity: RarityDef = _rarities[_pick_weighted(tier["weights"])]
+	var rarity: RarityDef = _rarities[_pick_weighted(_shifted(tier["weights"]))]
 	var weights: Array[int] = []
 	for def: TypeDef in _types:
 		weights.append(def.drop_weight)
@@ -228,6 +240,22 @@ func roll_item(type_id: String, rarity_id: String) -> Item:
 		var stat_id: String = pool.pop_at(_pick(pool.size()))
 		item.stats[stat_id] = _value(stat_id, rarity_id)
 	return item
+
+
+# The rarity weights of a tier (one per rarity, data order) after the shifts of set_weight_shifts.
+func _shifted(weights: Array) -> Array[int]:
+	var result: Array[int] = []
+	for w: Variant in weights:
+		result.append(int(w))
+	for shift: Dictionary in _shifts:
+		var from: int = rarity_rank(shift["from"])
+		var to: int = rarity_rank(shift["to"])
+		if from < 0 or to < 0:
+			continue
+		var moved: int = mini(int(shift["weight"]), result[from])
+		result[from] -= moved
+		result[to] += moved
+	return result
 
 
 func _can_roll() -> bool:

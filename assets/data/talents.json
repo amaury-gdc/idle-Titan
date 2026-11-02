@@ -1,29 +1,48 @@
 {
-	"schema_version": 1,
-	"stages_per_point": 5,
+	"schema_version": 2,
+	"tree_version": 1,
+	"stage_point_bands": [
+		{ "up_to": 100, "stages_per_point": 5 },
+		{ "stages_per_point": 20 }
+	],
+	"tier_thresholds": [0, 2, 4, 8, 12],
 	"branches": [
 		{ "id": "click", "name": "Clic" },
 		{ "id": "companions", "name": "Compagnons" },
 		{ "id": "economy", "name": "Économie" }
 	],
 	"nodes": [
-		{ "id": "click_1", "branch": "click", "name": "Poigne ferme", "cost": 1, "requires": [], "effect": { "stat": "click_damage", "percent": 4 } },
-		{ "id": "click_2", "branch": "click", "name": "Coup précis", "cost": 1, "requires": ["click_1"], "effect": { "stat": "click_damage", "percent": 4 } },
-		{ "id": "click_3", "branch": "click", "name": "Coup lourd", "cost": 2, "requires": ["click_1"], "effect": { "stat": "click_damage", "percent": 4 } },
-		{ "id": "click_4", "branch": "click", "name": "Frappe double", "cost": 3, "requires": ["click_2", "click_3"], "effect": { "stat": "click_damage", "percent": 6 } },
-		{ "id": "click_5", "branch": "click", "name": "Maître du clic", "cost": 5, "requires": ["click_4"], "effect": { "stat": "click_damage", "percent": 10 } },
+		{ "id": "click_grip", "branch": "click", "tier": 1, "name": "Poigne ferme", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "click_damage", "percent": 8 }] },
+		{ "id": "click_crit", "branch": "click", "tier": 1, "name": "Œil vif", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "crit_chance", "percent": 8 }] },
+		{ "id": "click_ally", "branch": "click", "tier": 2, "name": "Frappe alliée", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "click_share", "percent": 50 }] },
+		{ "id": "bighit_power", "branch": "click", "tier": 2, "name": "Gros coup puissant", "cost": 2, "requires": [], "effects": [{ "type": "skill_mod", "skill": "big_hit", "field": "amount", "value": "8" }] },
+		{ "id": "click_rhythm", "branch": "click", "tier": 3, "name": "Rythme", "cost": 3, "requires": [], "effects": [{ "type": "rhythm", "clicks": 40, "dps_seconds": "1", "min_gap_seconds": 5 }] },
+		{ "id": "click_heavy", "branch": "click", "tier": 3, "name": "Coup lourd", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "click_damage", "percent": 15 }] },
+		{ "id": "boss_hunter", "branch": "click", "tier": 4, "name": "Chasseur de boss", "cost": 3, "requires": [], "effects": [{ "type": "stat", "stat": "boss_damage", "percent": 10 }] },
+		{ "id": "bighit_cd", "branch": "click", "tier": 4, "name": "Gros coup rapide", "cost": 3, "requires": ["bighit_power"], "effects": [{ "type": "skill_mod", "skill": "big_hit", "field": "cooldown_seconds", "value": 40 }] },
+		{ "id": "click_top_timer", "branch": "click", "tier": 5, "name": "Sursis", "cost": 3, "requires": [], "exclusive_group": "click_top", "effects": [{ "type": "boss_timer", "seconds": 5 }] },
+		{ "id": "click_top_rhythm", "branch": "click", "tier": 5, "name": "Virtuose", "cost": 3, "requires": ["click_rhythm"], "exclusive_group": "click_top", "effects": [{ "type": "rhythm", "clicks": 30, "dps_seconds": "1.5", "min_gap_seconds": 5 }] },
 
-		{ "id": "companions_1", "branch": "companions", "name": "Camaraderie", "cost": 1, "requires": [], "effect": { "stat": "companion_damage", "percent": 2 } },
-		{ "id": "companions_2", "branch": "companions", "name": "Entraînement", "cost": 1, "requires": ["companions_1"], "effect": { "stat": "companion_damage", "percent": 2 } },
-		{ "id": "companions_3", "branch": "companions", "name": "Discipline", "cost": 2, "requires": ["companions_1"], "effect": { "stat": "companion_damage", "percent": 2 } },
-		{ "id": "companions_4", "branch": "companions", "name": "Formation", "cost": 3, "requires": ["companions_2", "companions_3"], "effect": { "stat": "companion_damage", "percent": 4 } },
-		{ "id": "companions_5", "branch": "companions", "name": "Légion", "cost": 5, "requires": ["companions_4"], "effect": { "stat": "companion_damage", "percent": 6 } },
+		{ "id": "frenzy_unlock", "branch": "companions", "tier": 1, "name": "Frénésie", "cost": 1, "requires": [], "effects": [{ "type": "skill_unlock", "skill": "damage_buff" }] },
+		{ "id": "comp_camaraderie", "branch": "companions", "tier": 1, "name": "Camaraderie", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "companion_damage", "percent": 3 }] },
+		{ "id": "comp_cadence", "branch": "companions", "tier": 2, "name": "Cadence", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "attack_speed", "percent": 5 }] },
+		{ "id": "frenzy_long", "branch": "companions", "tier": 2, "name": "Frénésie durable", "cost": 2, "requires": ["frenzy_unlock"], "effects": [{ "type": "skill_mod", "skill": "damage_buff", "field": "duration_seconds", "value": 20 }] },
+		{ "id": "comp_synergy", "branch": "companions", "tier": 3, "name": "Synergie", "cost": 2, "requires": [], "effects": [{ "type": "synergy", "percent_per_companion": 1, "level": 100, "max_percent": 6 }] },
+		{ "id": "comp_formation", "branch": "companions", "tier": 3, "name": "Formation", "cost": 3, "requires": [], "effects": [{ "type": "stat", "stat": "companion_damage", "percent": 8 }] },
+		{ "id": "frenzy_power", "branch": "companions", "tier": 4, "name": "Frénésie ardente", "cost": 3, "requires": ["frenzy_unlock"], "effects": [{ "type": "skill_mod", "skill": "damage_buff", "field": "amount", "value": "1.75" }] },
+		{ "id": "comp_legion", "branch": "companions", "tier": 4, "name": "Légion", "cost": 3, "requires": [], "effects": [{ "type": "stat", "stat": "companion_damage", "percent": 8 }] },
+		{ "id": "comp_top_champion", "branch": "companions", "tier": 5, "name": "Champion", "cost": 3, "requires": [], "exclusive_group": "companions_top", "effects": [{ "type": "champion", "percent": 12 }] },
+		{ "id": "comp_top_instinct", "branch": "companions", "tier": 5, "name": "Instinct de meute", "cost": 3, "requires": ["frenzy_unlock"], "exclusive_group": "companions_top", "effects": [{ "type": "skill_passive", "skill": "damage_buff", "multiplier": "1.2" }] },
 
-		{ "id": "economy_1", "branch": "economy", "name": "Bourse", "cost": 1, "requires": [], "effect": { "stat": "gold", "percent": 2 } },
-		{ "id": "economy_2", "branch": "economy", "name": "Butin", "cost": 1, "requires": ["economy_1"], "effect": { "stat": "gold", "percent": 2 } },
-		{ "id": "economy_3", "branch": "economy", "name": "Trésor", "cost": 2, "requires": ["economy_1"], "effect": { "stat": "gold", "percent": 2 } },
-		{ "id": "economy_4", "branch": "economy", "name": "Négoce", "cost": 3, "requires": ["economy_2", "economy_3"], "effect": { "stat": "gold", "percent": 4 } },
-		{ "id": "economy_offline", "branch": "economy", "name": "Rentes", "cost": 2, "requires": ["economy_2"], "effect": { "stat": "offline_gold", "percent": 25 } },
-		{ "id": "economy_5", "branch": "economy", "name": "Fortune", "cost": 5, "requires": ["economy_4"], "effect": { "stat": "gold", "percent": 6 } }
+		{ "id": "gold_unlock", "branch": "economy", "tier": 1, "name": "Bonus d'or", "cost": 1, "requires": [], "effects": [{ "type": "skill_unlock", "skill": "gold_bonus" }] },
+		{ "id": "eco_purse", "branch": "economy", "tier": 1, "name": "Bourse", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "gold", "percent": 3 }] },
+		{ "id": "economy_offline", "branch": "economy", "tier": 2, "name": "Rentes", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "offline_gold", "percent": 25 }] },
+		{ "id": "eco_flair", "branch": "economy", "tier": 2, "name": "Flair", "cost": 2, "requires": [], "effects": [{ "type": "loot_shift", "from": "common", "to": "rare", "weight": 10 }] },
+		{ "id": "eco_haggle", "branch": "economy", "tier": 3, "name": "Négociation", "cost": 3, "requires": [], "effects": [{ "type": "stat", "stat": "cost_discount", "percent": 5 }] },
+		{ "id": "gold_long", "branch": "economy", "tier": 3, "name": "Bonus durable", "cost": 2, "requires": ["gold_unlock"], "effects": [{ "type": "skill_mod", "skill": "gold_bonus", "field": "duration_seconds", "value": 30 }] },
+		{ "id": "gold_cd", "branch": "economy", "tier": 4, "name": "Bonus rapide", "cost": 3, "requires": ["gold_unlock"], "effects": [{ "type": "skill_mod", "skill": "gold_bonus", "field": "cooldown_seconds", "value": 80 }] },
+		{ "id": "eco_vigil", "branch": "economy", "tier": 4, "name": "Longue veille", "cost": 3, "requires": [], "effects": [{ "type": "offline_cap_hours", "hours": 16 }] },
+		{ "id": "eco_top_rentier", "branch": "economy", "tier": 5, "name": "Rentier", "cost": 3, "requires": [], "exclusive_group": "economy_top", "effects": [{ "type": "stat", "stat": "offline_gold", "percent": 40 }] },
+		{ "id": "eco_top_harvest", "branch": "economy", "tier": 5, "name": "Moisson", "cost": 3, "requires": [], "exclusive_group": "economy_top", "effects": [{ "type": "stat", "stat": "farm_gold", "percent": 12 }] }
 	]
 }

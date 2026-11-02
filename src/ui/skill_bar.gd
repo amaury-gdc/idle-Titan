@@ -8,15 +8,28 @@ extends VBoxContainer
 ## a press is reported through [signal activate_requested] and the composition root
 ## forwards it.
 ##
+## Talents (story 019): the three buttons always stay in place, so that the keys 1/2/3 never move.
+## A skill the talents lock reads "À débloquer"; its button stays usable and reports
+## [signal unlock_requested], to open the card of the node that unlocks it. A passive skill
+## ("Instinct de meute") reads "Passif" and cannot be pressed. Durations and cooldowns are the
+## values the talents give ([method SkillManager.effective_duration] and the like).
+##
 ## Usage:
 ## [codeblock]
 ## bar.activate_requested.connect(func(id: String) -> void: skills.activate(id))
+## bar.unlock_requested.connect(func(id: String) -> void: open_talent_card_of(id))
 ## bar.setup(skills)     # builds one button per skill
 ## bar.refresh()         # every frame, and right after an activation
 ## [/codeblock]
 
 ## The player pressed the button of skill [param id].
 signal activate_requested(id: String)
+## The player touched the button of the locked skill [param id].
+signal unlock_requested(id: String)
+
+## Keys of the drawn state of a locked and of a passive skill, past every [enum Skill.State].
+const KEY_LOCKED: int = 100_000_000
+const KEY_PASSIVE: int = 200_000_000
 
 const FONT_SIZE_BUTTON: int = 20
 const FONT_SIZE_COMPACT: int = 16
@@ -31,6 +44,8 @@ var _skills: SkillManager
 ## drawn (state, whole seconds shown), so unchanged buttons are not redrawn.
 var _rows: Array[Dictionary] = []
 var _compact: bool = false
+## [method SkillManager.talent_version] the hints were last built for.
+var _drawn_talent_version: int = -1
 
 @onready var _buttons_box: BoxContainer = %Buttons
 @onready var _buff_label: Label = %BuffLabel
@@ -69,18 +84,52 @@ func set_compact(compact: bool) -> void:
 ## seconds changed, and the list of running buffs.
 func refresh() -> void:
 	var changed: bool = false
+	var talents_moved: bool = _skills.talent_version() != _drawn_talent_version
+	_drawn_talent_version = _skills.talent_version()
 	for row: Dictionary in _rows:
 		var skill: Skill = row["skill"]
 		var state: Skill.State = skill.state()
 		var seconds: int = _seconds_shown(skill, state)
 		var key: int = int(state) * 1_000_000 + seconds
+		if not _skills.is_unlocked(skill.id):
+			key = KEY_LOCKED
+		elif _skills.is_passive(skill.id):
+			key = KEY_PASSIVE
+		# The hint only changes with the kind of button or the talents, not with the seconds.
+		var kind: int = key if key >= KEY_LOCKED else 0
+		if talents_moved or kind != row["kind"]:
+			row["kind"] = kind
+			(row["button"] as Button).tooltip_text = _effect_text(skill)
 		if key == row["key"]:
 			continue
 		changed = true
 		row["key"] = key
-		_draw_button(row["button"], skill, state, seconds)
+		match key:
+			KEY_LOCKED:
+				_draw_locked(row["button"], skill)
+			KEY_PASSIVE:
+				_draw_passive(row["button"], skill)
+			_:
+				_draw_button(row["button"], skill, state, seconds)
 	if changed:
 		_draw_buffs()
+
+
+## The button of the skill [param id], null for an unknown id.
+func button_of(id: String) -> Button:
+	for row: Dictionary in _rows:
+		if (row["skill"] as Skill).id == id:
+			return row["button"]
+	return null
+
+
+## What the hint bubble says for the skill [param id]: its effect, and for a locked one where to
+## unlock it.
+func hint_text(id: String) -> String:
+	for row: Dictionary in _rows:
+		if (row["skill"] as Skill).id == id:
+			return _effect_text(row["skill"])
+	return ""
 
 
 func _add_row(skill: Skill) -> void:
@@ -88,10 +137,9 @@ func _add_row(skill: Skill) -> void:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_size_button(button)
-	button.tooltip_text = _effect_text(skill)
-	button.pressed.connect(func() -> void: activate_requested.emit(skill.id))
+	button.pressed.connect(_on_button_pressed.bind(skill.id))
 	_buttons_box.add_child(button)
-	_rows.append({"skill": skill, "button": button, "key": -1})
+	_rows.append({"skill": skill, "button": button, "key": -1, "kind": -1})
 
 
 func _size_button(button: Button) -> void:
@@ -115,6 +163,26 @@ func _draw_button(button: Button, skill: Skill, state: Skill.State, seconds: int
 			button.text = "%s\n%s" % [skill.display_name, tr("Dans %d s") % seconds]
 
 
+# Stays enabled: a touch opens the card of the node that unlocks it.
+func _draw_locked(button: Button, skill: Skill) -> void:
+	button.disabled = false
+	button.theme_type_variation = &""
+	button.text = "%s\n%s" % [skill.display_name, tr("À débloquer")]
+
+
+func _draw_passive(button: Button, skill: Skill) -> void:
+	button.disabled = true
+	button.theme_type_variation = &"SkillActive"
+	button.text = "%s\n%s" % [skill.display_name, tr("Passif")]
+
+
+func _on_button_pressed(id: String) -> void:
+	if not _skills.is_unlocked(id):
+		unlock_requested.emit(id)
+	else:
+		activate_requested.emit(id)
+
+
 func _draw_buffs() -> void:
 	var lines: PackedStringArray = PackedStringArray()
 	for row: Dictionary in _rows:
@@ -135,12 +203,21 @@ func _seconds_shown(skill: Skill, state: Skill.State) -> int:
 
 
 func _effect_text(skill: Skill) -> String:
+	var text: String = ""
+	var cooldown: int = int(_skills.effective_cooldown(skill))
 	if skill.effect == Skill.Effect.BURST:
-		return tr("Dégâts immédiats : %s secondes de dégâts (compagnons + un clic).\nRecharge : %d s") % [_amount_shown(skill), int(skill.cooldown_seconds)]
-	var what: String = tr("Dégâts") if skill.effect == Skill.Effect.DAMAGE_MULTIPLIER else tr("Or gagné")
-	return tr("%s ×%s pendant %d s.\nRecharge : %d s") % [what, _amount_shown(skill), int(skill.duration_seconds), int(skill.cooldown_seconds)]
+		text = tr("Dégâts immédiats : %s secondes de dégâts (compagnons + un clic).\nRecharge : %d s") % [_amount_shown(skill), cooldown]
+	else:
+		var what: String = tr("Dégâts") if skill.effect == Skill.Effect.DAMAGE_MULTIPLIER else tr("Or gagné")
+		if _skills.is_passive(skill.id):
+			text = tr("%s ×%s en permanence : passif, rien à appuyer.") % [what, _amount_shown(skill)]
+		else:
+			text = tr("%s ×%s pendant %d s.\nRecharge : %d s") % [what, _amount_shown(skill), int(_skills.effective_duration(skill)), cooldown]
+	if not _skills.is_unlocked(skill.id):
+		text += "\n" + tr("À débloquer dans l'onglet Talents.")
+	return text
 
 
 # The data holds decimal strings such as "1.5"; the player reads a French comma.
 func _amount_shown(skill: Skill) -> String:
-	return skill.amount.replace(".", ",")
+	return _skills.effective_amount(skill).replace(".", ",")

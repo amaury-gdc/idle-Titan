@@ -82,6 +82,7 @@ const LOOT_VERTICAL_MARGINS: float = 9.0
 const SHAPE_META: StringName = &"adaptive_shape"
 ## Height of the return message when the window allows it; its content scrolls otherwise.
 const OFFLINE_PANEL_HEIGHT: float = 300.0
+## (Story 019) the window grows past it to hold its content, up to the view: see _fit_message_window.
 ## Longest value a header cell must hold without moving its neighbours (spec, Localization): the
 ## widest text of [method BigNumber.format] up to stage 300, the same as the companion buttons.
 const HEADER_LONGEST_VALUE: String = CompanionPanel.LONGEST_COST
@@ -141,6 +142,11 @@ var _loot_short_sale: String = ""
 var _effects_when_never_set: bool = true
 # Whether the last input was a key: a focus moved for a mouse user keeps its ring hidden.
 var _keyboard_used: bool = false
+# Whether the window of the return message shows the new talent tree message now.
+var _version_notice_open: bool = false
+# Height the window of the return message asks for: its content, at least OFFLINE_PANEL_HEIGHT; the
+# view caps it (AdaptiveLayout.modal_rect).
+var _message_window_height: float = OFFLINE_PANEL_HEIGHT
 
 @onready var _layout: Control = %Layout
 @onready var _split: BoxContainer = %Split
@@ -179,6 +185,7 @@ var _keyboard_used: bool = false
 @onready var _loot_message: Label = %LootMessage
 @onready var _offline_blocker: ColorRect = %OfflineBlocker
 @onready var _offline_panel: PanelContainer = %OfflinePanel
+@onready var _offline_title: Label = %OfflineTitle
 @onready var _offline_message: Label = %OfflineMessage
 @onready var _offline_close_button: Button = %OfflineCloseButton
 
@@ -208,10 +215,6 @@ func _ready() -> void:
 	_game = _saves.load_game()
 	_permanent = _saves.load_permanent()
 	_floors = FloorManager.new(_game, combat, boss, _permanent)
-	_skills = SkillManager.from_data(DataLoader.load_json(SKILLS_PATH), _game, combat, _floors)
-	if not _skills.is_valid():
-		_show_error(_skills.get_error())
-		return
 	_talents = TalentTree.from_data(DataLoader.load_json(TALENTS_PATH), _permanent, _game)
 	if not _talents.is_valid():
 		_show_error(_talents.get_error())
@@ -226,7 +229,14 @@ func _ready() -> void:
 	_floors.boss_killed.connect(_inventory.on_boss_killed)
 	# Before the offline grant, and before any handler below connects to a "changed" signal.
 	_modifiers = ModifierHub.new(_floors, _offline, _talents, _inventory)
+	# After the hub: the locks and values of the talents apply to the restored timers at once.
+	_skills = SkillManager.from_data(DataLoader.load_json(SKILLS_PATH), _game, combat, _floors, _modifiers)
+	if not _skills.is_valid():
+		_show_error(_skills.get_error())
+		return
 	var offline_gain: Dictionary = _grant_offline_gold()
+	# After the absence is paid with the bonuses the player had (design/talent-tree-v2.md, Données).
+	_talents.apply_tree_version()
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
 	_floors.farming_changed.connect(_on_farming_changed)
@@ -249,6 +259,7 @@ func _ready() -> void:
 	_companion_panel.setup(_companions, func() -> BigNumber: return _game.gold)
 	_gold_drawn = _game.gold
 	_skill_bar.activate_requested.connect(_on_skill_requested)
+	_skill_bar.unlock_requested.connect(_on_skill_unlock_requested)
 	_skill_bar.setup(_skills)
 	_skill_bar.watch_with(_bubble)
 	_dps_button.pressed.connect(_on_dps_pressed)
@@ -259,6 +270,8 @@ func _ready() -> void:
 	_talents.changed.connect(_on_talents_changed)
 	_talent_screen.buy_requested.connect(_on_talent_buy_requested)
 	_talent_screen.reset_requested.connect(_on_talent_reset_requested)
+	_talent_screen.set_context(_skills, float((curves as Dictionary).get("offline_max_hours", 0.0)),
+			func() -> int: return int(Time.get_unix_time_from_system()), _floors.is_boss_fight)
 	_talent_screen.setup(_talents)
 	_refresh_talents_button()
 	_inventory.changed.connect(_on_inventory_changed)
@@ -282,6 +295,8 @@ func _ready() -> void:
 	_offline_close_button.pressed.connect(_on_offline_closed)
 	if not offline_gain.is_empty():
 		_show_offline_gain(offline_gain)
+	elif _talents.version_notice_due():
+		_show_version_notice()
 	_watch_tab_visibility()
 
 
@@ -330,7 +345,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var index: int = SKILL_KEYS.find(key.physical_keycode)
 	if index < 0 or index >= _skills.skills().size():
 		return
-	_on_skill_requested(_skills.skills()[index].id)
+	_on_skill_key(_skills.skills()[index].id)
 	get_viewport().set_input_as_handled()
 
 
@@ -451,7 +466,7 @@ func _record_text(stage: int) -> String:
 
 # The overlays that take their size from the screen and not from a container.
 func _fit_overlays() -> void:
-	var rect: Rect2 = AdaptiveLayout.modal_rect(size, OFFLINE_PANEL_HEIGHT)
+	var rect: Rect2 = AdaptiveLayout.modal_rect(size, _message_window_height)
 	_offline_panel.position = rect.position
 	_offline_panel.size = rect.size
 
@@ -530,18 +545,70 @@ func _show_offline_gain(gain: Dictionary) -> void:
 	# A web return can come while "Réglages" is open: the message goes first. Tabs stay as they are.
 	_bubble.cancel()
 	_save_screen.close()
+	_version_notice_open = false
+	_offline_title.text = tr("Bon retour !")
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
 	if gain["capped"]:
 		_offline_message.text = tr("Absence prise en compte : %s (plafond atteint)\nOr gagné : %s") % [duration, gold]
 	else:
 		_offline_message.text = tr("Absence prise en compte : %s\nOr gagné : %s") % [duration, gold]
+	_open_message_window()
+
+
+## Shows the window of the return message with the texts already set. The focus goes to Continuer
+## for the keyboard, but the ScrollContainer follows the focus and would open the window scrolled to
+## that button, the title out of sight: the window first grows to its content (up to the view), then
+## the scroll goes back to the top once the layout is known.
+func _open_message_window() -> void:
 	_offline_blocker.visible = true
 	_offline_panel.visible = true
 	_offline_close_button.grab_focus()
+	_fit_message_window()
+
+
+func _fit_message_window() -> void:
+	var scroll: ScrollContainer = _offline_panel.get_child(0) as ScrollContainer
+	if not _offline_panel.is_inside_tree():
+		return
+	# Wrapped labels know their height only once the layout gave them their width.
+	await _offline_panel.get_tree().process_frame
+	var content: Control = scroll.get_child(0) as Control
+	var margins: float = _offline_panel.get_theme_stylebox("panel").get_minimum_size().y
+	_message_window_height = maxf(OFFLINE_PANEL_HEIGHT, content.get_combined_minimum_size().y + margins)
+	_fit_overlays()
+	await _offline_panel.get_tree().process_frame
+	scroll.scroll_vertical = 0
+
+
+## What closing the message window means for the talent tree: the version message it showed is
+## acknowledged (the tree sells again), or, after a return message, the version message is still
+## due and must come next. Returns true when it must be shown now.
+func _close_talent_notice() -> bool:
+	if _version_notice_open:
+		_version_notice_open = false
+		_talents.acknowledge_version()
+		return false
+	return _talents != null and _talents.version_notice_due()
+
+
+## The one-time message of a new talent tree (story 019): the points came back, the old bonuses are
+## gone until the next purchases. It uses the window of the return message, so the game waits the
+## same way; closing it is the acknowledgment the tree waits for before it sells anything again.
+func _show_version_notice() -> void:
+	_bubble.cancel()
+	_save_screen.close()
+	_version_notice_open = true
+	_offline_title.text = tr("Nouvel arbre de talents")
+	# A non-breaking space before the colon: it never starts a line.
+	_offline_message.text = tr("L'arbre de talents a changé : tous tes points te sont rendus. Les bonus de tes anciens talents sont retirés jusqu'à tes prochains achats.")
+	_open_message_window()
 
 
 func _on_offline_closed() -> void:
+	if _close_talent_notice():
+		_show_version_notice()
+		return
 	_offline_blocker.visible = false
 	_offline_panel.visible = false
 	# The focus was in the panel: a keyboard player would otherwise have it nowhere.
@@ -567,8 +634,13 @@ func _on_talent_buy_requested(id: String) -> void:
 	_talents.buy(id)
 
 
+# Always through the rules of the tree (boss fight, real-time wait, version message), never the
+# unconditional TalentTree.reset(); a refusal is told in the reset card, with its reason.
 func _on_talent_reset_requested() -> void:
-	_talents.reset()
+	var now: int = int(Time.get_unix_time_from_system())
+	var in_boss_fight: bool = _floors.is_boss_fight()
+	if not _talents.try_reset(now, in_boss_fight):
+		_talent_screen.show_reset_refused(TalentScreen.reset_refusal_text(_talents, now, in_boss_fight))
 
 
 func _on_talents_changed() -> void:
@@ -930,6 +1002,25 @@ func _on_skill_requested(id: String) -> void:
 		return
 	_skills.activate(id)
 	_skill_bar.refresh()
+
+
+# Keys 1/2/3: a locked or passive skill explains itself in the bubble, and the tab stays as it is.
+func _on_skill_key(id: String) -> void:
+	if _game_waits():
+		return
+	if not _skills.is_unlocked(id) or _skills.is_passive(id):
+		_bubble.show_for(_skill_bar.button_of(id), _skill_bar.hint_text(id))
+		return
+	_on_skill_requested(id)
+
+
+# A touch on a locked skill opens the card of the node that unlocks it, in the Talents tab.
+func _on_skill_unlock_requested(id: String) -> void:
+	var node_id: String = TalentScreen.unlock_node_of(_talents, id)
+	if _game_waits() or node_id.is_empty():
+		return
+	_tabs.select(ManagementTabs.Tab.TALENTS)
+	_talent_screen.open_node(node_id)
 
 
 func _on_companion_leveled_up(id: String, new_level: int) -> void:

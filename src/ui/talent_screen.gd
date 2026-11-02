@@ -1,33 +1,38 @@
 class_name TalentScreen
 extends PanelContainer
-## Content of the Talents tab (stories 006, 011, decision D5): the available points, the free reset,
-## the tree and the detail of a node. A touch on a node opens its detail, with Retour and the fixed
-## action Acheter; the reset asks for a confirmation in that same detail. The game keeps running.
-## Pure presentation: reads a [TalentTree]; a purchase is reported through [signal buy_requested]
-## and a confirmed reset through [signal reset_requested], and the composition root forwards them.
-## The bonus is shown as text and the node state by color AND by a word, and what a locked node
-## requires is printed on it: nothing lives in a tooltip alone, and color is never the only cue.
+## Content of the Talents tab (stories 006, 011, decision D5, reworked by story 019 after
+## design/talent-tree-v2.md "Interface"): the available points, the free reset with its real-time
+## countdown, the tree by tiers ("Palier 3 : 4 points sur 8") and the card of a node. A touch on a
+## node opens its card (effect, total before → after, cost, "Exclut X" for a top node), with Retour
+## and the fixed action Acheter; the card closes once the node is bought. The action is ignored for
+## [constant ACTION_GUARD_MSEC] after a card opens, so a double touch never buys. The reset asks for a
+## confirmation in that same place, or says why it is refused (boss fight, wait mm:ss). The game
+## keeps running. Pure presentation: reads a [TalentTree]; a purchase is reported through
+## [signal buy_requested] and a confirmed reset through [signal reset_requested], and the composition
+## root forwards them. Every node state is a word (Acheté, Coût, Manque, Palier fermé, Requiert,
+## Exclu), shown on the tile itself: nothing lives in a tooltip alone, and color is never the only cue.
+## The texts come from [TalentCardText].
 ##
-## Layout follows the pane's own size, not the orientation. Under
-## [constant ManagementTabs.DETAIL_WIDE_WIDTH] or [constant WIDE_MIN_HEIGHT]: one branch at a time
-## through a selector, as one column that scrolls, and the detail replaces the tree; the selector
-## already names the branch, and the general text comes after the nodes, so that a short pane still
-## shows a whole node. From both, and only if the data's branches fit ([method fits_full_tree]): the
-## full tree, its columns sharing what the pane gives them, with the detail as a band under it
-## (three columns of nodes leave no room beside them in a pane of about 680 u). The touched node
-## stays visible over that band. No column has a fixed width, and the selector wraps, so no data can
-## push the pane wider. A shape change keeps branch, detail, scroll and focus: same nodes, and
-## [PaneFocus] settles what a redraw hides.
+## Layout follows the pane's own size, not the orientation. Narrow (the phone, the reference): one
+## branch at a time through the sub-tabs, its nodes as a grid of [constant COMPACT_GRID_COLUMNS] tiles
+## under each tier header, a shorter points line, and the card replaces the tree. From
+## [constant DETAIL_BAND_MIN_WIDTH] wide and [constant WIDE_MIN_HEIGHT] high, the card is a band under
+## the tree, which stays visible. From [method fits_full_tree]: the three columns side by side, one
+## tile per row. No column has a fixed width, and the selector wraps, so no data can push the pane
+## wider. A shape change keeps branch, card, scroll and focus: same nodes, and [PaneFocus] settles
+## what a redraw hides.
 ##
-## Node buttons pass the mouse on: a drag in the tree scrolls it and never opens a detail.
+## Node buttons pass the mouse on: a drag in the tree scrolls it and never opens a card.
 ##
 ## Usage:
 ## [codeblock]
 ## screen.buy_requested.connect(func(id: String) -> void: tree.buy(id))
-## screen.reset_requested.connect(func() -> void: tree.reset())
+## screen.reset_requested.connect(func() -> void: tree.try_reset(now, floors.is_boss_fight()))
+## screen.set_context(skills, 12.0, clock, floors.is_boss_fight)   # optional, before setup
 ## screen.setup(tree)    # builds the columns and the nodes, once
 ## screen.refresh()      # after any change of the tree
-## screen.close_detail() # Escape: true when a detail was open
+## screen.open_node("frenzy_unlock")
+## screen.close_detail() # Escape: true when a card was open
 ## [/codeblock]
 
 ## The player asked to buy the node [param id].
@@ -43,12 +48,22 @@ signal focus_lost(hidden: bool)
 enum Detail { NONE, NODE, RESET }
 
 const NODE_MIN_SIZE: Vector2 = Vector2(170, 76)
+## Least width of a tile in the grid of two (phone); a long word still fits on one line.
+const COMPACT_TILE_MIN_WIDTH: float = 116.0
+## Tiles per row in one branch at a time.
+const COMPACT_GRID_COLUMNS: int = 2
+const TILE_FONT_SIZE: int = 16
+const TILE_GAP: int = 8
 const SEGMENT_HEIGHT: float = 50.0
 const SEGMENT_FONT_SIZE: int = 16
-## Height of the detail band under the full tree, its action bar not counted.
+## Height of the detail band under the tree, its action bar not counted.
 const DETAIL_BAND_HEIGHT: float = 130.0
-## Least pane height of the full tree: lower, tree and band would crush each other.
+## Least pane width that keeps the tree visible over the card (design/talent-tree-v2.md, Interface).
+const DETAIL_BAND_MIN_WIDTH: float = 560.0
+## Least pane height of the band: lower, tree and band would crush each other.
 const WIDE_MIN_HEIGHT: float = 480.0
+## Time after a card opens during which its action is ignored: a double touch must not buy.
+const ACTION_GUARD_MSEC: int = 250
 const SELECTED_MARK: String = "» "
 ## Number of BranchPanelN and BranchTitleN variations of the theme, used in turn by the branches.
 const BRANCH_STYLES: int = 3
@@ -62,18 +77,41 @@ const PANE_SIDE_MARGINS: float = 16.0
 const SCROLL_BAR_ROOM: float = 16.0
 
 var _tree: TalentTree
+var _text: TalentCardText
+var _skills: SkillManager
+var _offline_base_hours: float = 0.0
+## Unix time now, as an int; replaced by the tests.
+var _clock_unix: Callable = func() -> int: return int(Time.get_unix_time_from_system())
+## Whether a boss fight runs now.
+var _in_boss_fight: Callable = func() -> bool: return false
+## Milliseconds since start, for the double-touch guard; replaced by the tests.
+var _clock_msec: Callable = Time.get_ticks_msec
 ## One entry per node: {"def": TalentTree.TalentDef, "button": Button, "branch": int}.
 var _rows: Array[Dictionary] = []
+## One entry per tier header: {"label": Label, "branch": String, "tier": int}.
+var _headers: Array[Dictionary] = []
+var _grids: Array[GridContainer] = []
 var _columns: Array[Control] = []
 var _column_titles: Array[Label] = []
 var _segments: Array[Button] = []
 var _branch_index: int = 0
 var _detail: Detail = Detail.NONE
 var _selected_id: String = ""
+## Refusal told by the composition root after a refused reset; "" when none. Used only without a
+## context ([method set_context]): with one, the live refusal decides.
+var _forced_refusal: String = ""
+var _has_context: bool = false
+## Stage of the next point, computed once per redraw (0 for none).
+var _next_point: int = 0
+var _opened_msec: int = -ACTION_GUARD_MSEC
 var _wide: bool = false
+var _band: bool = false
 ## What the last redraw showed: see [method refresh_if_stale].
 var _drawn_best_stage: int = -1
 var _drawn_points: int = -1
+## Unix second of the last countdown check.
+var _countdown_second: int = -1
+var _countdown_left: int = -1
 
 @onready var _top: Control = %Top
 @onready var _points_label: Label = %PointsLabel
@@ -99,11 +137,43 @@ func _ready() -> void:
 	_back_button.pressed.connect(close_detail)
 	_action_button.pressed.connect(_on_action_pressed)
 	resized.connect(_on_resized)
+	# The countdown only runs while the tab shows. A hidden ancestor (another tab) also sends it.
+	visibility_changed.connect(_on_visibility_changed)
+	_on_visibility_changed()
+
+
+func _process(_delta: float) -> void:
+	if _tree == null:
+		return
+	var now: int = int(_clock_unix.call())
+	if now == _countdown_second:
+		return
+	_countdown_second = now
+	var left: int = _tree.reset_seconds_left(now)
+	if left == _countdown_left:
+		return
+	_countdown_left = left
+	_draw_reset_button()
+	if _detail == Detail.RESET:
+		_draw_detail()
+
+
+## Gives what the cards need besides the tree: [param skills] for the names and current values of the
+## skills, [param offline_base_hours] the offline cap without talents, [param clock_unix] a Callable
+## returning the Unix time as an int and [param in_boss_fight] one returning whether a boss fight runs.
+## Optional; call before [method setup].
+func set_context(skills: SkillManager, offline_base_hours: float, clock_unix: Callable, in_boss_fight: Callable) -> void:
+	_has_context = true
+	_skills = skills
+	_offline_base_hours = offline_base_hours
+	_clock_unix = clock_unix
+	_in_boss_fight = in_boss_fight
 
 
 ## Builds the columns, the selector and the nodes from [param tree] and draws them. Call once.
 func setup(tree: TalentTree) -> void:
 	_tree = tree
+	_text = TalentCardText.new(tree, _skills, _offline_base_hours)
 	var branches: Array[Dictionary] = tree.branches()
 	var group: ButtonGroup = ButtonGroup.new()
 	for i in branches.size():
@@ -127,7 +197,7 @@ func refresh_if_stale() -> void:
 		refresh()
 
 
-## True when a node's detail or the reset confirmation is open.
+## True when a node's card or the reset confirmation is open.
 func is_detail_open() -> bool:
 	return _detail != Detail.NONE
 
@@ -137,9 +207,19 @@ func detail() -> Detail:
 	return _detail
 
 
-## True when the pane is wide enough for the full tree.
+## Id of the node whose card is open, "" when none.
+func selected_node() -> String:
+	return _selected_id
+
+
+## True when the pane shows the three columns.
 func is_wide() -> bool:
 	return _wide
+
+
+## True when the card is a band under a tree that stays visible.
+func has_band() -> bool:
+	return _band
 
 
 ## True when a pane of size [param pane] holds the full tree of [param branches] columns and its
@@ -156,9 +236,43 @@ static func full_tree_min_width(branches: int) -> float:
 	return columns + float(maxi(branches - 1, 0)) * COLUMN_GAP + PANE_SIDE_MARGINS + SCROLL_BAR_ROOM
 
 
-## Index of the branch shown under the wide width, in the order of the data.
+## True when a pane of size [param pane] keeps the tree visible over the card.
+static func fits_band(pane: Vector2) -> bool:
+	return pane.x >= DETAIL_BAND_MIN_WIDTH and pane.y >= WIDE_MIN_HEIGHT
+
+
+## Id of the node that unlocks the skill [param skill_id] in [param tree], "" when none does.
+static func unlock_node_of(tree: TalentTree, skill_id: String) -> String:
+	for def: TalentTree.TalentDef in tree.nodes():
+		for effect: Dictionary in def.effects:
+			if effect["type"] == TalentTree.EFFECT_SKILL_UNLOCK and effect["skill"] == skill_id:
+				return def.id
+	return ""
+
+
+## Why the reset is refused now, in French (see [method TalentCardText.reset_refusal_text]).
+static func reset_refusal_text(tree: TalentTree, now_unix: int, in_boss_fight: bool) -> String:
+	return TalentCardText.reset_refusal_text(tree, now_unix, in_boss_fight)
+
+
+## Index of the branch shown one at a time, in the order of the data.
 func open_branch() -> int:
 	return _branch_index
+
+
+## Opens the card of the node [param id], on its branch, as a touch on it does. Unknown ids do nothing.
+func open_node(id: String) -> void:
+	if _tree == null or _tree.node(id) == null:
+		return
+	_on_node_pressed(id)
+
+
+## Opens the reset card with [param refusal], the reason the composition root got from the tree.
+func show_reset_refused(refusal: String) -> void:
+	var focus: PaneFocus = PaneFocus.capture(self)
+	_forced_refusal = refusal
+	_open(Detail.RESET, "")
+	_redraw(focus)
 
 
 ## Closes the detail and gives the focus back to what opened it. False when none was open.
@@ -169,12 +283,13 @@ func close_detail() -> bool:
 	focus.redirect(_reset_button if _detail == Detail.RESET else _button_of(_selected_id))
 	_detail = Detail.NONE
 	_selected_id = ""
+	_forced_refusal = ""
 	_redraw(focus)
 	return true
 
 
 ## Closes the reset confirmation, for leaving the tab: a question must not wait there unseen. The
-## detail of a node stays open.
+## card of a node stays open.
 func close_confirmation() -> void:
 	if _detail == Detail.RESET:
 		close_detail()
@@ -192,17 +307,26 @@ func last_focus() -> Control:
 	return null if controls.is_empty() else controls[-1]
 
 
+func _open(what: Detail, id: String) -> void:
+	_detail = what
+	_selected_id = id
+	_opened_msec = _clock_msec.call()
+
+
 func _redraw(focus: PaneFocus) -> void:
-	if _detail == Detail.RESET and _tree.spent_points() == 0:
+	if _detail == Detail.RESET and _tree.spent_points() == 0 and _forced_refusal.is_empty():
 		_detail = Detail.NONE
 	var available: int = _tree.available_points()
 	_drawn_points = available
 	_drawn_best_stage = _tree.best_stage()
-	_points_label.text = tr("Points disponibles : %d") % available
-	_info_label.text = tr("1 point tous les %d étages atteints. Meilleur étage : %d. Points dépensés : %d.") % [_tree.stages_per_point(), _tree.best_stage(), _tree.spent_points()]
-	_reset_button.disabled = _tree.spent_points() == 0
+	_next_point = _next_point_stage()
+	_points_label.text = tr("Points disponibles : %d") % available if _band else tr("Points : %d") % available
+	_info_label.text = _info_text()
+	_draw_reset_button()
 	for row: Dictionary in _rows:
 		_draw_node(row)
+	for header: Dictionary in _headers:
+		(header["label"] as Label).text = _text.tier_header(header["branch"], header["tier"])
 	var empty: String = _empty_text()
 	_empty_label.text = empty
 	_empty_label.visible = not empty.is_empty()
@@ -217,18 +341,51 @@ func _redraw(focus: PaneFocus) -> void:
 	focus_ends_changed.emit()
 
 
+# The button names the wait while there is one: the real time left, from the first draw.
+func _draw_reset_button() -> void:
+	var spent: int = _tree.spent_points()
+	_reset_button.disabled = spent == 0
+	var left: int = _tree.reset_seconds_left(int(_clock_unix.call()))
+	if spent > 0 and left > 0 and spent <= _tree.earned_points():
+		_reset_button.text = "%s\n%s" % [tr("Réinitialiser"), tr("dans %s") % TalentCardText.clock_text(left)]
+	else:
+		_reset_button.text = tr("Réinitialiser")
+
+
+func _info_text() -> String:
+	var next: int = _next_point
+	var lines: String = tr("Meilleur étage : %d. Points dépensés : %d.") % [_tree.best_stage(), _tree.spent_points()]
+	if next > 0:
+		lines += " " + tr("Prochain point à l'étage %d.") % next
+	return lines
+
+
+# The first stage that earns one more point (0 for none); _redraw computes it once into _next_point.
+func _next_point_stage() -> int:
+	return _tree.stage_for_points(_tree.earned_points() + 1)
+
+
 func _apply_layout() -> void:
 	var detail_open: bool = _detail != Detail.NONE
-	var tree_shown: bool = _wide or not detail_open
+	var tree_shown: bool = _band or not detail_open
 	_top.visible = tree_shown
 	_selector.visible = tree_shown and not _wide and _segments.size() > 1
 	_scroll.visible = tree_shown
 	_detail_panel.visible = detail_open
-	_detail_panel.size_flags_vertical = Control.SIZE_FILL if _wide else Control.SIZE_EXPAND_FILL
-	_detail_scroll.custom_minimum_size.y = DETAIL_BAND_HEIGHT if _wide else 0.0
+	_detail_panel.size_flags_vertical = Control.SIZE_FILL if _band else Control.SIZE_EXPAND_FILL
+	_detail_scroll.custom_minimum_size.y = DETAIL_BAND_HEIGHT if _band else 0.0
 	for i in _columns.size():
 		_columns[i].visible = _wide or i == _branch_index
 		_column_titles[i].visible = _wide
+	var grid_columns: int = 1 if _wide else COMPACT_GRID_COLUMNS
+	for grid: GridContainer in _grids:
+		if grid.columns != grid_columns:
+			grid.columns = grid_columns
+	var tile_width: float = NODE_MIN_SIZE.x if _wide else COMPACT_TILE_MIN_WIDTH
+	for row: Dictionary in _rows:
+		var button: Button = row["button"]
+		if button.custom_minimum_size.x != tile_width:
+			button.custom_minimum_size = Vector2(tile_width, NODE_MIN_SIZE.y)
 	_order_scroll_body()
 
 
@@ -257,6 +414,7 @@ func _add_segment(branch: Dictionary, index: int, group: ButtonGroup) -> void:
 	_segments.append(segment)
 
 
+# A column holds, per tier, its header (when the tree has more than one tier) and a grid of tiles.
 func _add_column(branch: Dictionary, index: int) -> void:
 	var style: int = index % BRANCH_STYLES
 	var column: PanelContainer = PanelContainer.new()
@@ -264,7 +422,7 @@ func _add_column(branch: Dictionary, index: int) -> void:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.mouse_filter = Control.MOUSE_FILTER_PASS
 	var content: VBoxContainer = VBoxContainer.new()
-	content.add_theme_constant_override("separation", 8)
+	content.add_theme_constant_override("separation", TILE_GAP)
 	column.add_child(content)
 	var title: Label = Label.new()
 	title.text = tr(branch["name"])
@@ -273,25 +431,32 @@ func _add_column(branch: Dictionary, index: int) -> void:
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # a long name must not widen the column
 	content.add_child(title)
 	_column_titles.append(title)
-	var rows: Dictionary = {}
+	var tiered: bool = _tree.tier_thresholds().size() > 1
+	var grids: Dictionary = {}
 	for def: TalentTree.TalentDef in _tree.nodes_of(branch["id"]):
-		if not rows.has(def.depth):
-			rows[def.depth] = _new_row()
-		(rows[def.depth] as VBoxContainer).add_child(_new_node(def, index))
-	var depths: Array = rows.keys()
-	depths.sort()
-	for depth: Variant in depths:
-		content.add_child(rows[depth])
+		if not grids.has(def.tier):
+			if tiered:
+				content.add_child(_new_header(branch["id"], def.tier))
+			var grid: GridContainer = GridContainer.new()
+			grid.columns = COMPACT_GRID_COLUMNS
+			grid.add_theme_constant_override("h_separation", TILE_GAP)
+			grid.add_theme_constant_override("v_separation", TILE_GAP)
+			grid.mouse_filter = Control.MOUSE_FILTER_PASS
+			content.add_child(grid)
+			_grids.append(grid)
+			grids[def.tier] = grid
+		(grids[def.tier] as GridContainer).add_child(_new_node(def, index))
 	_branches_box.add_child(column)
 	_columns.append(column)
 
 
-# Nodes of the same depth stack: a branch is one column that scrolls, and only the width the pane
-# gives it decides how wide its nodes are.
-func _new_row() -> VBoxContainer:
-	var row: VBoxContainer = VBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	return row
+func _new_header(branch_id: String, tier: int) -> Label:
+	var label: Label = Label.new()
+	label.theme_type_variation = &"PaneText"
+	label.add_theme_font_size_override("font_size", TILE_FONT_SIZE)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_headers.append({"label": label, "branch": branch_id, "tier": tier})
+	return label
 
 
 func _new_node(def: TalentTree.TalentDef, branch_index: int) -> Button:
@@ -299,9 +464,9 @@ func _new_node(def: TalentTree.TalentDef, branch_index: int) -> Button:
 	button.custom_minimum_size = NODE_MIN_SIZE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # also keeps a long text from widening it
+	button.add_theme_font_size_override("font_size", TILE_FONT_SIZE)
 	button.toggle_mode = true
 	button.mouse_filter = Control.MOUSE_FILTER_PASS
-	button.tooltip_text = _long_text(def)
 	button.pressed.connect(_on_node_pressed.bind(def.id))
 	_rows.append({"def": def, "button": button, "branch": branch_index})
 	return button
@@ -310,27 +475,25 @@ func _new_node(def: TalentTree.TalentDef, branch_index: int) -> Button:
 func _draw_node(row: Dictionary) -> void:
 	var def: TalentTree.TalentDef = row["def"]
 	var button: Button = row["button"]
-	var state: TalentTree.NodeState = _tree.state_of(def.id)
-	var status: String = ""
 	var variation: StringName = &"TalentLocked"
-	match state:
+	match _tree.state_of(def.id):
 		TalentTree.NodeState.OWNED:
-			status = tr("Acheté")
 			variation = &"TalentOwned"
 		TalentTree.NodeState.BUYABLE:
-			status = _cost_text(def.cost)
 			variation = &"TalentBuyable"
 		TalentTree.NodeState.UNAFFORDABLE:
-			status = _missing_text(def)
 			variation = &"TalentUnaffordable"
-		TalentTree.NodeState.LOCKED:
-			status = _requires_text(def)
 	if button.theme_type_variation != variation:
 		button.theme_type_variation = variation
 	var chosen: bool = _detail == Detail.NODE and def.id == _selected_id
 	button.set_pressed_no_signal(chosen)
-	var shown_name: String = SELECTED_MARK + tr(def.display_name) if chosen else tr(def.display_name)
-	button.text = "%s\n%s\n%s" % [shown_name, _effect_text(def), status]
+	var lines: PackedStringArray = PackedStringArray([SELECTED_MARK + tr(def.display_name) if chosen else tr(def.display_name)])
+	lines.append(_text.effect_short(def))
+	var excludes: String = _text.excludes_text(def)
+	if not excludes.is_empty():
+		lines.append(excludes)
+	lines.append(_text.state_text(def))
+	button.text = "\n".join(lines)
 
 
 func _draw_detail() -> void:
@@ -338,31 +501,32 @@ func _draw_detail() -> void:
 		Detail.NODE:
 			var def: TalentTree.TalentDef = _tree.node(_selected_id)
 			_detail_title.text = tr(def.display_name)
-			_detail_status.text = _detail_text(def)
+			_detail_status.text = "\n".join(_text.card_lines(def))
+			_action_button.visible = true
 			_action_button.theme_type_variation = &"BuyButton"
 			_action_button.text = tr("Acheter")
 			_action_button.disabled = not _tree.can_buy(def.id)
 		Detail.RESET:
-			_detail_title.text = tr("Réinitialiser les talents ?")
-			_detail_status.text = tr("Tes talents achetés sont retirés et leurs points te sont rendus, gratuitement.")
-			_action_button.theme_type_variation = &"DangerButton"
-			_action_button.text = tr("Oui, réinitialiser")
-			_action_button.disabled = false
+			var refusal: String = _reset_refusal()
+			_action_button.visible = refusal.is_empty()
+			_action_button.disabled = not refusal.is_empty()
+			if refusal.is_empty():
+				_detail_title.text = tr("Réinitialiser les talents ?")
+				_detail_status.text = tr("Tes talents achetés sont retirés et leurs points te sont rendus, gratuitement. Ensuite, attends 1 h avant la suivante.")
+				_action_button.theme_type_variation = &"DangerButton"
+				_action_button.text = tr("Oui, réinitialiser")
+			else:
+				_detail_title.text = tr("Réinitialisation impossible")
+				_detail_status.text = refusal
 
 
-func _detail_text(def: TalentTree.TalentDef) -> String:
-	var lines: PackedStringArray = PackedStringArray([_stat_text(def)])
-	match _tree.state_of(def.id):
-		TalentTree.NodeState.OWNED:
-			lines.append(tr("Talent acheté."))
-		TalentTree.NodeState.BUYABLE:
-			lines.append(_cost_text(def.cost))
-		TalentTree.NodeState.UNAFFORDABLE:
-			lines.append(_missing_text(def))
-		TalentTree.NodeState.LOCKED:
-			lines.append(_requires_text(def))
-			lines.append(_cost_text(def.cost))
-	return "\n".join(lines)
+# What the tree says now. With a context the live answer is the only one: a refusal told during a
+# boss fight or a wait must not outlive them. Without one, what the composition root was told.
+func _reset_refusal() -> String:
+	var refusal: String = TalentCardText.reset_refusal_text(_tree, int(_clock_unix.call()), bool(_in_boss_fight.call()))
+	if _has_context or not refusal.is_empty():
+		return refusal
+	return _forced_refusal
 
 
 func _empty_text() -> String:
@@ -374,59 +538,14 @@ func _empty_text() -> String:
 		all_owned = all_owned and state == TalentTree.NodeState.OWNED
 	if all_owned:
 		return tr("Tous les talents sont achetés.")
-	return tr("Aucun talent achetable pour le moment : un point s'obtient tous les %d étages.") % _tree.stages_per_point()
-
-
-func _effect_text(def: TalentTree.TalentDef) -> String:
-	match def.stat:
-		TalentTree.STAT_CLICK_DAMAGE:
-			return tr("Clic +%d %%") % def.percent
-		TalentTree.STAT_COMPANION_DAMAGE:
-			return tr("Compagnons +%d %%") % def.percent
-		TalentTree.STAT_OFFLINE_GOLD:
-			return tr("Hors-ligne +%d %%") % def.percent
-	return tr("Or +%d %%") % def.percent
-
-
-func _points_text(points: int) -> String:
-	return tr("%d pt") % points if points == 1 else tr("%d pts") % points
-
-
-func _cost_text(cost: int) -> String:
-	return tr("Coût : %s") % _points_text(cost)
+	var next: int = _next_point
+	if next > 0:
+		return tr("Aucun talent achetable pour le moment : prochain point à l'étage %d.") % next
+	return tr("Aucun talent achetable pour le moment.")
 
 
 func _missing_text(def: TalentTree.TalentDef) -> String:
-	return tr("%s, manque %s") % [_cost_text(def.cost), _points_text(def.cost - _tree.available_points())]
-
-
-# A node needs all its prerequisites (TalentTree.prerequisites_met), hence "et" and never "ou".
-func _requires_text(def: TalentTree.TalentDef) -> String:
-	var names: PackedStringArray = PackedStringArray()
-	for id: String in def.requires:
-		names.append(tr(_tree.node(id).display_name))
-	var count: int = names.size()
-	if count < 2:
-		return tr("Requiert : %s") % ", ".join(names)
-	var head: String = ", ".join(names.slice(0, count - 1))
-	return tr("Requiert : %s et %s") % [head, names[count - 1]]
-
-
-func _stat_text(def: TalentTree.TalentDef) -> String:
-	match def.stat:
-		TalentTree.STAT_CLICK_DAMAGE:
-			return tr("Dégâts de clic : +%d %%") % def.percent
-		TalentTree.STAT_COMPANION_DAMAGE:
-			return tr("Dégâts des compagnons : +%d %%") % def.percent
-		TalentTree.STAT_OFFLINE_GOLD:
-			return tr("Or gagné hors-ligne : +%d %%") % def.percent
-	return tr("Or par ennemi vaincu : +%d %%") % def.percent
-
-
-func _long_text(def: TalentTree.TalentDef) -> String:
-	if def.requires.is_empty():
-		return _stat_text(def)
-	return "%s\n%s" % [_stat_text(def), _requires_text(def)]
+	return _text.state_text(def)
 
 
 func _focusables() -> Array[Control]:
@@ -447,8 +566,8 @@ func _button_of(id: String) -> Button:
 
 func _on_node_pressed(id: String) -> void:
 	var focus: PaneFocus = PaneFocus.capture(self)
-	_detail = Detail.NODE
-	_selected_id = id
+	_forced_refusal = ""
+	_open(Detail.NODE, id)
 	for row: Dictionary in _rows:
 		if (row["def"] as TalentTree.TalentDef).id == id:
 			_show_branch(row["branch"])
@@ -458,27 +577,33 @@ func _on_node_pressed(id: String) -> void:
 
 # The band opening shrinks the tree: only the next frame's layout says where the node stands.
 func _reveal_node(button: Button) -> void:
-	if not _wide or not is_inside_tree():
+	if not _band or not is_inside_tree():
 		return
 	await get_tree().process_frame
-	if _wide and _scroll.is_visible_in_tree():
+	if _band and _scroll.is_visible_in_tree():
 		_scroll.ensure_control_visible(button)
 
 
 func _on_reset_pressed() -> void:
 	var focus: PaneFocus = PaneFocus.capture(self)
-	_detail = Detail.RESET
-	_selected_id = ""
+	_forced_refusal = ""
+	_open(Detail.RESET, "")
 	_redraw(focus)
-	# The confirmation is the next thing to read; in the wide layout the button above stays usable.
+	# The confirmation is the next thing to read; in the band layout the button above stays usable.
 	if focus.focused() != null:
 		_back_button.grab_focus(focus.is_hidden())
 
 
 func _on_action_pressed() -> void:
+	# The second touch of a double touch lands here right after the first opened the card.
+	if int(_clock_msec.call()) - _opened_msec < ACTION_GUARD_MSEC:
+		return
 	match _detail:
 		Detail.NODE:
-			buy_requested.emit(_selected_id)
+			var id: String = _selected_id
+			buy_requested.emit(id)
+			if _tree.is_owned(id):
+				close_detail()
 		Detail.RESET:
 			_detail = Detail.NONE
 			reset_requested.emit()
@@ -498,10 +623,16 @@ func _show_branch(index: int) -> void:
 		_segments[index].button_pressed = true
 
 
+func _on_visibility_changed() -> void:
+	set_process(is_visible_in_tree())
+
+
 func _on_resized() -> void:
 	var wide: bool = fits_full_tree(size, _columns.size())
-	if wide == _wide:
+	var band: bool = wide or fits_band(size)
+	if wide == _wide and band == _band:
 		return
 	_wide = wide
+	_band = band
 	if _tree != null:
 		refresh()

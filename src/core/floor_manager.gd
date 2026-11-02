@@ -120,6 +120,9 @@ signal boss_failed(failed_stage: int, fallback_stage: int)
 ## Farm mode was entered or left; [param farming] is the new value. Emitted before
 ## [signal stage_started]. Not emitted after construction (read [method is_farming]).
 signal farming_changed(farming: bool)
+## "Rythme" (story 019) gave a free burst of [param damage] (already dealt as a [constant HitSource.BURST]
+## hit). Display hook: nothing in the game listens to it.
+signal rhythm_triggered(damage: BigNumber)
 
 var _state: GameState
 var _combat: Combat
@@ -143,6 +146,37 @@ var _gold_multiplier: String = "1"
 var _talent_click: String = "1"
 var _talent_companion: String = "1"
 var _talent_gold: String = "1"
+## Effects of the talent tree (story 019), pushed by [ModifierHub]; "1" or 0 meaning none.
+## Factor on the share of the companions in a click ("Frappe alliée").
+var _click_share_factor: String = "1"
+## Factor on the gold of the kills of farm mode ("Moisson").
+var _farm_gold: String = "1"
+## Percent off the gold cost of companion levels, not awakenings ("Négociation").
+var _cost_discount_percent: int = 0
+## Percent of attack speed of the companions ("Cadence").
+var _attack_speed_percent: int = 0
+## "Synergie": percent per companion at [member _synergy_level] or above, up to [member _synergy_max].
+var _synergy_per_companion: int = 0
+var _synergy_level: int = 0
+var _synergy_max: int = 0
+## "Champion": percent added to the strongest companion.
+var _champion_percent: int = 0
+## "Rythme": clicks per trigger (0 = off), seconds of damage of the free burst as a decimal string,
+## minimum game seconds between two triggers. The counter and the time since the last trigger are
+## NOT saved: a load starts from zero clicks and an open gap.
+var _rhythm_clicks: int = 0
+var _rhythm_dps_seconds: String = "1"
+var _rhythm_min_gap: float = 0.0
+var _rhythm_count: int = 0
+## Companion cache (story 019, see [method strongest_companion_id]): the levels and awakenings it was
+## computed from, whether it is valid, and the values.
+var _cache_levels: Dictionary = {}
+var _cache_awakenings: Dictionary = {}
+var _cache_ready: bool = false
+var _cached_strongest: String = ""
+var _cached_synergy_count: int = 0
+var _cached_power: BigNumber = null
+var _rhythm_since: float = INF
 ## Factors only items give (story 007), "1" meaning none.
 var _global_damage: String = "1"
 var _boss_damage: String = "1"
@@ -201,7 +235,7 @@ func boss_time_left() -> float:
 	return _boss.time_left()
 
 
-## Full duration of a boss fight, in seconds.
+## Full duration of a boss fight, in seconds, the talents' bonus included.
 func boss_timer_seconds() -> float:
 	return _boss.timer_seconds()
 
@@ -265,6 +299,7 @@ func set_talent_modifiers(click: String, companion: String, gold: String) -> voi
 	_talent_click = click
 	_talent_companion = companion
 	_talent_gold = gold
+	_drop_companion_cache()
 
 
 ## Sets the factors only items give (story 007), pushed by [ModifierHub]: [param global_damage]
@@ -282,6 +317,59 @@ func set_item_modifiers(global_damage: String, boss_damage: String, boss_gold: S
 	_crit_factor = crit_factor
 
 
+## Sets the talent effects that [ModifierHub] pushes (story 019, design/talent-tree-v2.md), each
+## replacing the previous call:
+## [param click_share] factor on the share of the companions in a click, a decimal string ("1.50");
+## [param farm_gold] factor on the gold of the kills of farm mode ("1.12"); [param cost_discount_percent]
+## percent off every companion level, awakenings excluded (see [method discounted_cost]);
+## [param attack_speed_percent] percent of attack speed of the companions (see [method attack_speed_factor]);
+## [param boss_bonus_seconds] seconds added to every boss countdown that begins from now on.
+## "1", 0 and 0.0 mean none.
+func set_talent_effects(click_share: String, farm_gold: String, cost_discount_percent: int, attack_speed_percent: int, boss_bonus_seconds: float) -> void:
+	_click_share_factor = click_share
+	_farm_gold = farm_gold
+	_cost_discount_percent = clampi(cost_discount_percent, 0, 99)
+	_attack_speed_percent = maxi(attack_speed_percent, 0)
+	_boss.set_bonus_seconds(boss_bonus_seconds)
+	_drop_companion_cache()
+
+
+## Sets the two talent effects that depend on which companion is which (story 019): "Synergie" gives
+## [param per_companion] percent for each companion at [param level] or above, up to [param max_percent]
+## (0 for per_companion means none); "Champion" gives [param champion_percent] percent more to
+## [method strongest_companion_id]. Both multiply the companion talents of
+## [method set_talent_modifiers] and each other.
+func set_companion_effects(per_companion: int, level: int, max_percent: int, champion_percent: int) -> void:
+	_synergy_per_companion = maxi(per_companion, 0)
+	_synergy_level = level
+	_synergy_max = maxi(max_percent, 0)
+	_champion_percent = maxi(champion_percent, 0)
+	_drop_companion_cache()
+
+
+## Sets "Rythme" (story 019): every [param clicks] clicks of the player, a free burst of
+## [param dps_seconds] seconds of damage (a decimal string, same formula as the skill "Gros coup"), but
+## never twice within [param min_gap_seconds] seconds of game time ([method tick]). [param clicks] <= 0
+## switches it off and forgets the count. A count already started is kept when the numbers change.
+## When the count is full inside the gap, the burst comes with the first click after the gap.
+func set_rhythm(clicks: int, dps_seconds: String, min_gap_seconds: float) -> void:
+	_rhythm_clicks = maxi(clicks, 0)
+	_rhythm_dps_seconds = dps_seconds
+	_rhythm_min_gap = maxf(min_gap_seconds, 0.0)
+	if _rhythm_clicks == 0:
+		_rhythm_count = 0
+
+
+## Clicks counted toward the next "Rythme" burst (0 when off); lost at a reload, by design.
+func rhythm_count() -> int:
+	return _rhythm_count
+
+
+## Clicks that make a "Rythme" burst, 0 when the talent is not bought.
+func rhythm_clicks() -> int:
+	return _rhythm_clicks
+
+
 ## Injects the dice of the critical hits: a [Callable] returning a float in [0.0, 1.0), for
 ## example [code]rng.randf[/code] of a seeded [RandomNumberGenerator]. A click is critical when
 ## the roll * 100 is below the chance. Without a valid Callable, no click is ever critical
@@ -293,19 +381,91 @@ func set_crit_roll(roll: Callable) -> void:
 ## Damage a click deals right now (base + companion share, times the click talents),
 ## before the damage buff.
 func click_damage() -> BigNumber:
-	return _with_talent(_combat.click_damage(_state.companion_levels, _state.companion_awakenings), _talent_click)
+	return _with_talent(_combat.click_damage(_state.companion_levels, _state.companion_awakenings, _click_share_factor), _talent_click)
 
 
 ## [param damage], a companion's attack or damage per second, with the companion talents
-## applied. Unchanged when none is bought. The damage buff is not applied here.
-func companion_damage(damage: BigNumber) -> BigNumber:
-	return _with_talent(damage, _talent_companion)
+## applied. Unchanged when none is bought. The damage buff is not applied here. With the id of the
+## companion it comes from ([param id], "" for none), the effects that depend on the companion apply too:
+## "Synergie" (every companion) and "Champion" (the strongest one only).
+func companion_damage(damage: BigNumber, id: String = "") -> BigNumber:
+	var scaled: BigNumber = _with_talent(damage, _talent_companion)
+	if id.is_empty():
+		return scaled
+	scaled = _with_talent(scaled, TalentTree.factor_from_percent(synergy_percent()))
+	if _champion_percent > 0 and id == strongest_companion_id():
+		scaled = _with_talent(scaled, TalentTree.factor_from_percent(_champion_percent))
+	return scaled
 
 
-## Total damage per second of the companions, with the companion talents (the sum
-## [method Combat.companion_power] gives, scaled once).
+## Damage of one attack of the companion [param id] now (0 when not bought), with its awakenings and
+## all the companion talents.
+func companion_attack_damage(id: String) -> BigNumber:
+	return companion_damage(_combat.companion(id).damage_at_level(_level_of(id), _combat.awakening_count(_state.companion_awakenings, id), _combat.squad_awakenings(_state.companion_awakenings)), id)
+
+
+## Damage per second of the companion [param id] now (0 when not bought): the attack damage with every
+## companion talent, then the attack speed of "Cadence".
+func companion_dps(id: String) -> BigNumber:
+	var bare: BigNumber = _combat.companion(id).damage_per_second_at_level(_level_of(id), _combat.awakening_count(_state.companion_awakenings, id), _combat.squad_awakenings(_state.companion_awakenings))
+	return _with_talent(companion_damage(bare, id), TalentTree.factor_from_percent(_attack_speed_percent))
+
+
+## Total damage per second of the companions, with the companion talents: the sum of
+## [method companion_dps] over the roster. Cached, see [method strongest_companion_id].
 func companion_power() -> BigNumber:
-	return companion_damage(_combat.companion_power(_state.companion_levels, _state.companion_awakenings))
+	_follow_companions()
+	if _cached_power == null:
+		var total: BigNumber = BigNumber.new()
+		for def: Companion in _combat.companions():
+			total = total.add(companion_dps(def.id))
+		_cached_power = total
+	return _cached_power
+
+
+## Seconds of attack time a companion gains per second of game time: 1.0, or 1.05 with +5% attack
+## speed. The [CompanionManager] feeds its attack timers with it.
+func attack_speed_factor() -> float:
+	return 1.0 + float(_attack_speed_percent) / 100.0
+
+
+## The companion with the highest damage per second now, awakenings included and talents left out
+## (story 019 "Champion": "strongest" is the current dps, so it follows the levels and awakenings); the
+## first in roster order on a tie; "" when no companion is bought.
+## Cache: this id, the synergy count and [method companion_power] are computed once and kept until the
+## companion levels or awakenings of the state differ from the copy taken then (any change, through
+## [CompanionManager] or not), or until a talent setter of this class runs.
+func strongest_companion_id() -> String:
+	_follow_companions()
+	return _cached_strongest
+
+
+## Percent "Synergie" gives to every companion now: [code]min(per_companion * companions at level or
+## above, max)[/code], 0 when the talent is not bought. Cached, see [method strongest_companion_id].
+func synergy_percent() -> int:
+	if _synergy_per_companion <= 0:
+		return 0
+	_follow_companions()
+	return mini(_cached_synergy_count * _synergy_per_companion, _synergy_max)
+
+
+## [param cost], a gold cost of a companion level, with the discount of "Négociation" (never used on an
+## awakening, which no node touches):
+## floor(cost * (100 - percent) / 100), at least 1 for a cost that was not 0. Unchanged without the talent.
+func discounted_cost(cost: BigNumber) -> BigNumber:
+	return Companion.discounted_cost(cost, _cost_discount_percent)
+
+
+## Percent off the costs now, 0 when "Négociation" is not bought.
+func cost_discount_percent() -> int:
+	return _cost_discount_percent
+
+
+## [param dps_seconds] seconds (a decimal string) of the damage the player and the companions deal
+## in one second: (companion power + click damage) * dps_seconds, floored. The skill "Gros coup" and
+## "Rythme" both use it. The damage buff and item stats come later, in [method apply_damage].
+func damage_over(dps_seconds: String) -> BigNumber:
+	return companion_power().add(click_damage()).multiply_decimal(dps_seconds)
 
 
 ## [param damage] with the item stats (global damage, boss damage in a boss fight) and the damage
@@ -334,7 +494,8 @@ func hp_ratio() -> float:
 ## A player click: deals [method click_damage] to the enemy (times the damage buff), and
 ## rolls a critical hit, the only damage that can be critical. Returns the click damage
 ## BEFORE the buff and the critical hit, so the measured click dps that feeds
-## [method can_beat_next_boss] stays a buff-free estimate.
+## [method can_beat_next_boss] stays a buff-free estimate. The click also counts toward "Rythme"
+## ([method set_rhythm]): the free burst, when it comes, is dealt right after the click.
 func click() -> BigNumber:
 	var damage: BigNumber = click_damage()
 	var final_damage: BigNumber = buffed_damage(damage)
@@ -343,6 +504,7 @@ func click() -> BigNumber:
 		final_damage = _with_talent(final_damage, _crit_factor)
 		critical_hit.emit(final_damage)
 	_deal(final_damage, HitSource.CRITICAL if critical else HitSource.CLICK)
+	_count_rhythm()
 	return damage
 
 
@@ -371,6 +533,8 @@ func _deal(damage: BigNumber, source: HitSource) -> void:
 	var killed_stage: int = _state.stage
 	var was_boss: bool = _boss.is_active()
 	var reward: BigNumber = _with_talent(_reward, _talent_gold)
+	if _state.farming:
+		reward = _with_talent(reward, _farm_gold)
 	if was_boss:
 		reward = _with_talent(reward, _boss_gold)
 	if _gold_multiplier != "1":
@@ -418,6 +582,7 @@ func challenge_boss() -> bool:
 ## then [signal boss_failed], [signal farming_changed] and [signal stage_started] are
 ## emitted. Call it once per frame, after the damage of that frame has been applied (see the class comment).
 func tick(delta: float) -> void:
+	_rhythm_since += clampf(delta, 0.0, BossFight.MAX_TICK_SECONDS)
 	if _boss.tick(delta):
 		_fall_back()
 
@@ -440,6 +605,55 @@ func _fall_back() -> void:
 	boss_failed.emit(failed_stage, _state.stage)
 	farming_changed.emit(true)
 	stage_started.emit(_state.stage, _max_hp)
+
+
+# Counts one click toward "Rythme". A full count waits for the gap since the last burst, then the
+# first click deals the burst (damage_over, with the damage buff and item stats of apply_damage).
+func _count_rhythm() -> void:
+	if _rhythm_clicks <= 0:
+		return
+	_rhythm_count = mini(_rhythm_count + 1, _rhythm_clicks)
+	if _rhythm_count < _rhythm_clicks or _rhythm_since < _rhythm_min_gap:
+		return
+	_rhythm_count = 0
+	_rhythm_since = 0.0
+	var burst: BigNumber = damage_over(_rhythm_dps_seconds)
+	apply_damage(burst, HitSource.BURST)
+	rhythm_triggered.emit(burst)
+
+
+# Recomputes the companion cache when the levels or awakenings of the state are no longer those it was
+# computed from (Dictionary == compares the contents), or after _drop_companion_cache. The copies are
+# only taken on a change.
+func _follow_companions() -> void:
+	if _cache_ready and _state.companion_levels == _cache_levels and _state.companion_awakenings == _cache_awakenings:
+		return
+	_cache_levels = _state.companion_levels.duplicate()
+	_cache_awakenings = _state.companion_awakenings.duplicate()
+	_cache_ready = true
+	_cached_power = null
+	_cached_strongest = ""
+	_cached_synergy_count = 0
+	var best: BigNumber = BigNumber.new()
+	var squad: int = _combat.squad_awakenings(_state.companion_awakenings)
+	for def: Companion in _combat.companions():
+		var level: int = _level_of(def.id)
+		if level >= _synergy_level:
+			_cached_synergy_count += 1
+		var dps: BigNumber = def.damage_per_second_at_level(level, _combat.awakening_count(_state.companion_awakenings, def.id), squad)
+		if dps.compare(best) > 0:
+			best = dps
+			_cached_strongest = def.id
+
+
+# Forgets the companion cache: a factor it depends on changed.
+func _drop_companion_cache() -> void:
+	_cache_ready = false
+
+
+# Level of the companion [param id] in the state, 0 when not bought.
+func _level_of(id: String) -> int:
+	return maxi(int(_state.companion_levels.get(id, 0)), 0)
 
 
 # [param value] times a talent factor: floor(value * factor), but at least value + 1 when the

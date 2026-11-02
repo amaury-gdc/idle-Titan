@@ -37,6 +37,12 @@ extends SceneTree
 ## as soon as it beats the worn item of its type by the "worse item" rule (rarity, then sum of
 ## percentages, blind to the stat: an honest measure, not an optimistic one). Default 0, no
 ## items, no critical hit. --seed=<n> seeds the dice (default 1), --itemsdata=<path> replaces items.json.
+## Story 019: every effect of the tree acts through the real core, as in the game: Rythme on the clicks,
+## Cadence on the attack timers, Synergie and Champion on the companion damage, Sursis on the boss
+## countdown, Négociation on every level purchase (not the awakenings), Longue veille on the absences, Moisson on the
+## farm kills, Flair on the drops (--loot=1), Œil vif on the clicks (the inventory, which holds the
+## critical-hit base, is built whenever talents are on), Instinct de meute as a passive damage buff that
+## the skill policy can no longer press. The end of the run prints them.
 ## Story 014, see [SimMeasures]: --milestones=10,20,... follows these stages, plus those of the
 ## first boss, instead of the default list. --report=1 prints a line at each milestone: levels,
 ## power, estimated click share (clicks * click damage against the companions) and damage per gold of
@@ -134,12 +140,15 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	crit_rng.seed = seed_value + 1
 	var inventory: Inventory = null
 	var drops: Array[int] = [0, 0]
-	if use_loot:
+	# Story 019: with talents the inventory exists even without loot, as in the game: it holds the
+	# critical-hit base that "Œil vif" needs. Without --loot=1 no boss drops anything.
+	if use_loot or use_talents:
 		inventory = Inventory.from_data(DataLoader.load_json(items_path), permanent, state, combat, loot_rng.randf)
 		if not inventory.is_valid():
 			printerr("simulate_progress: " + inventory.get_error())
 			return false
 		floors.set_crit_roll(crit_rng.randf)
+	if use_loot:
 		floors.boss_killed.connect(inventory.on_boss_killed)
 		inventory.loot_received.connect(func(item: Item, sold: Array[Item], _gold: BigNumber) -> void: _wear_if_better(inventory, item, sold, drops))
 		print("Loot: greedy on rarity then sum of percentages, blind to the stat; seed %d" % seed_value)
@@ -153,6 +162,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			printerr("simulate_progress: " + skills.get_error())
 			return false
 	var skill_uses: Array[int] = [0, 0, 0]
+	var rhythm_bursts: Array[int] = [0]
+	floors.rhythm_triggered.connect(func(_damage: BigNumber) -> void: rhythm_bursts[0] += 1)
 	var failed_attempts: Array[int] = [0]
 	floors.boss_failed.connect(func(_failed: int, _back_to: int) -> void: failed_attempts[0] += 1)
 	var first_boss_stage: int = 1
@@ -243,7 +254,9 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		print("Awakenings at the end: %s, squad count %d" % [str(state.companion_awakenings), companions.squad_awakenings()])
 	if talents != null:
 		print("Talents at the end: %d earned, %d spent, %d left; click x%s, companions x%s, gold x%s, offline gold x%s" % [talents.earned_points(), talents.spent_points(), talents.available_points(), talents.factor(TalentTree.STAT_CLICK_DAMAGE), talents.factor(TalentTree.STAT_COMPANION_DAMAGE), talents.factor(TalentTree.STAT_GOLD), talents.factor(TalentTree.STAT_OFFLINE_GOLD)])
-	if inventory != null:
+		print("Talent effects at the end: %s" % SimMeasures.talent_effects_text(talents, floors, offline, skills))
+		print("Rhythm bursts: %d" % rhythm_bursts[0])
+	if use_loot:
 		var worn: Array[String] = []
 		for item: Item in inventory.equipped_items():
 			worn.append("%s %s %s" % [item.rarity, item.type, str(item.stats)])

@@ -84,7 +84,8 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 
 Offline gold (`OfflineIncome`, `src/core/offline_income.gd`), granted once at startup:
 
-- Counted seconds = min(now - `GameState.last_saved_unix`, `offline_max_hours` * 3600).
+- Counted seconds = min(now - `GameState.last_saved_unix`, cap), cap = `offline_max_hours` * 3600, or the
+  `offline_cap_hours` talent ("Longue veille", story 019) when higher.
 - Gold = floor(companion power * counted seconds * Gold(stage) / HP(stage) *
   `offline_efficiency` * talent factor), exact. Stage is `GameState.stage`; Gold and HP are
   those of the normal enemy of that stage, even on a boss stage. Companion power is the
@@ -120,7 +121,7 @@ error, like the two files above.
 |---|---|---|---|
 | `schema_version` | int | yes | Currently 3 (2 replaced `boss_hp_base` and `boss_hp_growth` by `boss_hp_multiplier`; 3 added `auto_challenge_margin`). `BossFight` refuses any other value. |
 | `boss_every_stages` | integer >= 2 | yes | A stage S is a boss stage when `S % boss_every_stages == 0`. Must be >= 2 so that a fallback can never reach a stage below 1 or another boss stage. Value in file: 10. |
-| `timer_seconds` | number (seconds, > 0) | yes | Length of the countdown of one boss fight; it starts when the fight begins. Value in file: 30. |
+| `timer_seconds` | number (seconds, > 0) | yes | Length of the countdown of one boss fight; it starts when the fight begins. The `boss_timer` talent ("Sursis", story 019) adds to it. Value in file: 30. |
 | `boss_hp_multiplier` | decimal string (unitless factor) | yes | Boss HP(S) = floor(enemy HP of stage S * `boss_hp_multiplier`), exact (`multiply_decimal`), never below 1. Value in file: "20". |
 | `boss_gold_base` | digit string (gold) | yes | Base of the boss gold curve. Boss gold(S) = floor(`boss_gold_base` * `boss_gold_growth`^(S-1)), exact. Replaces the normal kill gold on a boss stage. Value in file: "15". |
 | `boss_gold_growth` | decimal string (unitless factor) | yes | Per-stage multiplier of boss gold. Value in file: "1.30". |
@@ -215,7 +216,7 @@ game on the main screen error, like the files above.
 
 | Key | Type | Required | Meaning |
 |---|---|---|---|
-| `schema_version` | int | yes | 1 (the flat format below, the real file until story 019) or 2 (the tiered format, see "Schema 2" below). `TalentTree` refuses any other value; the version picks the reader. |
+| `schema_version` | int | yes | 1 (the flat format below, the real file until story 019) or 2 (the tiered format, see "Schema 2" below; the real file since story 019). `TalentTree` refuses any other value; the version picks the reader. |
 | `stages_per_point` | integer >= 1 | schema 1 only | One talent point every this many stages reached. Value in file: 5 (brief). |
 | `branches` | array of object | yes | Branches in display order (3 in the MVP), one column each. |
 | `branches[].id` | string | yes | Unique stable id. |
@@ -284,18 +285,39 @@ per node, so the real file keeps working unchanged. Schema 2 replaces `stages_pe
 
 Effects (every key required; "factor" is a decimal string > 0, "int" a whole number >= 1):
 
-| `type` | Keys | Applied in story 018 |
+| `type` | Keys | Applied (stories 018 and 019) |
 |---|---|---|
-| `stat` | `stat` (as schema 1), `percent` (int) | yes, as schema 1 |
-| `skill_unlock` | `skill` (skills.json id) | yes: the skill is locked until a node unlocking it is bought |
-| `skill_mod` | `skill`, `field` (`amount`, `duration_seconds` or `cooldown_seconds`), `value` (factor for `amount`, number > 0 otherwise) | yes: replaces the skills.json value; last bought node in file order wins |
-| `skill_passive` | `skill`, `multiplier` (factor) | validated and carried only |
-| `rhythm` | `clicks` (int), `dps_seconds` (factor), `min_gap_seconds` (number >= 0) | validated and carried only |
-| `boss_timer` | `seconds` (number > 0) | validated and carried only |
-| `offline_cap_hours` | `hours` (number > 0) | validated and carried only |
-| `synergy` | `percent_per_companion`, `level`, `max_percent` (ints) | validated and carried only |
-| `champion` | `percent` (int) | validated and carried only |
-| `loot_shift` | `from`, `to` (strings), `weight` (int) | validated and carried only |
+| `stat` | `stat`, `percent` (int) | percentages of one stat add up; stats below |
+| `skill_unlock` | `skill` (skills.json id) | the skill is locked until a node unlocking it is bought |
+| `skill_mod` | `skill`, `field` (`amount`, `duration_seconds` or `cooldown_seconds`), `value` (factor for `amount`, number > 0 otherwise) | replaces the skills.json value; last bought node in file order wins |
+| `skill_passive` | `skill`, `multiplier` (factor) | the skill is passive: its effect runs all the time at `multiplier`, it cannot be activated and has no timer, a running one stops; its `skill_mod` are ignored ("Instinct de meute" cancels "Frénésie durable" and "ardente"). `SkillManager.is_passive` |
+| `rhythm` | `clicks` (int), `dps_seconds` (factor), `min_gap_seconds` (number >= 0) | every `clicks` player clicks, a free burst of `dps_seconds` seconds of damage (formula of "Gros coup"), never twice within `min_gap_seconds` of game time; a full count waits for the gap and fires on the first click after it. The last bought rhythm in file order wins (Virtuose replaces Rythme). The count and the gap are NOT saved. `FloorManager.set_rhythm` |
+| `boss_timer` | `seconds` (number > 0) | added to every boss countdown that begins afterwards; counted by "Défi automatique". `BossFight.set_bonus_seconds` |
+| `offline_cap_hours` | `hours` (number > 0) | the offline cap becomes the higher of this and `offline_max_hours`. `OfflineIncome.set_talent_cap_hours` |
+| `synergy` | `percent_per_companion`, `level`, `max_percent` (ints) | every companion gets min(percent x companions at `level` or above, max) percent, recomputed live. `FloorManager.synergy_percent` |
+| `champion` | `percent` (int) | the companion with the highest damage per second now (awakenings in, talents out; first in roster order on a tie) gets that percent more; it follows level and awakening changes. `FloorManager.strongest_companion_id` |
+| `loot_shift` | `from`, `to` (rarity ids), `weight` (int) | moves `weight` from one rarity to the other in every boss tier, never more than `from` has (a weight of 0 stays 0, nothing goes negative, the sum is unchanged). `LootTable.set_weight_shifts`, only with an inventory |
+
+Stats of a `stat` effect (schema 1 and 2): `click_damage`, `companion_damage`, `gold`, `offline_gold` (as schema 1),
+and since story 019 `boss_damage` and `crit_chance` (summed with the items of the same stat, see items.json),
+plus four talent-only stats:
+
+| Stat | Effect |
+|---|---|
+| `click_share` | The share of the companions in a click (the part above `click_damage_base`) times 1 + percent / 100: 50 gives x1.5 ("Frappe alliée"). The base is untouched. |
+| `attack_speed` | The attack timers of the companions run 1 + percent / 100 times faster, and their dps shown and counted is raised by the same factor ("Cadence"). |
+| `cost_discount` | Each companion level costs floor(cost x (100 - percent) / 100), at least 1, level by level, so "Max" and single purchases agree and "Max" still stops at the awakening threshold. Awakening costs are NOT discounted: no node touches them (spec Règles, confirmed by Amaury for story 019) ("Négociation"). |
+| `farm_gold` | The gold of a kill in farm mode is multiplied by 1 + percent / 100, after `gold` and before the gold bonus of the skills ("Moisson"). |
+
+Order of the companion factors: floor(dps x companion talents), then x synergy, then x champion (strongest only),
+then x attack speed for a per-second value, each step at least +1 like the other talents. Offline gold keeps the
+bare companion power: none of them applies to an absence. `crit_chance` needs the inventory, which holds the
+critical-hit base (`crit` of items.json): with no inventory no click is critical.
+
+The real file (story 019) is the tree of `design/talent-tree-v2.md`: 30 nodes in 3 branches, tiers 1 to 5,
+`tree_version` 1, design bands and thresholds, one exclusive group per branch on tier 5 (`click_top`,
+`companions_top`, `economy_top`); `damage_buff` and `gold_bonus` are unlocked by `frenzy_unlock` and
+`gold_unlock`. Its points cost 69 in total, for 25 points at stage 200.
 
 Rules (`TalentTree`):
 
@@ -363,8 +385,8 @@ Stats. Percentages are whole numbers, like the talents.
 | `click_damage` | Click damage (base + companion share). Also a talent stat. | `FloorManager.click_damage` |
 | `companion_damage` | Each companion attack and the DPS shown. Also a talent stat. | `FloorManager.companion_damage` |
 | `global_damage` | Every hit: click, companion attack, "Gros coup". | `FloorManager.buffed_damage` |
-| `boss_damage` | Every hit while a boss fight runs. | `FloorManager.buffed_damage` |
-| `crit_chance` | Added to `crit.base_chance_percent`, capped by `crit.max_chance_percent`. | `ModifierHub` |
+| `boss_damage` | Every hit while a boss fight runs. Also a talent stat (story 019). | `FloorManager.buffed_damage` |
+| `crit_chance` | Added to `crit.base_chance_percent`, capped by `crit.max_chance_percent`. Also a talent stat (story 019). | `ModifierHub` |
 | `crit_damage` | Added to `crit.base_bonus_percent`. | `ModifierHub` |
 | `gold` | Gold of every kill, boss kills included. Also a talent stat. | `FloorManager.apply_damage` |
 | `boss_gold` | Gold of a boss kill only. | `FloorManager.apply_damage` |

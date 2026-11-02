@@ -37,6 +37,11 @@ func before_test() -> void:
 	_tree.sync_best_stage()
 	_screen = auto_free((load(SCENE) as PackedScene).instantiate())
 	_screen.visible = true
+	# Each reading of the clock is a second later: no action of these tests falls in the 250 ms guard.
+	var ticks: Array[int] = [0]
+	_screen._clock_msec = func() -> int:
+		ticks[0] += 1000
+		return ticks[0]
 	add_child(_screen)
 	_bought = []
 	_resets = []
@@ -144,10 +149,10 @@ func test_close_confirmation_closes_the_question() -> void:
 
 func test_missing_points_are_singular_and_plural_exactly() -> void:
 	_start(COMPACT)
-	assert_str(_screen._missing_text(_tree.node("c"))).is_equal("Coût : 3 pts, manque 2 pts")
+	assert_str(_screen._missing_text(_tree.node("c"))).is_equal("Coût : 3 pts, manque 2 pts")
 	_state.max_stage_reached = STAGE_WITH_ONE_POINT * 2
 	_tree.sync_best_stage()
-	assert_str(_screen._missing_text(_tree.node("c"))).is_equal("Coût : 3 pts, manque 1 pt")
+	assert_str(_screen._missing_text(_tree.node("c"))).is_equal("Coût : 3 pts, manque 1 pt")
 
 
 func test_requirements_read_as_all_of_them() -> void:
@@ -159,8 +164,8 @@ func test_requirements_read_as_all_of_them() -> void:
 	_start(COMPACT)
 
 	# Act, Assert
-	assert_str(_button("two").text).contains("Requiert : Nom a et Nom b")
-	assert_str(_button("three").text).contains("Requiert : Nom a, Nom b et Nom c")
+	assert_str(_button("two").text).contains("Requiert : Nom a et Nom b")
+	assert_str(_button("three").text).contains("Requiert : Nom a, Nom b et Nom c")
 
 
 func test_refresh_if_stale_skips_a_redraw_when_nothing_moved() -> void:
@@ -205,7 +210,7 @@ func test_six_branches_never_widen_the_tab() -> void:
 
 func test_locked_node_prints_what_it_requires() -> void:
 	_start(COMPACT)
-	assert_str(_button("b").text).contains("Requiert : Nom a")
+	assert_str(_button("b").text).contains("Requiert : Nom a")
 
 
 func test_touching_a_node_opens_its_detail_and_buys_nothing() -> void:
@@ -227,7 +232,7 @@ func test_locked_node_opens_a_detail_whose_action_is_disabled() -> void:
 	_button("b").pressed.emit()
 	assert_bool(_screen.is_detail_open()).is_true()
 	assert_bool(_screen._action_button.disabled).is_true()
-	assert_str(_screen._detail_status.text).contains("Requiert : Nom a")
+	assert_str(_screen._detail_status.text).contains("Requiert : Nom a")
 
 
 func test_compact_detail_replaces_the_tree() -> void:

@@ -182,10 +182,14 @@ func companion_power(companion_levels: Dictionary, awakenings: Dictionary) -> Bi
 ## talents). [param awakenings] is required, see [method companion_power].
 ## Example: two companions of 1 damage per second with shares "0.5" and "0.5", base 1: the click
 ## is 2 (floor of 1.0), not 1 (two floors of 0.5).
-func click_damage(companion_levels: Dictionary, awakenings: Dictionary) -> BigNumber:
+## [param share_factor] (decimal string, "1" for none, story 019 "Frappe alliée") multiplies the share of
+## the companions only, never the base; the shares are scaled first and floored once at the end.
+func click_damage(companion_levels: Dictionary, awakenings: Dictionary, share_factor: String = "1") -> BigNumber:
 	if _click_weights.is_empty():
-		var bonus: BigNumber = companion_power(companion_levels, awakenings).multiply_decimal(_click_power_factor)
-		return _click_base.add(bonus)
+		var power: BigNumber = companion_power(companion_levels, awakenings)
+		if share_factor != "1":
+			power = power.multiply_decimal(share_factor)
+		return _click_base.add(power.multiply_decimal(_click_power_factor))
 	var scaled: BigNumber = BigNumber.new()
 	var squad: int = squad_awakenings(awakenings)
 	for id: Variant in companion_levels:
@@ -195,6 +199,8 @@ func click_damage(companion_levels: Dictionary, awakenings: Dictionary) -> BigNu
 		var def: Companion = _companion_by_id.get(id)
 		var dps: BigNumber = def.damage_per_second_at_level(int(companion_levels[id]), awakening_count(awakenings, def.id), squad)
 		scaled = scaled.add(dps.multiply(weight))
+	if share_factor != "1":
+		scaled = scaled.multiply_decimal(share_factor)
 	return _click_base.add(scaled.divide_by_power_of_ten(_click_scale))
 
 

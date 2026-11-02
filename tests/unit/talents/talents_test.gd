@@ -523,4 +523,6 @@ func test_long_node_text_does_not_widen_its_button() -> void:
 	# Assert
 	var buttons: Array[Node] = screen.get_node("%Branches").find_children("*", "Button", true, false)
 	assert_int(buttons.size()).is_equal(1)
-	assert_float((buttons[0] as Button).get_combined_minimum_size().x).is_equal(TalentScreen.NODE_MIN_SIZE.x)
+	# Story 019: the narrow pane sets a smaller tile (grid of two); the text must still not widen it.
+	assert_float((buttons[0] as Button).get_combined_minimum_size().x).is_equal((buttons[0] as Button).custom_minimum_size.x)
+	assert_float((buttons[0] as Button).get_combined_minimum_size().x).is_less_equal(TalentScreen.NODE_MIN_SIZE.x)

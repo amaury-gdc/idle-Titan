@@ -585,7 +585,8 @@ func test_clock_set_back_waits_at_most_one_cooldown() -> void:
 	_buy(["click_grip"])
 	_permanent.talent_reset_unix = NOW + TEN_DAYS
 
-	# Act: the query shows one cooldown and changes nothing; the refused try pulls the stamp back
+	# Act: the first query shows one cooldown and pulls the stamp back to now (story 019: a countdown
+	# must not stay frozen until a press of Reset)
 	var at_once: int = _tree.reset_seconds_left(NOW)
 	var stamp_after_query: int = _permanent.talent_reset_unix
 	var refused: bool = _tree.try_reset(NOW, false)
@@ -594,7 +595,7 @@ func test_clock_set_back_waits_at_most_one_cooldown() -> void:
 
 	# Assert
 	assert_int(at_once).is_equal(COOLDOWN)
-	assert_int(stamp_after_query).is_equal(NOW + TEN_DAYS)
+	assert_int(stamp_after_query).is_equal(NOW)
 	assert_bool(refused).is_false()
 	assert_int(an_hour_later).is_equal(0)
 	assert_bool(done).is_true()

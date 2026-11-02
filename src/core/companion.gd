@@ -75,6 +75,7 @@ var _numerator: BigNumber = null
 ## 50 levels per companion).
 var _sum_memo_level: int = -1
 var _sum_memo_count: int = -1
+var _sum_memo_discount: int = 0
 var _sum_memo: BigNumber = null
 ## Awakening rules bound by [Combat] (story 016); a disabled instance until then.
 var _awakening: AwakeningRules = AwakeningRules.new()
@@ -122,12 +123,14 @@ func cost_of_level(level: int) -> BigNumber:
 ## lower is read as 1), each floored on its own: the same value as adding
 ## [method cost_of_level] for level, level + 1, and so on. 0 when count <= 0.
 ## Example: base_cost "10", growth "1.15": from level 1, count 2 costs 21.
-func cost_of_levels_from(level: int, count: int) -> BigNumber:
+## [param discount_percent] (story 019 "Négociation") takes that percent off each level on its own, see
+## [method discounted_cost], so the sum is still what [param count] single purchases would spend.
+func cost_of_levels_from(level: int, count: int, discount_percent: int = 0) -> BigNumber:
 	var total: BigNumber = BigNumber.new()
 	if count <= 0:
 		return total
 	var first: int = maxi(level, 1)
-	if _sum_memo_level == first and _sum_memo_count == count:
+	if _sum_memo_level == first and _sum_memo_count == count and _sum_memo_discount == discount_percent:
 		return _sum_memo
 	var numerator: BigNumber = _numerator_at(first)
 	var exponent: int = _growth_scale * (first - 1)
@@ -135,25 +138,36 @@ func cost_of_levels_from(level: int, count: int) -> BigNumber:
 		if i > 0:
 			numerator = numerator.multiply(_growth_numerator)
 			exponent += _growth_scale
-		total = total.add(numerator.divide_by_power_of_ten(exponent))
+		total = total.add(discounted_cost(numerator.divide_by_power_of_ten(exponent), discount_percent))
 	_sum_memo_level = first
 	_sum_memo_count = count
+	_sum_memo_discount = discount_percent
 	_sum_memo = total
 	return total
+
+
+## [param cost] with [param discount_percent] taken off: floor(cost * (100 - percent) / 100), but at
+## least 1 for a cost that was not 0 (a level never becomes free). Unchanged for a percent <= 0.
+## Example: 10 with 5 gives 9; 1 with 5 gives 1.
+static func discounted_cost(cost: BigNumber, discount_percent: int) -> BigNumber:
+	if discount_percent <= 0 or cost.is_zero():
+		return cost
+	var reduced: BigNumber = cost.multiply_decimal("0.%02d" % (100 - mini(discount_percent, 99)))
+	return reduced if not reduced.is_zero() else BigNumber.from_int(1)
 
 
 ## How many consecutive levels starting at [param level] (>= 1, lower is read as 1)
 ## [param gold] covers, from 0 to [param max_count]. The scan stops at the first level
 ## the gold cannot cover. Example: base_cost "10", growth "1.15", gold 21, from level
 ## 1: returns 2 (10 + 11).
-func affordable_levels_from(level: int, gold: BigNumber, max_count: int) -> int:
-	return affordable_walk_from(level, gold, max_count)["count"]
+func affordable_levels_from(level: int, gold: BigNumber, max_count: int, discount_percent: int = 0) -> int:
+	return affordable_walk_from(level, gold, max_count, discount_percent)["count"]
 
 
 ## The same scan as [method affordable_levels_from], which also keeps the sum it walked:
 ## {"count": int, "total": BigNumber}, where total is the exact cost of those count levels (0 when
 ## count is 0). One walk, so a caller needing both never pays for a second one.
-func affordable_walk_from(level: int, gold: BigNumber, max_count: int) -> Dictionary:
+func affordable_walk_from(level: int, gold: BigNumber, max_count: int, discount_percent: int = 0) -> Dictionary:
 	var kept: BigNumber = BigNumber.new()
 	if max_count <= 0:
 		return {"count": 0, "total": kept}
@@ -164,7 +178,7 @@ func affordable_walk_from(level: int, gold: BigNumber, max_count: int) -> Dictio
 		if i > 0:
 			numerator = numerator.multiply(_growth_numerator)
 			exponent += _growth_scale
-		var total: BigNumber = kept.add(numerator.divide_by_power_of_ten(exponent))
+		var total: BigNumber = kept.add(discounted_cost(numerator.divide_by_power_of_ten(exponent), discount_percent))
 		if total.compare(gold) > 0:
 			return {"count": i, "total": kept}
 		kept = total

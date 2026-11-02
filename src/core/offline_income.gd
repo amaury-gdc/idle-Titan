@@ -37,6 +37,8 @@ var _efficiency: String = "0"
 var _max_seconds: int = 0
 var _min_seconds: int = 0
 var _talent_factor: String = "1"
+## Cap of the talents in seconds (story 019), 0 for none.
+var _talent_cap_seconds: int = 0
 
 
 ## Reads the offline keys of [param curves] (core_curves.json as returned by
@@ -66,16 +68,27 @@ func set_talent_factor(factor: String) -> void:
 	_talent_factor = factor
 
 
+## Sets the offline cap the talents give (story 019 "Longue veille"), in hours: the cap is the higher of
+## this and offline_max_hours of the data, so it never lowers it. 0 means none.
+func set_talent_cap_hours(hours: float) -> void:
+	_talent_cap_seconds = int(maxf(hours, 0.0) * SECONDS_PER_HOUR)
+
+
+## Longest absence that counts, in seconds: offline_max_hours, or the talent cap when it is higher.
+func max_seconds() -> int:
+	return maxi(_max_seconds, _talent_cap_seconds)
+
+
 ## Seconds of absence that count: 0 when [param last_saved_unix] is unknown (<= 0), when
 ## no time passed or the clock went backwards, or when the elapsed time is below the
-## minimum; otherwise the elapsed time, capped at the maximum.
+## minimum; otherwise the elapsed time, capped at [method max_seconds].
 func counted_seconds(last_saved_unix: int, now_unix: int) -> int:
 	if last_saved_unix <= 0 or now_unix <= last_saved_unix:
 		return 0
 	var elapsed: int = now_unix - last_saved_unix
 	if elapsed < _min_seconds:
 		return 0
-	return mini(elapsed, _max_seconds)
+	return mini(elapsed, max_seconds())
 
 
 ## Gold for [param seconds] of absence at [param stage] with [param companion_levels]
@@ -96,7 +109,7 @@ func gold_for(seconds: int, stage: int, companion_levels: Dictionary, awakenings
 ## maximum cut the elapsed time}. The stage is never touched.
 func grant(state: GameState, now_unix: int) -> Dictionary:
 	var seconds: int = counted_seconds(state.last_saved_unix, now_unix)
-	var capped: bool = seconds > 0 and now_unix - state.last_saved_unix > _max_seconds
+	var capped: bool = seconds > 0 and now_unix - state.last_saved_unix > max_seconds()
 	state.last_saved_unix = now_unix
 	if seconds <= 0:
 		return {}

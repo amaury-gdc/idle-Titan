@@ -89,15 +89,16 @@ func level(id: String) -> int:
 
 
 ## Damage of one attack of [param id] at its current level, with its awakenings and the squad's
-## and the companion talents (story 006); 0 when not bought. [param id] must be in the roster.
+## and the companion talents (story 006, "Synergie" and "Champion" of story 019); 0 when not bought.
+## [param id] must be in the roster.
 func damage(id: String) -> BigNumber:
-	return _floors.companion_damage(_combat.companion(id).damage_at_level(level(id), awakenings(id), squad_awakenings()))
+	return _floors.companion_attack_damage(id)
 
 
-## Damage per second of [param id] at its current level, awakenings and companion talents included;
-## 0 when not bought. [param id] must be in the roster.
+## Damage per second of [param id] at its current level, awakenings and companion talents included,
+## attack speed of "Cadence" too; 0 when not bought. [param id] must be in the roster.
 func damage_per_second(id: String) -> BigNumber:
-	return _floors.companion_damage(_combat.companion(id).damage_per_second_at_level(level(id), awakenings(id), squad_awakenings()))
+	return _floors.companion_dps(id)
 
 
 ## Number of awakenings of [param id] (0 for none, an unknown id, or a roster without the
@@ -227,9 +228,11 @@ func buyable_levels_cap(id: String) -> int:
 
 ## Gold cost of the next level of [param id] (level 1 when not bought).
 ## [param id] must be in the roster. It is the price of the level even when the companion is
-## blocked at a threshold (see [method buyable_levels_cap]).
+## blocked at a threshold (see [method buyable_levels_cap]). "Négociation" (story 019) is included,
+## here and in every level cost and purchase of this class (see [method FloorManager.discounted_cost]);
+## awakening costs are NOT discounted (Amaury's ruling: no node touches the awakening cost).
 func next_cost(id: String) -> BigNumber:
-	return _combat.companion(id).cost_of_level(level(id) + 1)
+	return _floors.discounted_cost(_combat.companion(id).cost_of_level(level(id) + 1))
 
 
 ## True when [param id] is in the roster, is not blocked at an awakening threshold
@@ -245,7 +248,7 @@ func can_buy(id: String) -> bool:
 ## cut to [method buyable_levels_cap]: asking for 10 with 5 levels left to the threshold gives the
 ## cost of 5, which is what [method buy_levels] spends. [param id] must be in the roster.
 func cost_of_levels(id: String, count: int) -> BigNumber:
-	return _combat.companion(id).cost_of_levels_from(level(id) + 1, mini(count, buyable_levels_cap(id)))
+	return _combat.companion(id).cost_of_levels_from(level(id) + 1, mini(count, buyable_levels_cap(id)), _floors.cost_discount_percent())
 
 
 ## How many next levels of [param id] the gold on hand covers, at most [param max_count], never more
@@ -255,7 +258,7 @@ func affordable_levels(id: String, max_count: int = MAX_SCAN_LEVELS) -> int:
 	var companion: Companion = _combat.companion(id)
 	if companion == null:
 		return 0
-	return companion.affordable_levels_from(level(id) + 1, _state.gold, mini(mini(max_count, MAX_SCAN_LEVELS), buyable_levels_cap(id)))
+	return companion.affordable_levels_from(level(id) + 1, _state.gold, mini(mini(max_count, MAX_SCAN_LEVELS), buyable_levels_cap(id)), _floors.cost_discount_percent())
 
 
 ## What [method affordable_levels] counts, with the exact cost of those levels, from one walk:
@@ -264,7 +267,7 @@ func affordable_walk(id: String, max_count: int = MAX_SCAN_LEVELS) -> Dictionary
 	var companion: Companion = _combat.companion(id)
 	if companion == null:
 		return {"count": 0, "total": BigNumber.new()}
-	return companion.affordable_walk_from(level(id) + 1, _state.gold, mini(mini(max_count, MAX_SCAN_LEVELS), buyable_levels_cap(id)))
+	return companion.affordable_walk_from(level(id) + 1, _state.gold, mini(mini(max_count, MAX_SCAN_LEVELS), buyable_levels_cap(id)), _floors.cost_discount_percent())
 
 
 ## The tier levels of [param id], which must be in the roster. Read-only: do not modify.
@@ -355,20 +358,19 @@ func _awakening_cost(companion: Companion, index: int) -> BigNumber:
 ## roster order within one call, and an attack that kills the enemy makes the
 ## following attacks hit the next stage's enemy.
 func tick(delta: float) -> void:
-	var step: float = clampf(delta, 0.0, MAX_TICK_SECONDS)
+	# "Cadence" (story 019): the attack timers run faster than game time.
+	var step: float = clampf(delta, 0.0, MAX_TICK_SECONDS) * _floors.attack_speed_factor()
 	if step <= 0.0:
 		return
-	var squad: int = squad_awakenings()
 	for companion: Companion in _combat.companions():
-		var current_level: int = level(companion.id)
-		if current_level <= 0:
+		if level(companion.id) <= 0:
 			continue
 		var elapsed: float = float(_elapsed.get(companion.id, 0.0)) + step
 		var attacks: int = int(elapsed / companion.attack_interval_seconds)
 		_elapsed[companion.id] = elapsed - float(attacks) * companion.attack_interval_seconds
 		if attacks == 0:
 			continue
-		var attack_damage: BigNumber = _floors.companion_damage(companion.damage_at_level(current_level, awakenings(companion.id), squad))
+		var attack_damage: BigNumber = _floors.companion_attack_damage(companion.id)
 		for i in attacks:
 			_floors.apply_damage(attack_damage)
 			companion_attacked.emit(companion.id, attack_damage)
