@@ -32,6 +32,11 @@ extends SceneTree
 ## as soon as it beats the worn item of its type by the "worse item" rule (rarity, then sum of
 ## percentages, blind to the stat: an honest measure, not an optimistic one). Default 0, no
 ## items, no critical hit. --seed=<n> seeds the dice (default 1), --itemsdata=<path> replaces items.json.
+## Story 014, see [SimMeasures]: --milestones=10,20,... follows these stages, plus those of the
+## first boss, instead of the default list. --report=1 prints a line at each milestone: levels,
+## power, estimated click share (clicks * click damage against the companions) and damage per gold of
+## each next level. --buyer=cheapest (default) or ratio: the affordable level with the most
+## damage per gold, instead of the cheapest one.
 ## Report: time to the first boss fight, to the first boss kill, to stages 50/100/150,
 ## the stage at 3 h and the number of failed boss attempts (at each milestone and at the
 ## end). With --away, milestones also give the wall time (active + away) and each
@@ -84,11 +89,15 @@ func _init() -> void:
 		printerr("simulate_progress: " + offline.get_error())
 		quit(1)
 		return
-	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"])
+	if not SimMeasures.is_known_buyer(args["buyer"]):
+		printerr("simulate_progress: unknown buyer " + args["buyer"])
+		quit(1)
+		return
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"], args["milestones"], args["report"] > 0.0, args["buyer"])
 	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String) -> bool:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String, milestone_text: String, report: bool, buyer: String) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
@@ -132,8 +141,10 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	var first_boss_stage: int = 1
 	while not boss.is_boss_stage(first_boss_stage):
 		first_boss_stage += 1
-	var milestones: Array[int] = [first_boss_stage, first_boss_stage + 1]
-	milestones.append_array(MILESTONES)
+	var milestones: Array[int] = SimMeasures.merged_milestones(milestone_text, MILESTONES, [first_boss_stage, first_boss_stage + 1])
+	if milestones.is_empty():
+		printerr("simulate_progress: invalid milestones " + milestone_text)
+		return false
 	# Boss HP to beat, computed once per fallback; power is checked once per simulated
 	# second so a long farm stays cheap to simulate (GrowthCurve, BigNumber sums).
 	var check_every: int = maxi(int(1.0 / dt), 1)
@@ -174,7 +185,7 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		floors.tick(dt)
 		if skills != null:
 			skills.tick(dt)
-		while _buy_cheapest_affordable(companions):
+		while _buy_next(companions, buyer):
 			pass
 		if talents != null and step % check_every == 0 and talents.available_points() > 0:
 			_spend_talents(talents, talent_order, floors, offline, hub)
@@ -192,6 +203,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			if not absences.is_empty():
 				note += " [wall time %.1f min]" % ((seconds + away_seconds) / 60.0)
 			print("Stage %d reached at %.1f min (%.1f s)%s, failed boss attempts so far: %d" % [milestones[next_milestone], seconds / 60.0, seconds, note, failed_attempts[0]])
+			if report:
+				_print_report(state, floors, combat, cps)
 			next_milestone += 1
 		if step + 1 == report_step:
 			print("Stage at %.0f h: best %d (current %d), failed boss attempts so far: %d" % [REPORT_STAGE_AT_HOURS, state.max_stage_reached, state.stage, failed_attempts[0]])
@@ -279,6 +292,26 @@ func _wear_if_better(inventory: Inventory, item: Item, sold: Array[Item], drops:
 		inventory.equip(item.uid)
 
 
+# Prints the line of --report=1 for the stage just reached.
+func _print_report(state: GameState, floors: FloorManager, combat: Combat, cps: float) -> void:
+	var power: float = floors.companion_power().to_decimal_string().to_float()
+	var click_dps: float = floors.click_damage().to_decimal_string().to_float() * cps
+	var levels: Array[String] = []
+	var ratios: Array[String] = []
+	for companion: Companion in combat.companions():
+		var level: int = int(state.companion_levels.get(companion.id, 0))
+		levels.append("%s %d" % [companion.id, level])
+		ratios.append("%s %s" % [companion.id, String.num_scientific(SimMeasures.damage_per_gold(companion, level))])
+	print("  levels %s; power %s; click share %.3f; damage per gold %s" % [", ".join(levels), String.num_scientific(power), SimMeasures.click_share(click_dps, power), ", ".join(ratios)])
+
+
+func _buy_next(companions: CompanionManager, buyer: String) -> bool:
+	if buyer == SimMeasures.BUYER_RATIO:
+		var id: String = SimMeasures.best_ratio_id(companions)
+		return not id.is_empty() and companions.buy_or_upgrade(id)
+	return _buy_cheapest_affordable(companions)
+
+
 func _buy_cheapest_affordable(companions: CompanionManager) -> bool:
 	var best_id: String = ""
 	var best_cost: BigNumber = null
@@ -305,7 +338,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH, "milestones": "", "report": 0.0, "buyer": SimMeasures.BUYER_CHEAPEST}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

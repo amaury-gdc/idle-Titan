@@ -10,6 +10,32 @@ Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
 
+## Reference before the economy rework (story 014)
+
+Current data, measured on 2026-11-02 with the real simulator, so that any later change can be
+compared to it. Times are active play, levels are in roster order, the share is the estimate of
+`--report=1` (clicks * click damage against the companions).
+
+    <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=72 --auto=1 --skills=1 --away=0.5:8,3:8,6:12,24:8,36:8,48:12 --talents=1 --loot=1 --seed=1 --milestones=10,20,30,40,50,60,70,80,90,100,110,120,130,150,200 --report=1
+
+| Run | First boss reached | First boss killed | Stage 50 | Stage 100 | Stage 110 | Stage 120 | Stage 130 |
+|---|---|---|---|---|---|---|---|
+| 3 clicks/s, cheapest | 1.5 min | 6.8 min | 30.4 min | 5.22 h | 6.02 h | 35.0 h | not in 72 h |
+| 1 click/s, cheapest | 3.2 min | 11.0 min | 40.7 min | 6.02 h | 7.79 h | 43.6 h | not in 72 h |
+| 3 clicks/s, `--buyer=ratio` | 1.5 min | 6.8 min | 30.1 min | 3.02 h | 4.61 h | 33.1 h | not in 72 h |
+
+| Stage | Levels, 3 clicks/s, cheapest | Click share 3 / 1 clicks/s |
+|---|---|---|
+| 10 | 7, then 0 | 46 / 22% |
+| 50 | 146, 102, 58, 13, 0, 0, 0, 0 | 25 / 10% |
+| 100 | 315, 271, 227, 182, 138, 94, 50, 5 | 26 / 10% |
+| 120 | 409, 365, 321, 276, 232, 188, 144, 100 | 25 / 10% |
+
+The click share is flat from stage 50 on: `click_companion_power_factor` ties the click to the
+total power, so its share depends on the clicks per second and not on the phase. Times around
+0.5, 3 and 6 h follow the returns of the schedule as much as the power. Levels at stage 120 are
+the same in all three runs: the boss of stage 120 waits for Dragon level 100.
+
 ## Items (story 007)
 
 **Nothing here is measured or decided.** Every value of `items.json` (rules in `data_schema.md`)
