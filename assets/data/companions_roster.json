@@ -1,5 +1,12 @@
 {
 	"schema_version": 2,
+	"awakening": {
+		"thresholds": [200, 300, 400, 500, 600, 700, 800, 900, 1000],
+		"self_multiplier": "3.4",
+		"squad_multiplier": "2.10",
+		"squad_until_threshold": 600,
+		"cost_level_multiplier": "10"
+	},
 	"companions": [
 		{
 			"id": "scout",

@@ -37,6 +37,9 @@ extends SceneTree
 ## power, estimated click share (clicks * click damage against the companions) and damage per gold of
 ## each next level. --buyer=cheapest (default) or ratio: the affordable level with the most
 ## damage per gold, instead of the cheapest one.
+## --awaken=1|0 (story 016, default 1): 1 = every companion awakens as soon as it can, before levels are
+## bought; 0 = never, so the companions stay blocked at the thresholds. Only matters with a roster that
+## has an "awakening" block (try one through --roster=): without it nothing changes, nothing is printed.
 ## Report: time to the first boss fight, to the first boss kill, to stages 50/100/150,
 ## the stage at 3 h and the number of failed boss attempts (at each milestone and at the
 ## end). With --away, milestones also give the wall time (active + away) and each
@@ -93,11 +96,11 @@ func _init() -> void:
 		printerr("simulate_progress: unknown buyer " + args["buyer"])
 		quit(1)
 		return
-	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"], args["milestones"], args["report"] > 0.0, args["buyer"])
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"], args["milestones"], args["report"] > 0.0, args["buyer"], args["awaken"] > 0.0)
 	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String, milestone_text: String, report: bool, buyer: String) -> bool:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String, milestone_text: String, report: bool, buyer: String, awaken: bool) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
@@ -165,6 +168,11 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	var earned_samples: Array[float] = []
 	if not absences.is_empty():
 		floors.enemy_killed.connect(func(_stage: int, gold: BigNumber) -> void: earned[0] += gold.to_decimal_string().to_float())
+	# Story 016: one line per awakening, only printed when the roster has an "awakening" block.
+	var clock: Array[float] = [0.0, 0.0]
+	if combat.awakening_rules().is_enabled():
+		print("Awakening: %s" % ("as soon as affordable, before buying levels" if awaken else "never (companions stay blocked at the thresholds)"))
+		companions.awakened.connect(func(id: String) -> void: _print_awakening(id, companions, state, clock[0], clock[1], not absences.is_empty()))
 	for step in steps:
 		if not absences.is_empty() and step % income_every == 0:
 			earned_samples.append(earned[0])
@@ -185,6 +193,10 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		floors.tick(dt)
 		if skills != null:
 			skills.tick(dt)
+		if awaken:
+			clock[0] = float(step + 1) * dt
+			clock[1] = away_seconds
+			_awaken_all(companions)
 		while _buy_next(companions, buyer):
 			pass
 		if talents != null and step % check_every == 0 and talents.available_points() > 0:
@@ -211,6 +223,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	for i in range(next_milestone, milestones.size()):
 		print("Stage %d NOT reached in %.1f h" % [milestones[i], hours])
 	print("End of run at %.1f h: best stage %d (current %d), failed boss attempts %d, levels %s" % [hours, state.max_stage_reached, state.stage, failed_attempts[0], str(state.companion_levels)])
+	if combat.awakening_rules().is_enabled():
+		print("Awakenings at the end: %s, squad count %d" % [str(state.companion_awakenings), companions.squad_awakenings()])
 	if talents != null:
 		print("Talents at the end: %d earned, %d spent, %d left; click x%s, companions x%s, gold x%s, offline gold x%s" % [talents.earned_points(), talents.spent_points(), talents.available_points(), talents.factor(TalentTree.STAT_CLICK_DAMAGE), talents.factor(TalentTree.STAT_COMPANION_DAMAGE), talents.factor(TalentTree.STAT_GOLD), talents.factor(TalentTree.STAT_OFFLINE_GOLD)])
 	if inventory != null:
@@ -301,8 +315,25 @@ func _print_report(state: GameState, floors: FloorManager, combat: Combat, cps: 
 	for companion: Companion in combat.companions():
 		var level: int = int(state.companion_levels.get(companion.id, 0))
 		levels.append("%s %d" % [companion.id, level])
-		ratios.append("%s %s" % [companion.id, String.num_scientific(SimMeasures.damage_per_gold(companion, level))])
+		var own: int = combat.awakening_count(state.companion_awakenings, companion.id)
+		ratios.append("%s %s" % [companion.id, String.num_scientific(SimMeasures.damage_per_gold(companion, level, own, combat.squad_awakenings(state.companion_awakenings)))])
 	print("  levels %s; power %s; click share %.3f; damage per gold %s" % [", ".join(levels), String.num_scientific(power), SimMeasures.click_share(click_dps, power), ", ".join(ratios)])
+
+
+# --awaken=1: every companion that can awaken does, in roster order, again until none can.
+func _awaken_all(companions: CompanionManager) -> void:
+	var awoke: bool = true
+	while awoke:
+		awoke = false
+		for companion: Companion in companions.companions():
+			if companions.awaken(companion.id):
+				awoke = true
+
+
+# One line per awakening: who, which rank, at which stage and time.
+func _print_awakening(id: String, companions: CompanionManager, state: GameState, active_seconds: float, away_seconds: float, with_wall: bool) -> void:
+	var wall: String = " [wall time %.1f min]" % ((active_seconds + away_seconds) / 60.0) if with_wall else ""
+	print("Awakening %d of %s at level %d: stage %d (best %d) at %.1f min (%.2f h active)%s, squad count %d" % [companions.awakenings(id), id, companions.level(id), state.stage, state.max_stage_reached, active_seconds / 60.0, active_seconds / SECONDS_PER_HOUR, wall, companions.squad_awakenings()])
 
 
 func _buy_next(companions: CompanionManager, buyer: String) -> bool:
@@ -338,7 +369,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH, "milestones": "", "report": 0.0, "buyer": SimMeasures.BUYER_CHEAPEST}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH, "milestones": "", "report": 0.0, "buyer": SimMeasures.BUYER_CHEAPEST, "awaken": 1.0}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

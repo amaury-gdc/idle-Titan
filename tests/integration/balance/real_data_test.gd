@@ -75,8 +75,64 @@ func test_scout_costs_are_pinned() -> void:
 
 
 func test_scout_damage_includes_its_first_tier() -> void:
-	assert_str(_combat.companion("scout").damage_per_second_at_level(SCOUT_LEVEL).to_decimal_string()).is_equal(SCOUT_DPS_AT_LEVEL)
+	assert_str(_combat.companion("scout").damage_per_second_at_level(SCOUT_LEVEL, 0, 0).to_decimal_string()).is_equal(SCOUT_DPS_AT_LEVEL)
+
+
+## Stories 016 and 017: the awakening block of design/economy-rework.md "Éveil", which the real file
+## has since story 017 and which this test pins, and the bounds of "Gardien 1000 / Dragon 100".
+const AWAKENING_BLOCK: Dictionary = {
+	"thresholds": [200, 300, 400, 500, 600, 700, 800, 900, 1000],
+	"self_multiplier": "3.4",
+	"squad_multiplier": "2.10",
+	"squad_until_threshold": 600,
+	"cost_level_multiplier": "10",
+}
+const GUARDIAN_LEVEL: int = 1000
+const GUARDIAN_AWAKENINGS: int = 9
+const DRAGON_LEVEL: int = 100
+## The ratio must stay between 1.5 and 3, written as fractions: 3/2 and 3/1.
+const RATIO_MIN_NUMERATOR: int = 3
+const RATIO_MIN_DENOMINATOR: int = 2
+const RATIO_MAX: int = 3
+
+
+func test_real_roster_holds_the_awakening_block_of_the_design() -> void:
+	# Arrange
+	var roster: Dictionary = DataLoader.load_json("res://assets/data/companions_roster.json")
+
+	# Act
+	var block: Dictionary = roster.get("awakening", {})
+	var rules: AwakeningRules = AwakeningRules.from_block(roster.get("awakening"))
+
+	# Assert: the file and the design agree, key by key (JSON reads every number as a float), and the
+	# rules read it
+	assert_array(block.keys()).contains_exactly_in_any_order(AWAKENING_BLOCK.keys())
+	assert_array(rules.thresholds()).is_equal(AWAKENING_BLOCK["thresholds"])
+	for key: String in ["self_multiplier", "squad_multiplier", "cost_level_multiplier"]:
+		assert_str(block[key]).is_equal(AWAKENING_BLOCK[key])
+	assert_int(int(block["squad_until_threshold"])).is_equal(AWAKENING_BLOCK["squad_until_threshold"])
+	assert_bool(rules.is_valid()).is_true()
+	assert_bool(rules.is_enabled()).is_true()
+	assert_int(rules.threshold_count()).is_equal(GUARDIAN_AWAKENINGS)
+	assert_int(rules.squad_threshold_count()).is_equal(5)
+
+
+func test_guardian_1000_awakened_stays_between_1_5_and_3_dragons_100() -> void:
+	# Arrange: the real roster, awakening block included; the guardian's nine awakenings are the
+	# squad's (5 counted), and both share them, the dragon having none of its own
+	var combat: Combat = _combat
+	assert_str(combat.get_error()).is_empty()
+	var awakenings: Dictionary = {"guardian": GUARDIAN_AWAKENINGS}
+
+	# Act
+	var guardian: BigNumber = combat.companion_power({"guardian": GUARDIAN_LEVEL}, awakenings)
+	var dragon: BigNumber = combat.companion_power({"dragon": DRAGON_LEVEL}, awakenings)
+
+	# Assert: about x2.34 (3.4^9 * 60000 * 1000 * 216 / (140e9 * 100 * 24))
+	assert_int(combat.squad_awakenings(awakenings)).is_equal(5)
+	assert_int(guardian.multiply(BigNumber.from_int(RATIO_MIN_DENOMINATOR)).compare(dragon.multiply(BigNumber.from_int(RATIO_MIN_NUMERATOR)))).is_greater_equal(0)
+	assert_int(guardian.compare(dragon.multiply(BigNumber.from_int(RATIO_MAX)))).is_less_equal(0)
 
 
 func test_click_adds_its_share_of_the_companions_power() -> void:
-	assert_str(_combat.click_damage({"scout": SCOUT_LEVEL}).to_decimal_string()).is_equal(CLICK_WITH_SCOUT)
+	assert_str(_combat.click_damage({"scout": SCOUT_LEVEL}, {}).to_decimal_string()).is_equal(CLICK_WITH_SCOUT)

@@ -51,10 +51,11 @@ static func click_share(click_dps: float, companion_dps: float) -> float:
 
 
 ## Damage per second the next level of [param companion] adds per gold it costs, from level
-## [param level]. Floats: a measure to compare, never a game value.
-static func damage_per_gold(companion: Companion, level: int) -> float:
-	var now: float = companion.damage_per_second_at_level(level).to_decimal_string().to_float()
-	var next: float = companion.damage_per_second_at_level(level + 1).to_decimal_string().to_float()
+## [param level], with [param own_awakenings] of its own and [param squad_awakenings] counted for the
+## squad (story 016). Floats: a measure to compare, never a game value.
+static func damage_per_gold(companion: Companion, level: int, own_awakenings: int, squad_awakenings: int) -> float:
+	var now: float = companion.damage_per_second_at_level(level, own_awakenings, squad_awakenings).to_decimal_string().to_float()
+	var next: float = companion.damage_per_second_at_level(level + 1, own_awakenings, squad_awakenings).to_decimal_string().to_float()
 	return (next - now) / companion.cost_of_level(level + 1).to_decimal_string().to_float()
 
 
@@ -66,7 +67,7 @@ static func best_ratio_id(companions: CompanionManager) -> String:
 	for companion: Companion in companions.companions():
 		if not companions.can_buy(companion.id):
 			continue
-		var ratio: float = damage_per_gold(companion, companions.level(companion.id))
+		var ratio: float = damage_per_gold(companion, companions.level(companion.id), companions.awakenings(companion.id), companions.squad_awakenings())
 		if ratio > best_ratio:
 			best_ratio = ratio
 			best_id = companion.id

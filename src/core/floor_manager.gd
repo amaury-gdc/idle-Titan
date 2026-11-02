@@ -293,7 +293,7 @@ func set_crit_roll(roll: Callable) -> void:
 ## Damage a click deals right now (base + companion share, times the click talents),
 ## before the damage buff.
 func click_damage() -> BigNumber:
-	return _with_talent(_combat.click_damage(_state.companion_levels), _talent_click)
+	return _with_talent(_combat.click_damage(_state.companion_levels, _state.companion_awakenings), _talent_click)
 
 
 ## [param damage], a companion's attack or damage per second, with the companion talents
@@ -305,7 +305,7 @@ func companion_damage(damage: BigNumber) -> BigNumber:
 ## Total damage per second of the companions, with the companion talents (the sum
 ## [method Combat.companion_power] gives, scaled once).
 func companion_power() -> BigNumber:
-	return companion_damage(_combat.companion_power(_state.companion_levels))
+	return companion_damage(_combat.companion_power(_state.companion_levels, _state.companion_awakenings))
 
 
 ## [param damage] with the item stats (global damage, boss damage in a boss fight) and the damage

@@ -9,7 +9,7 @@ extends RefCounted
 ## enemy_max_hp(stage)  = max(1, floor(A_k * g_k^(stage - f_k)))   k = last segment with f_k <= stage
 ## gold_per_kill(stage) = gold_per_kill_base * gold_per_kill_growth^(stage - 1)
 ## companion_power      = sum over bought companions of their damage PER SECOND at their level
-##                        (0 if none bought), see [method Companion.damage_per_second_at_level]
+##                        and awakenings (0 if none bought), see [method Companion.damage_per_second_at_level]
 ## click_damage         = click_damage_base + floor(companion_power * click_companion_power_factor)
 ##                        (roster without "click_share"), or
 ##                        click_damage_base + floor(sum of click_share_i * dps_i)
@@ -24,8 +24,10 @@ extends RefCounted
 ## Companion power is damage per second, not per attack: companions attack at
 ## different intervals, and per-second is what they really add to the fight, so
 ## the click share stays fair when an interval is retuned. The factor is data.
-## The companion formulas (cost, damage, tiers) live in [Companion]; this class
-## only sums them, so there is one definition of companion damage.
+## The companion formulas (cost, damage, tiers, awakening multipliers) live in [Companion]; this
+## class only sums them, so there is one definition of companion damage. The awakening block of the
+## roster (story 016, see [AwakeningRules]) is read here and bound to every companion; the counts of
+## awakenings are passed in (required arguments), like the levels.
 ##
 ## Single-thread only. Build with [method from_data] and check [method is_valid].
 ##
@@ -36,7 +38,7 @@ extends RefCounted
 ##         DataLoader.load_json("res://assets/data/companions_roster.json"))
 ## if combat.is_valid():
 ##     var hp: BigNumber = combat.enemy_max_hp(10)
-##     var dmg: BigNumber = combat.click_damage(game_state.companion_levels)
+##     var dmg: BigNumber = combat.click_damage(game_state.companion_levels, game_state.companion_awakenings)
 ## else:
 ##     push_error(combat.get_error())
 ## [/codeblock]
@@ -80,6 +82,8 @@ var _default_cost_growth: String = ""
 var _companion_by_id: Dictionary = {}
 ## Companions in roster order.
 var _companions: Array[Companion] = []
+## The optional "awakening" block of the roster (story 016); disabled without it.
+var _awakening: AwakeningRules = AwakeningRules.new()
 
 
 ## Parses and validates the two data files (as returned by [method DataLoader.load_json],
@@ -126,35 +130,70 @@ func companion(id: String) -> Companion:
 	return _companion_by_id.get(id)
 
 
-## Sum of the damage per second of every bought companion. [param companion_levels]
-## is [member GameState.companion_levels] (id -> level). Ids missing from the roster
-## and levels <= 0 contribute nothing.
-func companion_power(companion_levels: Dictionary) -> BigNumber:
+## The awakening rules of the roster (disabled, with no threshold, when the roster has no
+## "awakening" block). Read-only: do not modify.
+func awakening_rules() -> AwakeningRules:
+	return _awakening
+
+
+## The awakening thresholds, strictly increasing (empty without a block). Read-only: do not modify.
+func awakening_thresholds() -> Array[int]:
+	return _awakening.thresholds()
+
+
+## Awakenings of companion [param id] in [param awakenings] ([member GameState.companion_awakenings],
+## id -> count), kept between 0 and the number of thresholds: a corrupt or foreign count can neither
+## be negative nor exceed what the data allows. Example: 12 with nine thresholds reads 9.
+func awakening_count(awakenings: Dictionary, id: String) -> int:
+	return clampi(int(awakenings.get(id, 0)), 0, _awakening.threshold_count())
+
+
+## The awakenings of the whole squad that count for the squad multiplier: for each companion of the
+## roster, its awakenings at thresholds up to "squad_until_threshold" (a companion awakened at 200 to
+## 800 with a limit of 600 counts 5). Example: two companions awakened twice, limit above both: 4.
+func squad_awakenings(awakenings: Dictionary) -> int:
+	var total: int = 0
+	var counted: int = _awakening.squad_threshold_count()
+	for def: Companion in _companions:
+		total += mini(awakening_count(awakenings, def.id), counted)
+	return total
+
+
+## Sum of the damage per second of every bought companion, awakenings included.
+## [param companion_levels] is [member GameState.companion_levels] (id -> level) and
+## [param awakenings] is [member GameState.companion_awakenings] (id -> count); the second is
+## required so that a caller that forgets it does not compile. Pass {} for none. Ids missing from
+## the roster and levels <= 0 contribute nothing.
+## Example: [code]combat.companion_power({"scout": 200}, {"scout": 1})[/code].
+func companion_power(companion_levels: Dictionary, awakenings: Dictionary) -> BigNumber:
 	var total: BigNumber = BigNumber.new()
+	var squad: int = squad_awakenings(awakenings)
 	for id: Variant in companion_levels:
 		var def: Companion = _companion_by_id.get(id)
 		if def == null:
 			continue
-		total = total.add(def.damage_per_second_at_level(int(companion_levels[id])))
+		total = total.add(def.damage_per_second_at_level(int(companion_levels[id]), awakening_count(awakenings, def.id), squad))
 	return total
 
 
 ## Damage of one click. Without "click_share" in the roster: base + floor(companion_power * factor).
 ## With a share on every companion: base + floor(sum of share_i * dps_i), a single floor over the
-## whole sum, dps_i being [method Companion.damage_per_second_at_level] (no talents).
+## whole sum, dps_i being [method Companion.damage_per_second_at_level] with its awakenings (no
+## talents). [param awakenings] is required, see [method companion_power].
 ## Example: two companions of 1 damage per second with shares "0.5" and "0.5", base 1: the click
 ## is 2 (floor of 1.0), not 1 (two floors of 0.5).
-func click_damage(companion_levels: Dictionary) -> BigNumber:
+func click_damage(companion_levels: Dictionary, awakenings: Dictionary) -> BigNumber:
 	if _click_weights.is_empty():
-		var bonus: BigNumber = companion_power(companion_levels).multiply_decimal(_click_power_factor)
+		var bonus: BigNumber = companion_power(companion_levels, awakenings).multiply_decimal(_click_power_factor)
 		return _click_base.add(bonus)
 	var scaled: BigNumber = BigNumber.new()
+	var squad: int = squad_awakenings(awakenings)
 	for id: Variant in companion_levels:
 		var weight: BigNumber = _click_weights.get(id)
 		if weight == null:
 			continue
 		var def: Companion = _companion_by_id.get(id)
-		var dps: BigNumber = def.damage_per_second_at_level(int(companion_levels[id]))
+		var dps: BigNumber = def.damage_per_second_at_level(int(companion_levels[id]), awakening_count(awakenings, def.id), squad)
 		scaled = scaled.add(dps.multiply(weight))
 	return _click_base.add(scaled.divide_by_power_of_ten(_click_scale))
 
@@ -181,6 +220,11 @@ func _load(curves: Variant, roster: Variant) -> void:
 		_default_cost_growth = growth
 	if not _error.is_empty():
 		return
+	if r.has("awakening"):
+		_awakening = AwakeningRules.from_block(r["awakening"])
+		if not _awakening.is_valid():
+			_fail(_awakening.get_error())
+			return
 	_read_roster(r)
 	if not _error.is_empty():
 		return
@@ -307,6 +351,7 @@ func _read_roster(roster: Dictionary) -> void:
 		if _companion_by_id.has(def.id):
 			_fail("companions_roster.json: duplicate id '%s'" % def.id)
 			return
+		def.bind_awakening(_awakening)
 		_companion_by_id[def.id] = def
 		_companions.append(def)
 

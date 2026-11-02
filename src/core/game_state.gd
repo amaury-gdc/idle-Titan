@@ -23,6 +23,11 @@ var farming: bool = false
 var gold: BigNumber = BigNumber.new()
 ## Companion id (String) -> level (int). Absent id means not bought.
 var companion_levels: Dictionary = {}
+## Companion id (String) -> number of awakenings (int, 0 to [constant AwakeningRules.MAX_THRESHOLDS]),
+## story 016. Absent id means none. Awakenings follow the run: [method reset] clears them. A save
+## without the key (older format) has none, and a count above the thresholds of the data is cut when
+## read by [Combat].
+var companion_awakenings: Dictionary = {}
 ## Real time of the last save, in Unix seconds (story 004b, brief "Hors-ligne"). 0 means
 ## unknown: a fresh state or a save written before this field existed, which earns no
 ## offline gold. Stamped by [SaveManager] on every save and read by [OfflineIncome].
@@ -45,6 +50,7 @@ func reset() -> void:
 	farming = false
 	gold = BigNumber.new()
 	companion_levels = {}
+	companion_awakenings = {}
 	last_saved_unix = 0
 	skill_timers = {}
 
@@ -57,6 +63,7 @@ func to_dict() -> Dictionary:
 		"farming": farming,
 		"gold": gold.to_decimal_string(),
 		"companion_levels": companion_levels.duplicate(),
+		"companion_awakenings": companion_awakenings.duplicate(),
 		"last_saved_unix": last_saved_unix,
 		"skill_timers": skill_timers.duplicate(true),
 	}
@@ -66,6 +73,8 @@ func to_dict() -> Dictionary:
 ## A save without max_stage_reached (older format) defaults it to the saved stage;
 ## one without farming defaults it to false; one without last_saved_unix (or with a
 ## negative, non-numeric or absurd value) defaults it to 0 and stays valid; one without
+## companion_awakenings (older format) has none, a count that is not a finite number is dropped
+## and the others are kept between 0 and [constant AwakeningRules.MAX_THRESHOLDS]; one without
 ## skill_timers (older format) starts with every skill ready, and a timer entry that is
 ## not {"cooldown_left", "active_left"} of finite numbers >= 0 is dropped.
 static func from_dict(data: Dictionary) -> GameState:
@@ -94,6 +103,12 @@ static func from_dict(data: Dictionary) -> GameState:
 			var lvl: Variant = levels[id]
 			if id is String and (lvl is float or lvl is int):
 				state.companion_levels[id] = maxi(int(lvl), 0)
+	var awakenings: Variant = data.get("companion_awakenings", {})
+	if awakenings is Dictionary:
+		for id: Variant in awakenings:
+			var count: Variant = awakenings[id]
+			if id is String and (count is float or count is int) and is_finite(float(count)):
+				state.companion_awakenings[id] = clampi(int(minf(float(count), float(AwakeningRules.MAX_THRESHOLDS))), 0, AwakeningRules.MAX_THRESHOLDS)
 	var timers: Variant = data.get("skill_timers", {})
 	if timers is Dictionary:
 		for id: Variant in timers:

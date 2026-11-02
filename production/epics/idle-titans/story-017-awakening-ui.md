@@ -1,12 +1,12 @@
 # Story 017: Interface de l'éveil et grands nombres
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: In Progress
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-02
+> **Last Updated**: 2026-11-03
 
 ## Context
 
@@ -26,6 +26,7 @@
 
 ## Acceptance Criteria
 
+- [ ] Le vrai `companions_roster.json` reçoit le bloc `awakening` de `design/economy-rework.md` en même temps que le bouton : sans bouton, le joueur resterait bloqué au niveau 200 (choix fait à la story 016). `real_data_test.gd` le fige.
 - [ ] Au seuil, le bouton affiche « Éveiller » et son coût, sur le meilleur achat, avec le gain d'escouade.
 - [ ] x10 s'arrête au seuil et affiche le vrai nombre ; Max s'arrête au seuil ; Palier vise le prochain palier ou seuil.
 - [ ] Après le niveau 200, plus de « Dernier palier » trompeur tant qu'un éveil reste à venir.
@@ -46,7 +47,10 @@
 
 ## Files
 
-- À remplir à la fin.
+- `assets/data/companions_roster.json` (bloc `awakening`), `assets/data/data_schema.md`
+- `src/ui/buy_quote.gd`, `src/ui/companion_panel.gd`, `src/ui/main_screen.gd`, `src/ui/tier_line.gd`, `src/ui/awakening_text.gd`, `src/ui/message_slot.gd` (trois créés)
+- `src/core/awakening_rules.gd`, `src/core/companion_manager.gd`, `src/core/display_settings.gd`
+- `tests/unit/ui/buy_quote_awakening_test.gd`, `tests/unit/ui/companion_panel_awakening_test.gd`, `tests/unit/ui/message_slot_test.gd` (créés), `tests/integration/balance/real_data_test.gd`
 
 ## QA Test Cases
 
@@ -59,7 +63,7 @@
 **Story Type**: UI
 **Required evidence**: captures dans `production/qa/evidence/story-017-awakening-ui/`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created: 93 captures dans `production/qa/evidence/story-017-awakening-ui/` (stamp à jour), tests dans `tests/unit/ui/`
 
 ---
 

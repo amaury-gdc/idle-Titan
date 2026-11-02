@@ -24,6 +24,9 @@ extends PanelContainer
 signal buy_requested(id: String, count: int)
 ## The player chose [param mode] (a [enum BuyQuote.Mode]) in the selector.
 signal mode_changed(mode: int)
+## The player pressed the "Éveiller" button of companion [param id], shown only at an awakening
+## threshold (story 017): awaken it.
+signal awaken_requested(id: String)
 
 ## Width of the list from which the rows use the bigger sizes (display setting).
 const WIDE_WIDTH: float = 470.0
@@ -48,10 +51,25 @@ const COLOR_DAMAGE: Color = Color(1, 0.62, 0.45)
 const PANEL_SIDE_MARGINS: float = 8.0
 const NO_BREAK_SPACE: String = " "
 ## Longest cost and longest count a compact button must hold on one line (spec, Localization), and
-## a little room so that rounding never wraps it (display settings).
-const LONGEST_COST: String = "999,9 Qa"
-const LONGEST_COUNT: int = 199
+## a little room so that rounding never wraps it (display settings). The cost is the widest text
+## [method BigNumber.format] gives up to stage 300 and the awakening costs of level 1000 (about
+## 1e46): a scientific notation with two exponent digits, measured wider than every suffix from K to
+## Dc (story 017, companion_panel_awakening_test.gd). The count is the most levels one press buys
+## before the last awakening: x200, a first Max from level 0 to the first threshold. Past the last
+## awakening a Max can count 4 digits ("x1000"): that text alone breaks before its cost, on the two
+## lines the 50 u button holds, so that the name of a companion at level 1000 keeps its line.
+const LONGEST_COST: String = "999,9e99"
+const LONGEST_COUNT: int = 200
 const BUTTON_TEXT_ROOM: float = 2.0
+## Rank badge of an awakened companion ("Éveil II"), at the end of its progress line: a frame drawn
+## around the text, so that the rank reads by its shape and its words, never by a colour alone. No
+## vertical margin: a line of 16 u is already 23 u high with room above and below the letters, so
+## the frame sits in it without making the row taller (display settings).
+const RANK_BORDER: int = 1
+const RANK_MARGIN_X: float = 4.0
+const RANK_MARGIN_Y: float = 0.0
+const RANK_CORNER: int = 4
+const COLOR_RANK: Color = Color(1, 0.84, 0.25)
 
 var _companions: CompanionManager
 var _gold: Callable
@@ -119,19 +137,32 @@ func refresh() -> void:
 	for row: Dictionary in _rows:
 		var id: String = row["id"]
 		var level: int = _companions.level(id)
-		var quote: BuyQuote = BuyQuote.of(_companions, id, _mode, gold)
+		# Read once per row and passed down: a cost of an awakening is a power on big numbers.
+		var next: Dictionary = _companions.next_awakening(id)
+		var quote: BuyQuote = BuyQuote.of(_companions, id, _mode, gold, next)
 		var title: Label = row["title"]
 		var damage: Label = row["damage"]
 		var button: Button = row["button"]
-		var tier: Dictionary = _companions.next_tier(id)
+		var line: TierLine = TierLine.of(_companions, id, next)
 		var tier_label: Label = row["tier"]
 		var bar: ProgressBar = row["bar"]
+		var rank_label: Label = row["rank"]
+		var rank: int = _companions.awakenings(id)
 		title.text = tr("%s Niv. %d") % [_companions.display_name(id), level]
-		damage.text = tr("DPS : %s") % _companions.damage_per_second(id).format()
-		tier_label.text = _tier_text(tier)
-		bar.value = tier_progress(level, tier)
+		# Most redraws follow the gold alone: the damage text is only rebuilt when the damage moved.
+		var dps: BigNumber = _companions.damage_per_second(id)
+		var drawn: BigNumber = row["dps"]
+		if drawn == null or drawn.compare(dps) != 0:
+			row["dps"] = dps
+			damage.text = tr("DPS : %s") % dps.format()
+		tier_label.text = tier_text(line)
+		bar.value = line.progress
+		rank_label.visible = rank > 0
+		if rank > 0:
+			rank_label.text = rank_text(rank)
 		row["count"] = quote.count
-		button.text = _button_text(level, quote)
+		row["awaken"] = quote.awakening
+		button.text = _awakening_button_text(id, quote) if quote.awakening else _button_text(level, quote)
 		button.disabled = not quote.affordable
 
 
@@ -140,21 +171,46 @@ static func keep_together(text: String) -> String:
 	return text.replace(" ", NO_BREAK_SPACE)
 
 
-## Filling of the tier bar, 0 to 1, for a companion at [param level] and [param tier] as given by
-## [method CompanionManager.next_tier]: from the previous tier to the next, full past the last
-## tier, empty when the companion has none.
+## Filling of the tier bar: see [method TierLine.tier_progress].
 static func tier_progress(level: int, tier: Dictionary) -> float:
-	var next_level: int = tier["level"]
-	var previous: int = tier["previous"]
-	if next_level == 0:
-		return 1.0 if previous > 0 else 0.0
-	return float(level - previous) / float(next_level - previous)
+	return TierLine.tier_progress(level, tier)
 
 
-func _tier_text(tier: Dictionary) -> String:
-	if tier["level"] == 0:
-		return tr("Tous les paliers atteints")
-	return keep_together(tr("Palier niv. %d : ×%s") % [tier["level"], tier["multiplier"]])
+## The words of the progress line [param line], one per state of [enum TierLine.Kind]: the state
+## is always in the text, the bar only repeats it.
+func tier_text(line: TierLine) -> String:
+	match line.kind:
+		TierLine.Kind.TIER:
+			return keep_together(tr("Palier niv. %d : ×%s") % [line.level, line.multiplier])
+		TierLine.Kind.AWAKENING_AHEAD:
+			return keep_together(tr("Éveil niv. %d : ×%s") % [line.level, line.multiplier])
+		TierLine.Kind.AWAKENING_READY:
+			return tr("Éveil disponible")
+		TierLine.Kind.ALL_AWAKENED:
+			return tr("Tous les éveils faits")
+	return tr("Tous les paliers atteints")
+
+
+## The rank badge of [param rank] awakenings: "Éveil II", on one line.
+func rank_text(rank: int) -> String:
+	return keep_together(tr("Éveil %s") % AwakeningText.roman(rank))
+
+
+# "Éveiller : cost" and, on a second line, what the awakening multiplies: the whole squad when this
+# threshold counts for it, the companion alone otherwise.
+func _awakening_button_text(id: String, quote: BuyQuote) -> String:
+	var squad: bool = _companions.next_awakening_counts_for_squad(id)
+	return "%s\n%s" % [_awakening_cost_line(quote.cost.format()), _awakening_gain_line(squad)]
+
+
+func _awakening_cost_line(cost: String) -> String:
+	return (tr("Éveiller : %s") % keep_together(cost)).replace(" :", NO_BREAK_SPACE + ":")
+
+
+func _awakening_gain_line(squad: bool) -> String:
+	if squad:
+		return keep_together(tr("Escouade ×%s") % _companions.awakening_squad_text())
+	return keep_together(tr("Ce compagnon ×%s") % _companions.awakening_self_text())
 
 
 func _button_text(level: int, quote: BuyQuote) -> String:
@@ -211,16 +267,42 @@ func _add_row(id: String) -> void:
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tier_line.add_child(tier)
 	tier_line.add_child(bar)
+	var rank: Label = _new_rank_badge()
+	tier_line.add_child(rank)
 	row.add_child(top)
 	row.add_child(tier_line)
 	_rows_box.add_child(row)
-	var entry: Dictionary = {"id": id, "title": title, "damage": damage, "tier": tier, "bar": bar, "button": button, "count": 0}
+	var entry: Dictionary = {"id": id, "title": title, "damage": damage, "tier": tier, "bar": bar, "rank": rank, "button": button, "count": 0, "awaken": false, "dps": null}
 	button.pressed.connect(_on_buy_pressed.bind(entry))
 	_rows.append(entry)
 	_size_row(entry)
 
 
+# The framed "Éveil II" at the end of the progress line, hidden until the first awakening.
+func _new_rank_badge() -> Label:
+	var badge: Label = Label.new()
+	badge.theme_type_variation = &"PaneText"
+	badge.add_theme_color_override("font_color", COLOR_RANK)
+	var frame: StyleBoxFlat = StyleBoxFlat.new()
+	frame.draw_center = false
+	frame.set_border_width_all(RANK_BORDER)
+	frame.border_color = COLOR_RANK
+	frame.set_corner_radius_all(RANK_CORNER)
+	frame.content_margin_left = RANK_MARGIN_X
+	frame.content_margin_right = RANK_MARGIN_X
+	frame.content_margin_top = RANK_MARGIN_Y
+	frame.content_margin_bottom = RANK_MARGIN_Y
+	badge.add_theme_stylebox_override("normal", frame)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.visible = false
+	return badge
+
+
 func _on_buy_pressed(row: Dictionary) -> void:
+	if row["awaken"]:
+		awaken_requested.emit(row["id"])
+		return
 	var count: int = row["count"]
 	if count > 0:
 		buy_requested.emit(row["id"], count)
@@ -257,14 +339,22 @@ func _size_row(row: Dictionary) -> void:
 	button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, ROW_MIN_HEIGHT - TIER_LINE_HEIGHT)
 
 
-# Wide enough for the longest cost on one line, measured: the name wraps, the cost must not.
+# Wide enough for the longest cost on one line, measured: the name wraps, the cost must not. Each
+# line of the awakening button holds on its own line too.
 func _compact_button_width(button: Button) -> float:
 	var verb: String = tr("Améliorer")
 	var text: String = "%s x%d : %s" % [verb, LONGEST_COUNT, keep_together(LONGEST_COST)]
 	var font: Font = button.get_theme_font("font")
 	var box: StyleBox = button.get_theme_stylebox("normal")
 	var margins: float = box.get_margin(SIDE_LEFT) + box.get_margin(SIDE_RIGHT)
-	var measured: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE_COMPACT).x
+	var lines: PackedStringArray = PackedStringArray([text, _awakening_cost_line(LONGEST_COST)])
+	# The gain lines name factors of the data: known once setup gave the companions.
+	if _companions != null:
+		lines.append(_awakening_gain_line(true))
+		lines.append(_awakening_gain_line(false))
+	var measured: float = 0.0
+	for line: String in lines:
+		measured = maxf(measured, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE_COMPACT).x)
 	return maxf(BUTTON_WIDTH_COMPACT, ceilf(measured + margins) + BUTTON_TEXT_ROOM)
 
 

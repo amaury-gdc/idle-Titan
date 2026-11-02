@@ -1,0 +1,10 @@
+Reviewed-Content-Hash: assets/data/companions_roster.json ae989af9a11a55b53302cb20b338a460282b96f1
+Reviewed-Content-Hash: src/ui/buy_quote.gd ad7ef31da025d9e6c1a61dfc1d15644c48766138
+Reviewed-Content-Hash: src/ui/companion_panel.gd a268dd5c10b477f951443ba0b0c43ec471fcfacf
+Reviewed-Content-Hash: src/ui/main_screen.gd 28a4c639e646beac3c3b1743a6d35941d93b6777
+Reviewed-Content-Hash: src/ui/tier_line.gd 5c60629811289be3220ac399bb7c8b00a2da40c8
+Reviewed-Content-Hash: src/ui/awakening_text.gd 51fcaba440e92dae67e3401654f1595f10f2d9d9
+Reviewed-Content-Hash: src/ui/message_slot.gd e661de45e70b7e7210f6630fe1a70518d7688f45
+Reviewed-Content-Hash: src/core/awakening_rules.gd 4489a8f7b7b4f83c4ead97ea9001d6eac115c362
+Reviewed-Content-Hash: src/core/companion_manager.gd 9084fa7a77e8e33294ac3ccb9e3bcbd636aaca48
+Reviewed-Content-Hash: src/core/display_settings.gd 82a849e20e905594bc4b7b733585b20581f52a3d

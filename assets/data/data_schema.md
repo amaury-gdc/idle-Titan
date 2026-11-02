@@ -33,12 +33,22 @@ same for `boss_curves.json`.
 | `companions[].tiers` | array of object | yes | Level tiers, may be empty. |
 | `companions[].tiers[].level` | integer >= 2, strictly increasing | yes | Level at which the tier applies. |
 | `companions[].tiers[].damage_multiplier` | decimal string (unitless factor > 0) | yes | Multiplies the companion's damage from that level on; tiers stack by product. |
+| `awakening` | object | no | Companion awakening (story 016, `design/economy-rework.md` "Éveil"), read by `AwakeningRules` with schema 2, no version bump. Absent: no threshold, levels are free. The real file has the block since story 017, which brings the "Éveiller" button (without it the player would stay blocked at the first threshold); `real_data_test.gd` pins it. Present: every key below is required, and an invalid block makes `Combat` refuse the roster. |
+| `awakening.thresholds` | array of integers from 1 to 100000, strictly increasing, at most 100 (levels) | yes | Levels at which every companion stops: it can buy no level past the next threshold it has not awakened until the player pays the awakening, in order. Design value: `[200, 300, ..., 1000]`. Past the last one, levels are free again. |
+| `awakening.self_multiplier` | decimal string (unitless factor > 0) | yes | Multiplies the damage of the awakened companion, once per awakening. Design value: `"3.4"`. |
+| `awakening.squad_multiplier` | decimal string (unitless factor > 0) | yes | Multiplies the damage of EVERY companion, once per counted awakening of any companion. Design value: `"2.10"`. |
+| `awakening.squad_until_threshold` | integer >= 0 (level) | yes | Only awakenings at a threshold <= this level count for the squad multiplier. Design value: `600` (thresholds 200 to 600). |
+| `awakening.cost_level_multiplier` | decimal string (unitless factor > 0) | yes | Awakening cost = `floor(this * cost_of_level(threshold))` in gold. Design value: `"10"`. |
 
 Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 
 - Cost of level L: `floor(base_cost * cost_growth^(L-1))`.
 - Damage per attack at level L: `floor(base_damage * L * product of damage_multiplier
   of every tier with tier.level <= L)`. One floor, after the whole product.
+- With an `awakening` block, damage per attack at level L, with `a` awakenings of the companion
+  and `A` counted awakenings of the squad (sum over companions of their awakenings at thresholds
+  <= `squad_until_threshold`): `floor(base_damage * L * tiers * self_multiplier^a *
+  squad_multiplier^A)`, still one floor. Saved in `GameState.companion_awakenings` (id -> count).
 - Damage per second at level L: `floor(damage per attack / attack_interval_seconds)`.
 - Companion power (click formula input): sum of the damage PER SECOND of the bought
   companions. Per second rather than per attack because companions attack at

@@ -4,7 +4,8 @@ extends RefCounted
 ## the game saves: it is NOT part of [GameState], [PermanentState] or the text of "Copier ma
 ## sauvegarde", and "Réinitialiser ma sauvegarde" does not touch it. It holds "Effets visuels"
 ## (floating numbers, companion spheres and balls, monster squash), on by default, and the x1 /
-## x10 / Max / Palier choice of the companion list (stories 010, 013), x1 by default.
+## x10 / Max / Palier choice of the companion list (stories 010, 013), x1 by default, and whether
+## the sentence of the first awakening was already shown (story 017), not by default.
 ## An absent, unreadable or malformed file means the default. The path can be injected for tests.
 ## Single-thread only.
 ##
@@ -26,6 +27,7 @@ const DEFAULT_PATH: String = "user://settings.cfg"
 const SECTION: String = "display"
 const KEY_VISUAL_EFFECTS: String = "visual_effects"
 const KEY_BUY_MODE: String = "buy_mode"
+const KEY_AWAKENING_INTRO_SEEN: String = "awakening_intro_seen"
 ## Stored values of the buy mode go from 0 to this, excluded: a [enum BuyQuote.Mode], kept as a
 ## number here so that this file depends on nothing in the interface.
 const BUY_MODE_COUNT: int = 4
@@ -65,6 +67,26 @@ func buy_mode() -> int:
 ## written; the new value still counts until the game closes.
 func set_buy_mode(mode: int) -> bool:
 	_config.set_value(SECTION, KEY_BUY_MODE, mode)
+	return _config.save(_path) == OK
+
+
+## True once the sentence of the first awakening has been shown (story 017): it is shown once per
+## player, so this flag outlives a reload and a reset of the save. A malformed value counts as not
+## seen.
+## [codeblock]
+## if not settings.awakening_intro_seen():
+##     settings.mark_awakening_intro_seen()
+##     show_sentence()
+## [/codeblock]
+func awakening_intro_seen() -> bool:
+	var value: Variant = _config.get_value(SECTION, KEY_AWAKENING_INTRO_SEEN, false)
+	return value is bool and value
+
+
+## Keeps that the sentence of the first awakening was shown and writes the file at once. Returns
+## false when the file could not be written; the flag still counts until the game closes.
+func mark_awakening_intro_seen() -> bool:
+	_config.set_value(SECTION, KEY_AWAKENING_INTRO_SEEN, true)
 	return _config.save(_path) == OK
 
 

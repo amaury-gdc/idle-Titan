@@ -79,9 +79,11 @@ func counted_seconds(last_saved_unix: int, now_unix: int) -> int:
 
 
 ## Gold for [param seconds] of absence at [param stage] with [param companion_levels]
-## ([member GameState.companion_levels]). Zero when no companion is bought.
-func gold_for(seconds: int, stage: int, companion_levels: Dictionary) -> BigNumber:
-	var power: BigNumber = _combat.companion_power(companion_levels)
+## ([member GameState.companion_levels]) and [param awakenings]
+## ([member GameState.companion_awakenings], required: pass {} for none; the power of an awakened
+## squad is what earns offline, story 016). Zero when no companion is bought.
+func gold_for(seconds: int, stage: int, companion_levels: Dictionary, awakenings: Dictionary) -> BigNumber:
+	var power: BigNumber = _combat.companion_power(companion_levels, awakenings)
 	var gross: BigNumber = power.multiply(BigNumber.from_int(seconds)).multiply(_combat.gold_per_kill(stage))
 	return gross.multiply_decimal(_efficiency).multiply_decimal(_talent_factor).divide(_combat.enemy_max_hp(stage))
 
@@ -98,7 +100,7 @@ func grant(state: GameState, now_unix: int) -> Dictionary:
 	state.last_saved_unix = now_unix
 	if seconds <= 0:
 		return {}
-	var gold: BigNumber = gold_for(seconds, state.stage, state.companion_levels)
+	var gold: BigNumber = gold_for(seconds, state.stage, state.companion_levels, state.companion_awakenings)
 	if gold.is_zero():
 		return {}
 	state.gold = state.gold.add(gold)

@@ -9,13 +9,16 @@ extends RefCounted
 ## Formulas (level L >= 1, BigNumber-exact; level 0 means "not bought"):
 ## [codeblock]
 ## cost_of_level(L)          = floor(base_cost * cost_growth^(L - 1))
-## damage_at_level(L)        = floor(base_damage * L * product of damage_multiplier
-##                                   of every tier with tier.level <= L)
-## damage_per_second_at_level(L) = floor(damage_at_level(L) / attack_interval_seconds)
+## damage_at_level(L, a, A)  = floor(base_damage * L * product of damage_multiplier
+##                                   of every tier with tier.level <= L
+##                                   * self_multiplier^a * squad_multiplier^A)
+## damage_per_second_at_level(L, a, A) = floor(damage_at_level(L, a, A) / attack_interval_seconds)
 ## [/codeblock]
-## The tier product is applied before a single floor, so decimal multipliers such
-## as "1.5" do not drift. Costs and damages of the last queried level are memoized
-## (pure functions of the level), so repeated reads each frame allocate nothing.
+## a is this companion's awakenings and A the counted awakenings of the squad (story 016, see
+## [AwakeningRules]). The tier and awakening product is applied before a single floor, so decimal
+## multipliers such as "1.5" or "3.4" do not drift. Costs and damages of the last queried level
+## are memoized (pure functions of the level, and of a and A for damages), so repeated reads
+## each frame allocate nothing.
 ##
 ## Each level's cost is floored on its own, so the sum of N levels has no closed
 ## form: a geometric sum would differ. Sums therefore walk the unfloored numerator
@@ -30,7 +33,7 @@ extends RefCounted
 ## var companion: Companion = Companion.from_entry(entry, "1.1")
 ## if companion.is_valid():
 ##     var cost: BigNumber = companion.cost_of_level(3)
-##     var damage: BigNumber = companion.damage_at_level(10)   # includes the level-10 tier
+##     var damage: BigNumber = companion.damage_at_level(10, 0, 0)   # level-10 tier, no awakening
 ## else:
 ##     push_error(companion.get_error())
 ## [/codeblock]
@@ -73,9 +76,16 @@ var _numerator: BigNumber = null
 var _sum_memo_level: int = -1
 var _sum_memo_count: int = -1
 var _sum_memo: BigNumber = null
+## Awakening rules bound by [Combat] (story 016); a disabled instance until then.
+var _awakening: AwakeningRules = AwakeningRules.new()
+## The last damage and dps, keyed by (level, own awakenings, squad awakenings).
 var _damage_memo_level: int = -1
+var _damage_memo_own: int = 0
+var _damage_memo_squad: int = 0
 var _damage_memo: BigNumber = null
 var _dps_memo_level: int = -1
+var _dps_memo_own: int = 0
+var _dps_memo_squad: int = 0
 var _dps_memo: BigNumber = null
 
 
@@ -189,25 +199,52 @@ func next_tier_from(level: int) -> Dictionary:
 	return {"level": 0, "multiplier": "", "previous": previous}
 
 
-## Damage of one attack at [param level], tiers included. 0 for level <= 0.
-## Example: base_damage "2", tier {level 10, x "2"}: level 9 deals 18, level 10 deals 40.
-func damage_at_level(level: int) -> BigNumber:
+## Binds the awakening rules of the roster (story 016), called by [Combat] when it reads the
+## roster. Without it, awakenings have no effect. Clears the damage memos.
+func bind_awakening(rules: AwakeningRules) -> void:
+	_awakening = rules
+	_damage_memo_level = -1
+	_dps_memo_level = -1
+
+
+## Damage of one attack at [param level], tiers included, times the awakenings. 0 for level <= 0.
+## [param own_awakenings] is this companion's awakenings and [param squad_awakenings] the counted
+## awakenings of the whole squad ([method Combat.squad_awakenings]); both required, 0 meaning none,
+## so a caller that forgets them does not compile. One floor over the whole product.
+## Example: base_damage "2", tier {level 10, x "2"}: level 9 deals 18, level 10 deals 40 with (0, 0).
+## With "3.4" per awakening of its own and "2.10" for the squad, level 10 deals 40 * 3.4 = 136 with
+## (1, 0) and floor(40 * 3.4 * 2.10) = 285 with (1, 1).
+func damage_at_level(level: int, own_awakenings: int, squad_awakenings: int) -> BigNumber:
 	if level <= 0:
 		return BigNumber.new()
-	if _damage_memo_level != level:
-		_damage_memo = _compute_damage(level)
+	var own: int = maxi(own_awakenings, 0)
+	var squad: int = maxi(squad_awakenings, 0)
+	# The memo is keyed by the level AND the awakenings: an awakening at the same level changes
+	# the damage and must never read a stale value.
+	if _damage_memo_level != level or _damage_memo_own != own or _damage_memo_squad != squad:
+		_damage_memo = _compute_damage(level, own, squad)
 		_damage_memo_level = level
+		_damage_memo_own = own
+		_damage_memo_squad = squad
 	return _damage_memo
 
 
 ## Damage per second at [param level]: damage_at_level / attack_interval_seconds,
 ## floored (a 1-damage companion attacking every 2 s counts 0). This is what feeds
 ## [method Combat.companion_power], so a fast weak companion and a slow strong one
-## with the same real output weigh the same in the click formula.
-func damage_per_second_at_level(level: int) -> BigNumber:
-	if _dps_memo_level != level:
-		_dps_memo = damage_at_level(level).multiply(BigNumber.from_int(1000)).divide(BigNumber.from_int(_interval_ms))
+## with the same real output weigh the same in the click formula. The awakening arguments are
+## those of [method damage_at_level] and are required too. 0 for level <= 0.
+func damage_per_second_at_level(level: int, own_awakenings: int, squad_awakenings: int) -> BigNumber:
+	# Before the memo: its empty key (level -1) would otherwise answer a negative level with null.
+	if level <= 0:
+		return BigNumber.new()
+	var own: int = maxi(own_awakenings, 0)
+	var squad: int = maxi(squad_awakenings, 0)
+	if _dps_memo_level != level or _dps_memo_own != own or _dps_memo_squad != squad:
+		_dps_memo = damage_at_level(level, own, squad).multiply(BigNumber.from_int(1000)).divide(BigNumber.from_int(_interval_ms))
 		_dps_memo_level = level
+		_dps_memo_own = own
+		_dps_memo_squad = squad
 	return _dps_memo
 
 
@@ -224,7 +261,7 @@ func _numerator_at(level: int) -> BigNumber:
 	return _numerator
 
 
-func _compute_damage(level: int) -> BigNumber:
+func _compute_damage(level: int, own_awakenings: int, squad_awakenings: int) -> BigNumber:
 	var scaled: BigNumber = _base_damage.multiply(BigNumber.from_int(level))
 	var scale_sum: int = 0
 	for i in _tier_levels.size():
@@ -232,6 +269,10 @@ func _compute_damage(level: int) -> BigNumber:
 			break
 		scaled = scaled.multiply(_tier_numerators[i])
 		scale_sum += _tier_scales[i]
+	if own_awakenings > 0 or squad_awakenings > 0:
+		var awakening: Array = _awakening.multiplier_fraction(own_awakenings, squad_awakenings)
+		scaled = scaled.multiply(awakening[0])
+		scale_sum += awakening[1]
 	if scale_sum == 0:
 		return scaled
 	return scaled.divide(BigNumber.from_int(10).power(scale_sum))

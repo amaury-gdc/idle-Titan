@@ -42,7 +42,7 @@ func _combat(entries: Array, power_factor: String = "") -> Combat:
 
 
 func _click(combat: Combat, levels: Dictionary) -> String:
-	return combat.click_damage(levels).to_decimal_string()
+	return combat.click_damage(levels, {}).to_decimal_string()
 
 
 # --- Shares: one floor ---
@@ -280,7 +280,7 @@ func test_click_on_a_combat_with_an_invalid_roster_returns_the_base() -> void:
 	assert_bool(combat.is_valid()).is_false()
 
 	# Act: the main screen may still query the click before it shows the error
-	var click: BigNumber = combat.click_damage({"a": 1})
+	var click: BigNumber = combat.click_damage({"a": 1}, {})
 
 	# Assert
 	assert_object(click).is_not_null()

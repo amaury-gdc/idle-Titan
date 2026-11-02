@@ -82,8 +82,9 @@ const LOOT_VERTICAL_MARGINS: float = 9.0
 const SHAPE_META: StringName = &"adaptive_shape"
 ## Height of the return message when the window allows it; its content scrolls otherwise.
 const OFFLINE_PANEL_HEIGHT: float = 300.0
-## Longest value a header cell must hold without moving its neighbours (spec, Localization).
-const HEADER_LONGEST_VALUE: String = "999,9 Qa"
+## Longest value a header cell must hold without moving its neighbours (spec, Localization): the
+## widest text of [method BigNumber.format] up to stage 300, the same as the companion buttons.
+const HEADER_LONGEST_VALUE: String = CompanionPanel.LONGEST_COST
 const HEADER_LONGEST_STAGE: int = 999
 ## Space between a caption and its value in a one-line header cell (display setting).
 const HEADER_CELL_GAP: int = 6
@@ -127,6 +128,8 @@ var _shape: AdaptiveLayout.Shape = AdaptiveLayout.Shape.UNDECIDED
 # Changing the content scale makes the window report a new size: see _sync_window.
 var _syncing_window: bool = false
 var _dots: NotificationDots = NotificationDots.new()
+# The place of the loot message, shared with the sentence of the first awakening (story 017).
+var _message_slot: MessageSlot = MessageSlot.new()
 # Reference to the gold value last drawn: every change of gold is a new BigNumber.
 var _gold_drawn: BigNumber
 var _talent_points_seen: int = -1
@@ -239,6 +242,8 @@ func _ready() -> void:
 	_companions.companions_bought.connect(_on_companion_leveled_up)
 	_setup_visual_effects(roster)
 	_companion_panel.buy_requested.connect(_on_companion_buy_requested)
+	_companion_panel.awaken_requested.connect(_on_companion_awaken_requested)
+	_companions.awakened.connect(_on_companion_awakened)
 	_companion_panel.mode_changed.connect(_on_buy_mode_changed)
 	_companion_panel.set_mode(_display.buy_mode())
 	_companion_panel.setup(_companions, func() -> BigNumber: return _game.gold)
@@ -460,8 +465,14 @@ func _start_message_timers() -> void:
 	_loot_timer = Timer.new()
 	_loot_timer.wait_time = LOOT_MESSAGE_SECONDS
 	_loot_timer.one_shot = true
-	_loot_timer.timeout.connect(_loot_toast.hide)
+	_loot_timer.timeout.connect(_on_message_timeout)
 	add_child(_loot_timer)
+
+
+# The message ends; a loot that waited behind the sentence of the first awakening shows now.
+func _on_message_timeout() -> void:
+	_loot_toast.hide()
+	_message_slot.release()
 
 
 func _start_autosave(curves: Variant) -> void:
@@ -679,6 +690,14 @@ func _on_inventory_changed() -> void:
 
 
 func _on_loot_received(item: Item, sold: Array[Item], gold_gained: BigNumber) -> void:
+	if not sold.has(item):
+		_dots.note_item_kept()
+		_show_dots()
+	# The sentence of the first awakening is shown once in a game's life: a loot waits behind it.
+	_message_slot.offer(_show_loot.bind(item, sold, gold_gained))
+
+
+func _show_loot(item: Item, sold: Array[Item], gold_gained: BigNumber) -> void:
 	_loot_lines = _loot_text(item, sold, gold_gained)
 	_loot_short_sale = ""
 	if not sold.is_empty() and not sold.has(item):
@@ -688,9 +707,6 @@ func _on_loot_received(item: Item, sold: Array[Item], gold_gained: BigNumber) ->
 	_loot_toast.visible = true
 	_place_loot_toast()
 	_loot_timer.start()
-	if not sold.has(item):
-		_dots.note_item_kept()
-		_show_dots()
 
 
 func _loot_text(item: Item, sold: Array[Item], gold_gained: BigNumber) -> PackedStringArray:
@@ -875,6 +891,33 @@ func _refresh_auto_toggle() -> void:
 
 func _on_companion_buy_requested(id: String, count: int) -> void:
 	_companions.buy_levels(id, count)
+
+
+func _on_companion_awaken_requested(id: String) -> void:
+	_companions.awaken(id)
+
+
+# The awakening multiplies the damage at once: everything showing a damage or a cost is redrawn. The
+# player's very first awakening says what it did, once, in the loot message (story 017).
+func _on_companion_awakened(id: String) -> void:
+	_refresh()
+	_companion_panel.refresh()
+	_refresh_dps()
+	_observe_companions()
+	if AwakeningText.take_intro(_display):
+		# Pinned for its whole duration: a loot arriving meanwhile waits (see MessageSlot).
+		_message_slot.pin()
+		_show_message(AwakeningText.intro_sentence(_companions.display_name(id)))
+
+
+# One sentence in the loot message, in its neutral colour, placed and timed like a loot.
+func _show_message(text: String) -> void:
+	_loot_lines = PackedStringArray([text])
+	_loot_short_sale = ""
+	_loot_message.remove_theme_color_override("font_color")
+	_loot_toast.visible = true
+	_place_loot_toast()
+	_loot_timer.start()
 
 
 func _on_buy_mode_changed(mode: int) -> void:
