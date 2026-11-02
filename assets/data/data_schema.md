@@ -184,7 +184,9 @@ Effects (exact BigNumber, applied by `FloorManager`):
 
 Cooldown modifier: `SkillManager.set_cooldown_modifier(factor)` scales every cooldown
 started afterwards, for the talents of story 006. Default 1.0, never below the duration.
-Not saved. No talent uses it for now (story 006).
+Not saved. No talent uses it for now (story 006). Story 018 talents act per skill instead, through
+`skill_unlock` and `skill_mod` (see talents.json schema 2): `SkillManager.effective_amount`,
+`effective_duration` and `effective_cooldown` give the values in use.
 
 Time: timers count game time fed to `SkillManager.tick`, cut to 5 s per call
 (`MAX_TICK_SECONDS`, same bound as the companions and the boss countdown), so skills stop
@@ -213,8 +215,8 @@ game on the main screen error, like the files above.
 
 | Key | Type | Required | Meaning |
 |---|---|---|---|
-| `schema_version` | int | yes | Currently 1. `TalentTree` refuses any other value. |
-| `stages_per_point` | integer >= 1 | yes | One talent point every this many stages reached. Value in file: 5 (brief). |
+| `schema_version` | int | yes | 1 (the flat format below, the real file until story 019) or 2 (the tiered format, see "Schema 2" below). `TalentTree` refuses any other value; the version picks the reader. |
+| `stages_per_point` | integer >= 1 | schema 1 only | One talent point every this many stages reached. Value in file: 5 (brief). |
 | `branches` | array of object | yes | Branches in display order (3 in the MVP), one column each. |
 | `branches[].id` | string | yes | Unique stable id. |
 | `branches[].name` | string | yes | Display name (French). |
@@ -262,6 +264,64 @@ highest `GameState.max_stage_reached` ever seen, never lowered. The record is ne
 the available points would go negative. An older save has no record and starts from the
 `max_stage_reached` of the game save at the first query. The field `talent_points` is still
 read and written so older saves keep their value, but nothing uses it since version 4.
+
+### Schema 2 (story 018, `design/talent-tree-v2.md`)
+
+A schema 1 file reads as a schema 2 tree with one open-ended band, one tier open at 0, no
+exclusive group, `tree_version` 0 (no versioning: nothing is ever refunded) and one `stat` effect
+per node, so the real file keeps working unchanged. Schema 2 replaces `stages_per_point` and
+`nodes[].effect` by:
+
+| Key | Type | Required | Meaning |
+|---|---|---|---|
+| `tree_version` | integer >= 1 | yes | Raise it when the tree changes so much that old purchases make no sense: every point is handed back once (see "Version" below). |
+| `stage_point_bands` | array of object | yes | `{"up_to": stage, "stages_per_point": n}` in increasing `up_to`, the last band without `up_to`. Design values: `[{"up_to": 100, "stages_per_point": 5}, {"stages_per_point": 20}]`, 20 points at stage 100, 25 at 200. |
+| `tier_thresholds` | array of integer | yes | Points spent in a branch that open each tier, increasing, the first one 0. Design values: `[0, 2, 4, 8, 12]`. |
+| `reset_cooldown_seconds` | integer >= 0 (seconds) | no, default 3600 | Real-time wait between two resets. |
+| `nodes[].tier` | integer, 1 to the number of thresholds | yes | Tier of the node. |
+| `nodes[].exclusive_group` | non-empty string | no | At most one node of a group is bought (the summits). |
+| `nodes[].effects` | non-empty array of object | yes | Each `{"type": ..., keys}`; types and keys below. |
+
+Effects (every key required; "factor" is a decimal string > 0, "int" a whole number >= 1):
+
+| `type` | Keys | Applied in story 018 |
+|---|---|---|
+| `stat` | `stat` (as schema 1), `percent` (int) | yes, as schema 1 |
+| `skill_unlock` | `skill` (skills.json id) | yes: the skill is locked until a node unlocking it is bought |
+| `skill_mod` | `skill`, `field` (`amount`, `duration_seconds` or `cooldown_seconds`), `value` (factor for `amount`, number > 0 otherwise) | yes: replaces the skills.json value; last bought node in file order wins |
+| `skill_passive` | `skill`, `multiplier` (factor) | validated and carried only |
+| `rhythm` | `clicks` (int), `dps_seconds` (factor), `min_gap_seconds` (number >= 0) | validated and carried only |
+| `boss_timer` | `seconds` (number > 0) | validated and carried only |
+| `offline_cap_hours` | `hours` (number > 0) | validated and carried only |
+| `synergy` | `percent_per_companion`, `level`, `max_percent` (ints) | validated and carried only |
+| `champion` | `percent` (int) | validated and carried only |
+| `loot_shift` | `from`, `to` (strings), `weight` (int) | validated and carried only |
+
+Rules (`TalentTree`):
+
+- Earned = sum over the bands of floor(stages of the best stage inside the band / its `stages_per_point`).
+- A node of tier t can be bought when the points spent in its branch (current costs) reach
+  `tier_thresholds[t - 1]`. A tier that closes again after a retuned cost takes nothing away.
+- A node is refused when another node of its `exclusive_group` is bought. A save holding two of
+  them counts the first in file order; the other gives its points back.
+- Skills: a skill that some node unlocks is locked until such a node is bought; the lock is
+  derived from the bought nodes, never saved, and checked by `SkillManager` (through
+  `ModifierHub`), which refuses to activate it, ignores its saved timers and stops it when it
+  becomes locked. Restored and running timers are cut to the values with the `skill_mod`.
+- Reset (`TalentTree.try_reset`): refused during a boss fight, and for `reset_cooldown_seconds`
+  after the last reset unless the spent points exceed the earned ones. A last reset dated in the
+  future (clock set back) is pulled back to now, so the wait is never longer than one cooldown.
+- Version: when `tree_version` differs from `PermanentState.talent_tree_seen`,
+  `TalentTree.apply_tree_version` (called after the offline absence is paid) empties
+  `PermanentState.talents`, old ids included, and lifts the reset wait; the message stays due
+  and buying is refused until `acknowledge_version`, which records the version. A save that
+  never passed stage 1 and bought nothing is acknowledged silently.
+
+Saved fields, in the permanent save (version 6): `talent_tree_seen` (int, default 0: the
+`tree_version` the player acknowledged) and `talent_reset_unix` (int, Unix seconds of the last
+reset, default 0). A save of version 5 or older has neither: it reads 0 and 0, so the first
+versioned tree refunds it once, and its reset is free. Negative, non-numeric or absurd values
+read as 0.
 
 ## items.json
 

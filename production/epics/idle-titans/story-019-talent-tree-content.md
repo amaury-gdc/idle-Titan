@@ -33,6 +33,8 @@
 - [ ] Une compétence à débloquer garde son bouton, « À débloquer » ; le toucher ouvre sa fiche, la touche affiche une bulle.
 - [ ] L'écran montre paliers, sommets, fiche avant → après, tous les états sans couleur seule, et le message de version.
 - [ ] Sous-onglets en grille de 2 tuiles sur téléphone, trois colonnes quand elles tiennent, bandeau de détail dès 560 u.
+- [ ] L'écran refuse le reset pendant un combat de boss : il passe par `TalentTree.try_reset` (avec `FloorManager.is_boss_fight()`), plus par l'ancien `reset()` sans règle ; test qui échoue si l'écran rappelle l'ancien reset.
+- [ ] Le décompte d'1 h du reset affiche le temps restant réel dès l'ouverture de l'écran, même après une horloge reculée : jamais figé à 1 h en attendant un premier appui sur Reset ; test avec une date de dernier reset dans le futur.
 - [ ] Textes, 44 px, 14 px, chevauchements et débordements contrôlés dans l'export sur 18 tailles, avec les noms les plus longs.
 - [ ] Fluidité mesurée dans l'export, onglet ouvert, normale et processeur ×4.
 - [ ] Captures dans `production/qa/evidence/story-019-talent-tree-content/`, et tous les tests verts.

@@ -15,7 +15,7 @@ extends RefCounted
 ## [/codeblock]
 
 ## Save-format version written by this build.
-const CURRENT_VERSION: int = 5
+const CURRENT_VERSION: int = 6
 
 ## Unused since version 4, kept so that older saves keep their value: spent points are
 ## derived from [member talents] and their costs, earned points from
@@ -45,6 +45,14 @@ var inventory_items: Array[Item] = []
 ## The equipped items of the [Inventory], type id (String) -> [Item]; at most one per type.
 ## Not counted in the bag. Added in version 5.
 var equipped_items: Dictionary = {}
+## The talents.json [code]tree_version[/code] whose message the player acknowledged (story 018, see
+## [method TalentTree.apply_tree_version]). Added in version 6; older saves have 0, so the first
+## versioned tree hands their points back once.
+var talent_tree_seen: int = 0
+## Real time of the last talent reset, in Unix seconds, start of the reset wait (story 018, see
+## [method TalentTree.try_reset]). Added in version 6; 0 means none, and so does a negative,
+## non-numeric or absurd value.
+var talent_reset_unix: int = 0
 
 
 ## JSON-safe payload including the format version.
@@ -65,6 +73,8 @@ func to_dict() -> Dictionary:
 		"boss_hint_shown": boss_hint_shown,
 		"inventory": bag,
 		"equipped": worn,
+		"talent_tree_seen": talent_tree_seen,
+		"talent_reset_unix": talent_reset_unix,
 	}
 
 
@@ -93,6 +103,13 @@ static func from_dict(data: Dictionary) -> PermanentState:
 	var hint: Variant = data.get("boss_hint_shown", false)
 	if hint is bool:
 		state.boss_hint_shown = hint
+	# Talent tree version and reset (version 6).
+	var tree_seen: Variant = data.get("talent_tree_seen", 0)
+	if (tree_seen is float or tree_seen is int) and float(tree_seen) > 0.0 and float(tree_seen) <= GameState.MAX_SAVED_UNIX:
+		state.talent_tree_seen = int(tree_seen)
+	var reset_at: Variant = data.get("talent_reset_unix", 0)
+	if (reset_at is float or reset_at is int) and float(reset_at) > 0.0 and float(reset_at) <= GameState.MAX_SAVED_UNIX:
+		state.talent_reset_unix = int(reset_at)
 	# Items (version 5). A malformed item, a repeated uid or an equipped item filed under
 	# another type than its own is dropped, so a uid always names one item.
 	var seen: Dictionary = {}

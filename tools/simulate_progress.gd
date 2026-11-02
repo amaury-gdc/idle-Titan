@@ -28,6 +28,11 @@ extends SceneTree
 ## earned, greedily: the first buyable node in data order, checked once per simulated
 ## second (default 0, no talents). --build=<branch>,<branch> looks at the nodes of these
 ## branches first (ids of talents.json); --talentsdata=<path> replaces talents.json.
+## --order=<node>,<node>,... (story 018) replaces that greedy policy by a strict per-node order:
+## each node is bought as soon as it can be, the next one waits for it, a node excluded by its
+## group is skipped, and the nodes not listed are never bought (see [method SimMeasures.next_ordered_talent]).
+## The [ModifierHub] exists in every mode, with or without talents and items: the skills read
+## their locks and talent values from it, and a locked skill is never activated nor counted.
 ## --loot=1 (story 007) drops the real items of the bosses and critical hits, and wears a drop
 ## as soon as it beats the worn item of its type by the "worse item" rule (rarity, then sum of
 ## percentages, blind to the stat: an honest measure, not an optimistic one). Default 0, no
@@ -96,37 +101,38 @@ func _init() -> void:
 		printerr("simulate_progress: unknown buyer " + args["buyer"])
 		quit(1)
 		return
-	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"], args["milestones"], args["report"] > 0.0, args["buyer"], args["awaken"] > 0.0)
+	var ran: bool = _simulate(combat, boss, offline, args["cps"], args["dt"], args["hours"], args["auto"] > 0.0, _parse_away(args["away"]), int(args["skills"]), args["skillsdata"], args["talents"] > 0.0, args["talentsdata"], args["build"], args["loot"] > 0.0, int(args["seed"]), args["itemsdata"], args["milestones"], args["report"] > 0.0, args["buyer"], args["awaken"] > 0.0, args["order"])
 	quit(0 if ran else 1)
 
 
-func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String, milestone_text: String, report: bool, buyer: String, awaken: bool) -> bool:
+func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: float, dt: float, hours: float, auto: bool, absences: Array[Vector2], skill_mode: int, skills_path: String, use_talents: bool, talents_path: String, build: String, use_loot: bool, seed_value: int, items_path: String, milestone_text: String, report: bool, buyer: String, awaken: bool, order_text: String) -> bool:
 	var state: GameState = GameState.new()
 	var permanent: PermanentState = PermanentState.new()
 	permanent.auto_challenge = auto
 	var floors: FloorManager = FloorManager.new(state, combat, boss, permanent)
 	var companions: CompanionManager = CompanionManager.new(state, combat, floors)
-	var skills: SkillManager = null
-	if skill_mode > 0:
-		skills = SkillManager.from_data(DataLoader.load_json(skills_path), state, combat, floors)
-		if not skills.is_valid():
-			printerr("simulate_progress: " + skills.get_error())
-			return false
 	var talents: TalentTree = null
 	var talent_order: Array[String] = []
+	var strict_order: PackedStringArray = SimMeasures.parse_order(order_text)
+	if not strict_order.is_empty() and not use_talents:
+		printerr("simulate_progress: --order needs --talents=1")
+		return false
 	if use_talents:
-		talents = TalentTree.from_data(DataLoader.load_json(talents_path), permanent, state)
+		talents = SimMeasures.simulated_tree(DataLoader.load_json(talents_path), permanent, state)
 		if not talents.is_valid():
 			printerr("simulate_progress: " + talents.get_error())
 			return false
 		talent_order = _talent_order(talents, build)
+		for id: String in strict_order:
+			if talents.node(id) == null:
+				printerr("simulate_progress: unknown talent in --order: " + id)
+				return false
 	# Two generators: the many critical rolls must not shift the loot of a seed.
 	var loot_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	loot_rng.seed = seed_value
 	var crit_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	crit_rng.seed = seed_value + 1
 	var inventory: Inventory = null
-	var hub: ModifierHub = null
 	var drops: Array[int] = [0, 0]
 	if use_loot:
 		inventory = Inventory.from_data(DataLoader.load_json(items_path), permanent, state, combat, loot_rng.randf)
@@ -136,8 +142,16 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		floors.set_crit_roll(crit_rng.randf)
 		floors.boss_killed.connect(inventory.on_boss_killed)
 		inventory.loot_received.connect(func(item: Item, sold: Array[Item], _gold: BigNumber) -> void: _wear_if_better(inventory, item, sold, drops))
-		hub = ModifierHub.new(floors, offline, talents, inventory)
 		print("Loot: greedy on rarity then sum of percentages, blind to the stat; seed %d" % seed_value)
+	# Story 018: the hub in every mode, talents and items each optional, so the skills read their
+	# locks and values from it exactly like the game.
+	var hub: ModifierHub = ModifierHub.new(floors, offline, talents, inventory)
+	var skills: SkillManager = null
+	if skill_mode > 0:
+		skills = SkillManager.from_data(DataLoader.load_json(skills_path), state, combat, floors, hub)
+		if not skills.is_valid():
+			printerr("simulate_progress: " + skills.get_error())
+			return false
 	var skill_uses: Array[int] = [0, 0, 0]
 	var failed_attempts: Array[int] = [0]
 	floors.boss_failed.connect(func(_failed: int, _back_to: int) -> void: failed_attempts[0] += 1)
@@ -154,7 +168,9 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	var cps_factor: String = "%.3f" % cps
 	var skill_text: String = ["none", "each skill as soon as it is ready", "gold bonus when ready, burst and damage buff in boss fights only"][clampi(skill_mode, 0, 2)]
 	print("Player model: %.2f clicks/s without pause, cheapest affordable level bought after every %.2f s step; boss countdown %.0f s; farm mode exit: %s; skills: %s" % [cps, dt, boss.timer_seconds(), "auto challenge setting" if auto else "challenge when expected damage covers the boss HP", skill_text])
-	if talents != null:
+	if talents != null and not strict_order.is_empty():
+		print("Talents: strict order %s, nothing else" % str(strict_order))
+	elif talents != null:
 		print("Talents: greedy, order %s" % str(talent_order))
 	var report_step: int = int(REPORT_STAGE_AT_HOURS * SECONDS_PER_HOUR / dt)
 	var steps: int = int(hours * SECONDS_PER_HOUR / dt)
@@ -200,7 +216,7 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		while _buy_next(companions, buyer):
 			pass
 		if talents != null and step % check_every == 0 and talents.available_points() > 0:
-			_spend_talents(talents, talent_order, floors, offline, hub)
+			SimMeasures.spend_talents(talents, talent_order, strict_order)
 		if floors.is_farming() and step % check_every == 0:
 			floors.set_click_dps(floors.click_damage().multiply_decimal(cps_factor))
 			if not auto and floors.can_beat_next_boss():
@@ -265,8 +281,9 @@ func _use_skills(skills: SkillManager, floors: FloorManager, mode: int, uses: Ar
 			continue
 		if mode == 2 and skill.effect != Skill.Effect.GOLD_MULTIPLIER and not floors.is_boss_fight():
 			continue
-		skills.activate(skill.id)
-		uses[int(skill.effect)] += 1
+		# A skill the talents lock is refused: not counted.
+		if skills.activate(skill.id):
+			uses[int(skill.effect)] += 1
 
 
 # Node ids in buying order: the branches of [param build] first, then data order.
@@ -279,20 +296,6 @@ func _talent_order(talents: TalentTree, build: String) -> Array[String]:
 		if not order.has(def.id):
 			order.append(def.id)
 	return order
-
-
-# Buys the first buyable node of [param order], again and again, then updates the formulas.
-func _spend_talents(talents: TalentTree, order: Array[String], floors: FloorManager, offline: OfflineIncome, hub: ModifierHub) -> void:
-	var bought: bool = true
-	while bought:
-		bought = false
-		for id: String in order:
-			if talents.buy(id):
-				bought = true
-				break
-	# The hub already followed each purchase; apply_to would overwrite the items.
-	if hub == null:
-		talents.apply_to(floors, offline)
 
 
 # Wears the new item when it was not sold and beats the worn item of its type. Counts drops and sales.
@@ -369,7 +372,7 @@ func _parse_away(text: String) -> Array[Vector2]:
 
 
 func _parse_args() -> Dictionary:
-	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH, "milestones": "", "report": 0.0, "buyer": SimMeasures.BUYER_CHEAPEST, "awaken": 1.0}
+	var args: Dictionary = {"cps": 3.0, "dt": 0.1, "hours": 3.0, "curves": CURVES_PATH, "roster": ROSTER_PATH, "bosses": BOSSES_PATH, "auto": 0.0, "away": "", "eff": "", "skills": 0.0, "skillsdata": SKILLS_PATH, "talents": 0.0, "talentsdata": TALENTS_PATH, "build": "", "loot": 0.0, "seed": 1.0, "itemsdata": ITEMS_PATH, "milestones": "", "report": 0.0, "buyer": SimMeasures.BUYER_CHEAPEST, "awaken": 1.0, "order": ""}
 	for arg: String in OS.get_cmdline_user_args():
 		var parts: PackedStringArray = arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() != 2 or not args.has(parts[0]):

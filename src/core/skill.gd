@@ -21,7 +21,7 @@ extends RefCounted
 ## [codeblock]
 ## var skill: Skill = Skill.from_entry(entry)
 ## if skill.is_valid() and skill.state() == Skill.State.READY:
-##     skill.start(60.0)             # SkillManager passes the cooldown with modifiers applied
+##     skill.start(60.0, 0.0)        # SkillManager passes the values with the talents applied
 ## skill.tick(0.1)
 ## print(skill.cooldown_left())
 ## [/codeblock]
@@ -60,9 +60,11 @@ var display_name: String = ""
 ## What the skill does.
 var effect: Effect = Effect.BURST
 ## Strength as a decimal string: seconds of damage for a burst ("dps_seconds" in the
-## data, see [method SkillManager.burst_damage]), factor for a buff ("multiplier").
+## data, see [method SkillManager.burst_damage]), factor for a buff ("multiplier"). Value of
+## the data: the talents may replace it, see [method SkillManager.effective_amount].
 var amount: String = "1"
-## Seconds the effect lasts (0 for a burst).
+## Seconds the effect lasts (0 for a burst), before the talents
+## ([method SkillManager.effective_duration]).
 var duration_seconds: float = 0.0
 ## Base recharge in seconds, before any modifier (always >= [member duration_seconds]).
 var cooldown_seconds: float = 1.0
@@ -108,11 +110,13 @@ func active_left() -> float:
 	return _active_left
 
 
-## Starts the skill: its cooldown becomes [param cooldown] and, for a buff, the effect
-## runs for [member duration_seconds]. The caller checks the state is READY first.
-func start(cooldown: float) -> void:
-	_cooldown_left = maxf(cooldown, duration_seconds)
-	_active_left = duration_seconds
+## Starts the skill: the effect runs for [param duration] seconds (0 for a burst) and the
+## cooldown becomes [param cooldown], at least that duration. [SkillManager] passes the values
+## with the talents applied, not [member duration_seconds] and [member cooldown_seconds]. The
+## caller checks the state is READY first.
+func start(cooldown: float, duration: float) -> void:
+	_cooldown_left = maxf(cooldown, duration)
+	_active_left = duration
 
 
 ## Advances both timers by [param step] seconds (already clamped by the caller). Returns
@@ -127,12 +131,13 @@ func tick(step: float) -> bool:
 	return ended
 
 
-## Puts the timers back from a save. Values are cut to what the data allows (a retuned
-## file never leaves a timer longer than its new maximum), negatives and NaN count as 0,
-## and the effect never outlasts the cooldown.
-func restore(cooldown_left_value: float, active_left_value: float) -> void:
-	_cooldown_left = clampf(cooldown_left_value, 0.0, cooldown_seconds) if is_finite(cooldown_left_value) else 0.0
-	_active_left = clampf(active_left_value, 0.0, minf(duration_seconds, _cooldown_left)) if is_finite(active_left_value) else 0.0
+## Puts the timers back from a save, or cuts the running ones. Values are cut to
+## [param max_cooldown] and [param max_duration], the values the skill has now (a retuned file
+## or a reset of the talents never leaves a timer longer than its new maximum; 0 and 0 stop the
+## skill), negatives and NaN count as 0, and the effect never outlasts the cooldown.
+func restore(cooldown_left_value: float, active_left_value: float, max_cooldown: float, max_duration: float) -> void:
+	_cooldown_left = clampf(cooldown_left_value, 0.0, max_cooldown) if is_finite(cooldown_left_value) else 0.0
+	_active_left = clampf(active_left_value, 0.0, minf(max_duration, _cooldown_left)) if is_finite(active_left_value) else 0.0
 
 
 func _load(entry: Dictionary) -> void:

@@ -17,6 +17,10 @@ extends RefCounted
 ## The caller must keep a reference to the hub for as long as the game runs. Either source
 ## may be null (the simulator runs with or without items, a test with neither).
 ##
+## Skills (story 018): the hub is also where [SkillManager] reads what the talents do to the
+## skills, [method skill_unlocked] and [method skill_override], and [signal changed] tells it
+## when that may have changed. Without talents every skill is unlocked with its data values.
+##
 ## Usage:
 ## [codeblock]
 ## var hub: ModifierHub = ModifierHub.new(floors, offline, talents, inventory)
@@ -24,6 +28,10 @@ extends RefCounted
 ## inventory.equip(uid)       # same
 ## print(hub.percent("click_damage"), " ", hub.crit_chance_percent())
 ## [/codeblock]
+
+## The factors were pushed again after a change of the talents or the inventory (also once when
+## built, before anyone can connect).
+signal changed
 
 var _floors: FloorManager
 var _offline: OfflineIncome
@@ -85,3 +93,15 @@ func refresh() -> void:
 			factor(Item.STAT_GLOBAL_DAMAGE), factor(Item.STAT_BOSS_DAMAGE), factor(Item.STAT_BOSS_GOLD),
 			crit_chance_percent(), TalentTree.factor_from_percent(crit_bonus_percent()))
 	_offline.set_talent_factor(factor(Item.STAT_OFFLINE_GOLD))
+	changed.emit()
+
+
+## False when the talents lock the skill [param skill_id] (see [method TalentTree.skill_unlocked]).
+func skill_unlocked(skill_id: String) -> bool:
+	return _talents == null or _talents.skill_unlocked(skill_id)
+
+
+## The value the talents give to [param field] of the skill [param skill_id], or null to keep the
+## data (see [method TalentTree.skill_override]).
+func skill_override(skill_id: String, field: String) -> Variant:
+	return null if _talents == null else _talents.skill_override(skill_id, field)

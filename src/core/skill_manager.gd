@@ -26,6 +26,16 @@ extends RefCounted
 ## Cooldown modifiers: [method set_cooldown_modifier] scales every cooldown started
 ## afterwards (story 006 talents). A cooldown never goes below the effect duration.
 ##
+## Talents (story 018, design/talent-tree-v2.md), read through the optional [ModifierHub]:
+## a skill some node unlocks is LOCKED until such a node is bought. The lock is derived from the
+## bought nodes, never stored, and checked here: [method can_activate] and [method activate]
+## refuse a locked skill, whatever asks (button, key, simulator). A saved timer of a locked skill
+## is ignored, and a skill that becomes locked (reset, new tree version) stops at once: its buff
+## ends, its cooldown is dropped, nothing is left over. [method effective_amount],
+## [method effective_duration] and [method effective_cooldown] are the per-skill values with the
+## [code]skill_mod[/code] of the talents; activations, restored timers and running timers (cut
+## when a value shrinks) all use them.
+##
 ## Time: skills run on game time fed to [method tick], clamped to [constant MAX_TICK_SECONDS]
 ## like the companions and the boss countdown. A tab in the background therefore pauses
 ## cooldowns and running buffs (at most one clamped step is credited on return), and so
@@ -36,7 +46,7 @@ extends RefCounted
 ## Usage:
 ## [codeblock]
 ## var skills: SkillManager = SkillManager.from_data(
-##         DataLoader.load_json("res://assets/data/skills.json"), game_state, combat, floors)
+##         DataLoader.load_json("res://assets/data/skills.json"), game_state, combat, floors, hub)
 ## if skills.is_valid():
 ##     if skills.activate("big_hit"):
 ##         print("boom")
@@ -58,6 +68,8 @@ var _error: String = ""
 var _state: GameState
 var _combat: Combat
 var _floors: FloorManager
+## Source of the locks and per-skill values of the talents; null means none.
+var _modifiers: ModifierHub
 ## Skills in file (display) order.
 var _skills: Array[Skill] = []
 ## Skill id (String) -> [Skill].
@@ -69,13 +81,18 @@ var _cooldown_modifier: float = 1.0
 ## Parses and validates skills.json (as returned by [method DataLoader.load_json], null
 ## allowed), restores the timers saved in [param state] and applies the buffs still
 ## running to [param floors]. Always returns an instance; check [method is_valid].
-## [param floors] must be built from the same [param state] and [param combat].
-static func from_data(data: Variant, state: GameState, combat: Combat, floors: FloorManager) -> SkillManager:
+## [param floors] must be built from the same [param state] and [param combat]. [param modifiers]
+## brings the talents (locks and per-skill values); build it first, so that the restored timers
+## already follow them. Without it no skill is locked and the data values apply.
+static func from_data(data: Variant, state: GameState, combat: Combat, floors: FloorManager, modifiers: ModifierHub = null) -> SkillManager:
 	var manager: SkillManager = SkillManager.new()
 	manager._state = state
 	manager._combat = combat
 	manager._floors = floors
+	manager._modifiers = modifiers
 	manager._load(data)
+	if modifiers != null and manager.is_valid():
+		modifiers.changed.connect(manager._follow_talents)
 	return manager
 
 
@@ -111,33 +128,55 @@ func cooldown_modifier() -> float:
 	return _cooldown_modifier
 
 
-## Cooldown [param skill] would get if activated now: the data value times the modifier,
-## at least the effect duration.
+## Cooldown [param skill] would get if activated now: the value of the talents (else of the
+## data) times the modifier, at least [method effective_duration].
 func effective_cooldown(skill_to_check: Skill) -> float:
-	return maxf(skill_to_check.cooldown_seconds * _cooldown_modifier, skill_to_check.duration_seconds)
+	return maxf(_talent_cooldown(skill_to_check) * _cooldown_modifier, effective_duration(skill_to_check))
+
+
+## Seconds the effect of [param skill] lasts now: the value of the talents, else of the data.
+## Always 0 for a burst.
+func effective_duration(skill_to_check: Skill) -> float:
+	if skill_to_check.effect == Skill.Effect.BURST:
+		return 0.0
+	var value: Variant = _override(skill_to_check, TalentTree.SKILL_DURATION)
+	return skill_to_check.duration_seconds if value == null else float(value)
+
+
+## Strength of [param skill] now, as a decimal string (seconds of damage of a burst, factor of a
+## buff): the value of the talents, else of the data.
+func effective_amount(skill_to_check: Skill) -> String:
+	var value: Variant = _override(skill_to_check, TalentTree.SKILL_AMOUNT)
+	return skill_to_check.amount if value == null else String(value)
 
 
 ## Damage the burst [param skill] deals now, before the damage buff:
-## floor((companion_power + click_damage) * dps_seconds), both with their talents.
+## floor((companion_power + click_damage) * dps_seconds), both with their talents, dps_seconds
+## from [method effective_amount].
 func burst_damage(burst: Skill) -> BigNumber:
 	var per_second: BigNumber = _floors.companion_power().add(_floors.click_damage())
-	return per_second.multiply_decimal(burst.amount)
+	return per_second.multiply_decimal(effective_amount(burst))
 
 
-## True when [param id] exists and is READY.
+## False when [param id] is unknown or the talents lock it (derived from the bought nodes).
+func is_unlocked(id: String) -> bool:
+	return _by_id.has(id) and (_modifiers == null or _modifiers.skill_unlocked(id))
+
+
+## True when [param id] exists, is unlocked and is READY.
 func can_activate(id: String) -> bool:
 	var found: Skill = _by_id.get(id)
-	return found != null and found.state() == Skill.State.READY
+	return found != null and is_unlocked(id) and found.state() == Skill.State.READY
 
 
 ## Activates [param id]: starts its cooldown and applies its effect (a burst deals its
-## damage now, a buff starts). Returns false and changes nothing when the id is unknown
-## or the skill is not READY.
+## damage now, a buff starts). Returns false and changes nothing when the id is unknown,
+## the skill is locked or not READY.
 func activate(id: String) -> bool:
 	if not can_activate(id):
 		return false
 	var found: Skill = _by_id[id]
-	found.start(effective_cooldown(found))
+	found.start(effective_cooldown(found), effective_duration(found))
 	if found.effect == Skill.Effect.BURST:
 		_floors.apply_damage(burst_damage(found), FloorManager.HitSource.BURST)
 	else:
@@ -207,8 +246,36 @@ func _load(data: Variant) -> void:
 	for restored: Skill in _skills:
 		var saved: Variant = _state.skill_timers.get(restored.id)
 		if saved is Dictionary:
-			restored.restore(float(saved.get("cooldown_left", 0.0)), float(saved.get("active_left", 0.0)))
+			restored.restore(float(saved.get("cooldown_left", 0.0)), float(saved.get("active_left", 0.0)), _cooldown_cap(restored), effective_duration(restored))
+	_follow_talents()
+
+
+# Stops the locked skills and cuts the timers of the others to their current values, then pushes
+# the buffs. Called after the load and on every change of the hub. The cooldown cap leaves the
+# cooldown modifier out: it only applies to cooldowns started afterwards.
+func _follow_talents() -> void:
+	for followed: Skill in _skills:
+		if is_unlocked(followed.id):
+			followed.restore(followed.cooldown_left(), followed.active_left(), _cooldown_cap(followed), effective_duration(followed))
+		else:
+			followed.restore(0.0, 0.0, 0.0, 0.0)
 	_push_multipliers()
+
+
+# The cooldown of the talents, else of the data, without the modifier.
+func _talent_cooldown(skill_to_check: Skill) -> float:
+	var value: Variant = _override(skill_to_check, TalentTree.SKILL_COOLDOWN)
+	return skill_to_check.cooldown_seconds if value == null else float(value)
+
+
+# Longest a saved or running cooldown may be: [method _talent_cooldown], at least the duration.
+func _cooldown_cap(skill_to_check: Skill) -> float:
+	return maxf(_talent_cooldown(skill_to_check), effective_duration(skill_to_check))
+
+
+# The value the talents give to [param field] of [param skill], or null.
+func _override(skill_to_check: Skill, field: String) -> Variant:
+	return null if _modifiers == null else _modifiers.skill_override(skill_to_check.id, field)
 
 
 # Tells the FloorManager the factors of the buffs running now ("1" when none).
@@ -219,8 +286,8 @@ func _push_multipliers() -> void:
 		if running.state() != Skill.State.ACTIVE:
 			continue
 		if running.effect == Skill.Effect.DAMAGE_MULTIPLIER:
-			damage = running.amount
+			damage = effective_amount(running)
 		elif running.effect == Skill.Effect.GOLD_MULTIPLIER:
-			gold = running.amount
+			gold = effective_amount(running)
 	_floors.set_damage_multiplier(damage)
 	_floors.set_gold_multiplier(gold)

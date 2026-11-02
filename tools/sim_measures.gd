@@ -10,6 +10,8 @@ extends RefCounted
 ## var stages: Array[int] = SimMeasures.merged_milestones("10,50", [50, 100], [10, 11])
 ## var share: float = SimMeasures.click_share(click_dps, companion_dps)
 ## var id: String = SimMeasures.best_ratio_id(companions)
+## var tree: TalentTree = SimMeasures.simulated_tree(data, permanent, state)
+## var bought: int = SimMeasures.spend_talents(tree, greedy_ids, SimMeasures.parse_order("click_grip, bighit_power"))
 ## [/codeblock]
 
 ## Buyer that takes the cheapest affordable level.
@@ -57,6 +59,60 @@ static func damage_per_gold(companion: Companion, level: int, own_awakenings: in
 	var now: float = companion.damage_per_second_at_level(level, own_awakenings, squad_awakenings).to_decimal_string().to_float()
 	var next: float = companion.damage_per_second_at_level(level + 1, own_awakenings, squad_awakenings).to_decimal_string().to_float()
 	return (next - now) / companion.cost_of_level(level + 1).to_decimal_string().to_float()
+
+
+## The talent tree of a simulated run: built from [param data] on [param permanent] and
+## [param state], and, when valid, with its version acknowledged. A simulated player starts fresh and
+## has nothing to be refunded; without it a tree_version >= 1 would refuse every purchase.
+static func simulated_tree(data: Variant, permanent: PermanentState, state: GameState) -> TalentTree:
+	var tree: TalentTree = TalentTree.from_data(data, permanent, state)
+	if tree.is_valid():
+		tree.acknowledge_version()
+	return tree
+
+
+## The node ids of --order ("a, b,c"), trimmed, empty entries dropped.
+static func parse_order(text: String) -> PackedStringArray:
+	var ids: PackedStringArray = PackedStringArray()
+	for entry: String in text.split(","):
+		if not entry.strip_edges().is_empty():
+			ids.append(entry.strip_edges())
+	return ids
+
+
+## Spends the points of [param talents] as the simulated player does: with [param strict] (--order),
+## its nodes one after the other (see [method next_ordered_talent]); else the first buyable node of
+## [param greedy_order], again and again. Returns the number of nodes bought.
+static func spend_talents(talents: TalentTree, greedy_order: Array[String], strict: PackedStringArray) -> int:
+	var count: int = 0
+	if not strict.is_empty():
+		var next: String = next_ordered_talent(talents, strict)
+		while not next.is_empty() and talents.buy(next):
+			count += 1
+			next = next_ordered_talent(talents, strict)
+		return count
+	var bought: bool = true
+	while bought:
+		bought = false
+		for id: String in greedy_order:
+			if talents.buy(id):
+				count += 1
+				bought = true
+				break
+	return count
+
+
+## Id of the node a player following [param order] (--order, story 018) buys now, or "" when the
+## next one must wait. The order is strict: bought nodes and nodes excluded by their group are
+## passed, the first other node is bought when it is BUYABLE, else everything waits for it (a node
+## whose prerequisites are never bought stops the order there). Every id must be in the tree.
+static func next_ordered_talent(talents: TalentTree, order: PackedStringArray) -> String:
+	for id: String in order:
+		var state: TalentTree.NodeState = talents.state_of(id)
+		if state == TalentTree.NodeState.OWNED or state == TalentTree.NodeState.EXCLUDED:
+			continue
+		return id if state == TalentTree.NodeState.BUYABLE else ""
+	return ""
 
 
 ## Id of the affordable companion whose next level gives the most damage per gold, the first in

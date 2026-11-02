@@ -1,7 +1,7 @@
 # Story 018: Arbre v2, format, verrous et rendu des points
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Logic
 > **Estimate**: L
@@ -50,7 +50,10 @@
 
 ## Files
 
-- À remplir à la fin.
+- `src/core/talent_tree.gd` (schéma 2, paliers, exclusions, effets, rendu de version, reset), `src/core/skill_manager.gd`, `src/core/skill.gd`, `src/core/modifier_hub.gd`, `src/core/permanent_state.gd` (version 6)
+- `tools/simulate_progress.gd`, `tools/sim_measures.gd` (`--order`, arbre versionné)
+- `assets/data/data_schema.md`
+- `tests/unit/talents/talent_tree_v2_test.gd`, `tests/integration/save/talent_refund_test.gd` (créés)
 
 ## QA Test Cases
 
@@ -63,7 +66,7 @@
 **Story Type**: Logic
 **Required evidence**: `tests/unit/talents/talent_tree_v2_test.gd`, `tests/integration/save/talent_refund_test.gd`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created: `tests/unit/talents/talent_tree_v2_test.gd` (37 tests), `tests/integration/save/talent_refund_test.gd` (9 tests)
 
 ---
 
@@ -73,3 +76,10 @@
 - Unlocks: `production/epics/idle-titans/story-019-talent-tree-content.md`
 
 ---
+
+## Completion Notes
+**Completed**: 2026-11-02
+**Criteria**: 10/10 passing (aucun différé)
+**Deviations**: aucune bloquante. Limites connues : `main_screen.gd` non branché (hub avant compétences, `try_reset`, message de version, valeurs effectives sur la barre de compétences), à faire en story 019 ; en jeu, le reset reste possible pendant un boss tant que l'écran appelle l'ancien reset ; après une horloge reculée, le décompte reste à 1 h jusqu'au premier appui sur Reset ; une recharge démarrée avec un modificateur > 1 est raccourcie au prochain changement du hub (aucun talent n'en utilise) ; les stats `boss_damage` et `crit_chance` restent à ajouter en 019
+**Test Evidence**: `tests/unit/talents/talent_tree_v2_test.gd` (37 tests), `tests/integration/save/talent_refund_test.gd` (9 tests), écrits bien que dispensés au niveau minimal ; suite complète 760/760, simulateur 24 h identique
+**Reviewed by**: self, no independent review

@@ -1,12 +1,12 @@
 # Story 017: Interface de l'éveil et grands nombres
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-03
+> **Last Updated**: 2026-11-02
 
 ## Context
 
@@ -73,3 +73,10 @@
 - Unlocks: `production/epics/idle-titans/story-018-talent-tree-format.md`
 
 ---
+
+## Completion Notes
+**Completed**: 2026-11-02
+**Criteria**: 9/9 passing (aucun différé)
+**Deviations**: aucune bloquante. Limites connues : pastille d'onglet non allumée pour un éveil abordable ; phrase de premier éveil perdue si la page se ferme pendant les 4 s ; à 320 de large, nom long avec niveau à 4 chiffres sur 2 lignes (option B choisie) ; simulateur par défaut sans éveil en 3 h, à recaler à la story 020 ; essai à la main sur téléphone pas encore fait
+**Test Evidence**: 93 captures dans `production/qa/evidence/story-017-awakening-ui/` (stamp à jour) ; 53 tests écrits bien que dispensés au niveau minimal
+**Reviewed by**: self, no independent review
