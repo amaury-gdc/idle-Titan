@@ -34,6 +34,15 @@ const MANY_COMPANIONS: int = 30
 const FIRST_ID: String = "first"
 const SECOND_ID: String = "second"
 const UNIQUE_DAMAGE: int = 987
+## Mouse widths in units and atlas pixels per unit, from the smallest phone to the largest screen
+## (2560 wide is twice the 1280 layout, at 3 device pixels per CSS pixel, painted twice as fine).
+const ATLAS_MOUSES: Array[float] = [20.0, 38.0]
+const ATLAS_SCALES: Array[float] = [1.76, 4.0, 12.0]
+const ROSTER_SIZE: int = 8
+## The smallest texture side every WebGL2 device must accept.
+const TEXTURE_LIMIT: int = 4096
+## Frames the tree may take to render the first atlas.
+const BAKE_FRAMES: int = 5
 
 var _die: float = DIE_HIT
 
@@ -488,6 +497,62 @@ func test_orbs_invalid_colors_and_entries_do_not_break_the_setup() -> void:
 	orbs.on_companion_attacked(SECOND_ID, _damage())
 
 	assert_int(orbs.active_ball_count()).is_equal(2)
+
+
+func test_orbs_atlas_cell_holds_the_whole_mouse_with_its_padding() -> void:
+	for mouse: float in ATLAS_MOUSES:
+		for pixels_per_unit: float in ATLAS_SCALES:
+			var cell: int = CompanionOrbs.atlas_cell_pixels(mouse, pixels_per_unit)
+
+			var extent: Vector2 = MouseFace.half_extent(mouse)
+			var needed: float = (maxf(extent.x, extent.y) + CompanionOrbs.ATLAS_PADDING) * 2.0 * pixels_per_unit
+			assert_float(float(cell)).is_greater_equal(needed)
+
+
+func test_orbs_atlas_cells_never_overlap_and_stay_inside_the_atlas() -> void:
+	var cell: int = CompanionOrbs.atlas_cell_pixels(ATLAS_MOUSES[1], ATLAS_SCALES[1])
+	var atlas: Rect2 = Rect2(Vector2.ZERO, Vector2(CompanionOrbs.atlas_pixels(ROSTER_SIZE, cell)))
+
+	var cells: Array[Rect2] = []
+	for i in ROSTER_SIZE:
+		cells.append(Rect2(CompanionOrbs.atlas_origin(i, cell), Vector2(cell, cell)))
+
+	for i in ROSTER_SIZE:
+		assert_bool(atlas.encloses(cells[i])).is_true()
+		for j in range(i + 1, ROSTER_SIZE):
+			assert_bool(cells[i].intersects(cells[j])).is_false()
+
+
+func test_orbs_atlas_stays_under_the_texture_limit_on_the_largest_screen() -> void:
+	var cell: int = CompanionOrbs.atlas_cell_pixels(GameZone.MOUSE_MAX_SIZE, ATLAS_SCALES[ATLAS_SCALES.size() - 1])
+
+	var atlas: Vector2i = CompanionOrbs.atlas_pixels(ROSTER_SIZE, cell)
+
+	assert_int(maxi(atlas.x, atlas.y)).is_less_equal(TEXTURE_LIMIT)
+
+
+func test_orbs_outside_the_tree_paint_no_atlas_and_still_throw_balls() -> void:
+	var orbs: CompanionOrbs = _new_orbs([FIRST_ID])
+
+	orbs.set_slots(PackedVector2Array([Vector2.ZERO]), ATLAS_MOUSES[0])
+	orbs.on_companion_attacked(FIRST_ID, _damage())
+
+	assert_bool(orbs._has_front).is_false()
+	assert_int(orbs.active_ball_count()).is_equal(1)
+
+
+# Headless, nothing is rendered: the atlas is asked for, never shown. The export captures show it.
+func test_orbs_in_the_tree_ask_for_an_atlas_that_holds_every_mouse() -> void:
+	var orbs: CompanionOrbs = _new_orbs([FIRST_ID, SECOND_ID])
+
+	add_child(orbs)
+	for i in BAKE_FRAMES:
+		await get_tree().process_frame
+
+	var baker: SubViewport = orbs._bakers[orbs._front]
+	var cell: int = orbs._bake_cells[orbs._front]
+	assert_int(cell).is_equal(CompanionOrbs.atlas_cell_pixels(CompanionOrbs.ORB_RADIUS * 2.0, orbs._screen_scale() * CompanionOrbs.BAKE_OVERSAMPLE))
+	assert_that(baker.size).is_equal(CompanionOrbs.atlas_pixels(2, cell))
 
 
 func test_real_roster_gives_every_companion_a_valid_color_and_still_loads() -> void:

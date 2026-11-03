@@ -1,12 +1,20 @@
 class_name CompanionOrbs
 extends Control
-## Draws the companions beside the monster (story 009): one coloured sphere per companion the
-## player owns, and a small ball thrown from the sphere to the monster each time that companion
-## attacks. Pure display: the damage falls when the companion attacks, the ball only shows it, and a
+## Draws the companions beside the monster (story 009): one coloured mouse per companion the player
+## owns (a [MouseFace], story 019b; spheres before it, hence the names here), and a small ball
+## thrown from it to the monster each time that companion attacks. Pure display: the damage falls when the companion attacks, the ball only shows it, and a
 ## ball that is not thrown changes nothing in the game.
 ## Implements production/epics/idle-titans/story-009-visual-feedback.md ("Compagnons").
 ##
-## ONE canvas item draws every sphere and every ball in [method _draw]: no node per ball. The
+## ONE canvas item draws every ball in [method _draw]: no node per ball. The mice sit on a second
+## canvas item behind it, redrawn only when they change (slots, levels, setting), never while the
+## balls fly. They are textures: a mouse is 11 circles, and 8 of them drawn as circles cost the
+## main thread about 1.5 points with the processor slowed 4 times, at every frame even when not
+## redrawn (story 019b, measured in the export). So each companion's mouse is painted once with
+## [method MouseFace.draw] into an atlas (a [SubViewport] rendered once, at [constant BAKE_OVERSAMPLE]
+## times the screen pixels so that the linear filter smooths the edges), painted again only when the
+## size of the mice or of the screen pixels changes. Two atlases take turns: the old one stays on
+## screen, stretched, until the new one is rendered, so a resize never blinks. The
 ## balls live in a fixed pool of [constant BALL_POOL_SIZE] slots on parallel arrays, so nothing is
 ## allocated while playing. A ball is thrown only if the companion has not thrown one for
 ## [constant BALL_MIN_INTERVAL_SECONDS] of display time (accumulated from [method _process]) and a slot
@@ -54,7 +62,12 @@ const ORB_GRID_COLUMNS: int = 3
 const DEFAULT_COLOR: Color = Color(0.7, 0.7, 0.75, 1.0)
 const OUTLINE_COLOR: Color = Color(0.04, 0.05, 0.09, 1.0)
 const OUTLINE_WIDTH: float = 3.0
-const HIGHLIGHT_COLOR: Color = Color(1.0, 1.0, 1.0, 0.45)
+## Atlas pixels per screen pixel (display setting, not a gameplay value).
+const BAKE_OVERSAMPLE: float = 2.0
+## Mice per row of the atlas.
+const ATLAS_COLUMNS: int = 4
+## Free room around a mouse in its cell, in units: the linear filter never reaches the next cell.
+const ATLAS_PADDING: float = 2.0
 
 var _index: Dictionary = {}
 var _colors: PackedColorArray = PackedColorArray()
@@ -72,15 +85,59 @@ var _paused: bool = false
 ## Positions set by [method set_slots]; empty means the default grid.
 var _slots: PackedVector2Array = PackedVector2Array()
 var _orb_radius: float = ORB_RADIUS
+## The canvas item of the mice, behind the balls, at this node's origin so that it shares its
+## coordinates.
+var _mice: Control = Control.new()
+## The two atlases, and what each was (or is being) painted at: pixels per unit, mouse width in
+## units, cell side in pixels.
+var _bakers: Array[SubViewport] = []
+var _bake_scales: PackedFloat32Array = PackedFloat32Array([0.0, 0.0])
+var _bake_sizes: PackedFloat32Array = PackedFloat32Array([0.0, 0.0])
+var _bake_cells: PackedInt32Array = PackedInt32Array([0, 0])
+## The atlas on screen; none until the first one is rendered.
+var _front: int = 0
+var _has_front: bool = false
+## The atlas being painted, shown at the end of the frame that renders it; -1 for none.
+var _pending: int = -1
 
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mice.show_behind_parent = true
+	_mice.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	# The atlas was painted on a transparent background: its colours are premultiplied.
+	var blend: CanvasItemMaterial = CanvasItemMaterial.new()
+	blend.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+	_mice.material = blend
+	_mice.draw.connect(_draw_mice)
+	add_child(_mice)
+	for i in 2:
+		var baker: SubViewport = SubViewport.new()
+		baker.transparent_bg = true
+		baker.disable_3d = true
+		baker.gui_disable_input = true
+		baker.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		var painter: Control = Control.new()
+		painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		painter.draw.connect(_paint_atlas.bind(painter, i))
+		baker.add_child(painter)
+		add_child(baker)
+		_bakers.append(baker)
 	_ball_busy.resize(BALL_POOL_SIZE)
 	_ball_age.resize(BALL_POOL_SIZE)
 	_ball_from.resize(BALL_POOL_SIZE)
 	_ball_color.resize(BALL_POOL_SIZE)
 	set_process(false)
+
+
+func _notification(what: int) -> void:
+	# The screen pixels per unit change with the window, even when the layout keeps its slots.
+	if what == NOTIFICATION_ENTER_TREE:
+		get_viewport().size_changed.connect(_bake)
+		_bake.call_deferred()
+	elif what == NOTIFICATION_EXIT_TREE:
+		get_viewport().size_changed.disconnect(_bake)
 
 
 func _process(delta: float) -> void:
@@ -106,13 +163,6 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if not _enabled:
 		return
-	for i in _colors.size():
-		if _owned[i] == 0:
-			continue
-		var center: Vector2 = _orb_position(i)
-		draw_circle(center, _orb_radius + OUTLINE_WIDTH, OUTLINE_COLOR)
-		draw_circle(center, _orb_radius, _colors[i])
-		draw_circle(center + Vector2(-_orb_radius, -_orb_radius) * 0.35, _orb_radius * 0.35, HIGHLIGHT_COLOR)
 	var ball_radius: float = BALL_RADIUS * _orb_radius / ORB_RADIUS
 	for i in BALL_POOL_SIZE:
 		if _ball_busy[i] == 0:
@@ -120,6 +170,96 @@ func _draw() -> void:
 		var position_now: Vector2 = _ball_from[i].lerp(_anchor, _ball_age[i] / BALL_FLIGHT_SECONDS)
 		draw_circle(position_now, ball_radius + OUTLINE_WIDTH * 0.5, OUTLINE_COLOR)
 		draw_circle(position_now, ball_radius, _ball_color[i])
+
+
+func _draw_mice() -> void:
+	if not _enabled or not _has_front:
+		return
+	var texture: ViewportTexture = _bakers[_front].get_texture()
+	var cell: int = _bake_cells[_front]
+	# A mouse as wide as the sphere was (story 019b): the radius is half its width. Until the new
+	# atlas is rendered, the old one is stretched to the new size.
+	var side: float = float(cell) / _bake_scales[_front] * (_orb_radius * 2.0 / _bake_sizes[_front])
+	for i in _colors.size():
+		if _owned[i] == 0:
+			continue
+		var source: Rect2 = Rect2(atlas_origin(i, cell), Vector2(cell, cell))
+		_mice.draw_texture_rect_region(texture, Rect2(_orb_position(i) - Vector2(side, side) / 2.0, Vector2(side, side)), source)
+
+
+# Paints every companion's mouse, each in the center of its cell, on atlas [param index].
+func _paint_atlas(painter: Control, index: int) -> void:
+	var scale_now: float = _bake_scales[index]
+	var cell: int = _bake_cells[index]
+	if cell == 0:
+		return
+	painter.draw_set_transform(Vector2.ZERO, 0.0, Vector2(scale_now, scale_now))
+	for i in _colors.size():
+		var center: Vector2 = (atlas_origin(i, cell) + Vector2(cell, cell) / 2.0) / scale_now
+		MouseFace.draw(painter, center, _bake_sizes[index], _colors[i])
+
+
+# Paints the atlas that is not on screen for the current mouse width and screen pixels, and shows
+# it once rendered. Nothing outside the tree: no screen, no pixels.
+func _bake() -> void:
+	if not is_inside_tree() or _colors.is_empty():
+		return
+	var scale_now: float = _screen_scale() * BAKE_OVERSAMPLE
+	var mouse: float = _orb_radius * 2.0
+	if _has_front and is_equal_approx(_bake_scales[_front], scale_now) and is_equal_approx(_bake_sizes[_front], mouse):
+		_pending = -1 # An atlas painted for another size is no longer wanted.
+		return
+	var back: int = 1 - _front if _has_front else _front
+	var cell: int = atlas_cell_pixels(mouse, scale_now)
+	_bake_scales[back] = scale_now
+	_bake_sizes[back] = mouse
+	_bake_cells[back] = cell
+	_bakers[back].size = atlas_pixels(_colors.size(), cell)
+	_bakers[back].render_target_update_mode = SubViewport.UPDATE_ONCE
+	(_bakers[back].get_child(0) as Control).queue_redraw()
+	_pending = back
+	if not RenderingServer.frame_post_draw.is_connected(_show_atlas):
+		RenderingServer.frame_post_draw.connect(_show_atlas, CONNECT_ONE_SHOT)
+
+
+func _show_atlas() -> void:
+	if _pending < 0:
+		return
+	_front = _pending
+	_has_front = true
+	_pending = -1
+	_mice.queue_redraw()
+
+
+# Screen pixels per unit where the mice are drawn: the window stretch and the transforms above.
+func _screen_scale() -> float:
+	return absf(get_viewport().get_final_transform().get_scale().x * _mice.get_global_transform_with_canvas().get_scale().x)
+
+
+# The mice and the balls: everything that changes what stands, not what flies.
+func _redraw_all() -> void:
+	queue_redraw()
+	_mice.queue_redraw()
+
+
+## Side in pixels of an atlas cell that holds a mouse [param mouse] units wide, outline and
+## [constant ATLAS_PADDING] included, painted at [param pixels_per_unit].
+static func atlas_cell_pixels(mouse: float, pixels_per_unit: float) -> int:
+	var extent: Vector2 = MouseFace.half_extent(mouse)
+	return ceili((maxf(extent.x, extent.y) + ATLAS_PADDING) * 2.0 * pixels_per_unit)
+
+
+## Top left corner, in pixels, of the cell of companion [param i] in an atlas of [param cell] pixel
+## cells.
+@warning_ignore("integer_division")
+static func atlas_origin(i: int, cell: int) -> Vector2:
+	return Vector2(float(i % ATLAS_COLUMNS * cell), float(i / ATLAS_COLUMNS * cell))
+
+
+## Size in pixels of an atlas of [param count] mice in [param cell] pixel cells.
+static func atlas_pixels(count: int, cell: int) -> Vector2i:
+	var rows: int = ceili(float(maxi(count, 1)) / ATLAS_COLUMNS)
+	return Vector2i(mini(maxi(count, 1), ATLAS_COLUMNS) * cell, rows * cell)
 
 
 ## Reads the companions of the roster data (the Variant [method DataLoader.load_json] returns): the
@@ -144,7 +284,10 @@ func setup(roster: Variant) -> void:
 			_colors.append(Color.html(hex) if hex is String and Color.html_is_valid(hex) else DEFAULT_COLOR)
 			_owned.append(0)
 			_since_ball.append(BALL_MIN_INTERVAL_SECONDS)
-	queue_redraw()
+	# Other colours: the atlas on screen no longer holds these mice.
+	_has_front = false
+	_bake()
+	_redraw_all()
 
 
 ## Where the balls fly to: the center of the monster, in this node's coordinates.
@@ -152,12 +295,14 @@ func set_target_point(point: Vector2) -> void:
 	_anchor = point
 
 
-## Where the spheres stand, in this node's coordinates, and their radius: one fixed slot per
-## companion in roster order. An empty [param slots] goes back to the default grid.
+## Where the spheres stand, in this node's coordinates, and their radius (half the width of a
+## mouse): one fixed slot per companion in roster order. An empty [param slots] goes back to the
+## default grid.
 func set_slots(slots: PackedVector2Array, radius: float = ORB_RADIUS) -> void:
 	_slots = slots
 	_orb_radius = radius
-	queue_redraw()
+	_bake()
+	_redraw_all()
 
 
 ## Shows the sphere of [param id] when [param level] is 1 or more, hides it otherwise. An unknown id
@@ -168,7 +313,7 @@ func set_level(id: String, level: int) -> void:
 	if i < 0:
 		return
 	_owned[i] = 1 if level >= 1 else 0
-	queue_redraw()
+	_mice.queue_redraw()
 
 
 ## The "Effets visuels" setting: off draws nothing, runs nothing and ignores new attacks.
@@ -176,7 +321,7 @@ func set_enabled(enabled: bool) -> void:
 	_enabled = enabled
 	if not _is_active():
 		clear()
-	queue_redraw()
+	_redraw_all()
 
 
 ## Hidden tab or modal screen: true clears the balls and stops the animation until false. The
