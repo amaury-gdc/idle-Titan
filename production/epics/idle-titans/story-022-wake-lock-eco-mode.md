@@ -96,7 +96,7 @@ Couleurs de l'écran économie : valeurs `#8C8C8C`, or `#A08A3C`, libellés, « 
 
 ## Dependencies
 
-- Depends on: `production/epics/idle-titans/story-017-awakening-ui.md`
+- Depends on: `production/archive/idle-titans/story-017-awakening-ui.md`
 - Unlocks: `production/epics/idle-titans/story-021-monster-variety.md`
 
 ---

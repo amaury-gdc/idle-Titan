@@ -86,7 +86,7 @@
 
 ## Dependencies
 
-- Depends on: `production/epics/idle-titans/story-017-awakening-ui.md`, `production/epics/idle-titans/story-022-wake-lock-eco-mode.md`
+- Depends on: `production/archive/idle-titans/story-017-awakening-ui.md`, `production/epics/idle-titans/story-022-wake-lock-eco-mode.md`
 - Unlocks: None
 
 ---
