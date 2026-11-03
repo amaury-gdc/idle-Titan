@@ -16,7 +16,11 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Project Structure
 
-@.claude/docs/directory-structure.md
+Code root `src/` (Godot). Tests: `tests/unit/[system]/`, `tests/integration/[system]/`.
+Data `assets/data/`, design `design/`, docs `docs/`, production `production/`
+(finished stories in `production/archive/`), throwaway prototypes `prototypes/`.
+Full map and the Unity/Unreal code roots: `.claude/docs/directory-structure.md`
+(read on demand).
 
 ## Engine Version Reference
 
@@ -42,7 +46,17 @@ after it runs `project.yaml` holds the real values.
 
 ## Coordination Rules
 
-@.claude/docs/coordination-rules.md
+Full text, model tiers and Agent Teams: `.claude/docs/coordination-rules.md`
+(read on demand). In short:
+
+- No unilateral cross-domain changes; conflicts escalate to the shared parent
+  (else `creative-director` for design, `technical-director` for technical).
+- Read design docs by section: Grep `^#`, then Read with offset/limit; whole-file
+  reads of docs over 40 KB are refused.
+- Nothing goes upstream: never file or comment on an engine, plugin or vendor
+  issue or PR, even when asked; draft only (`/bug-report`), the user submits.
+- Spawn independent subagents in parallel; surface a BLOCKED agent at once and
+  give a partial report.
 
 ## Collaboration Protocol
 
@@ -71,7 +85,25 @@ See `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md` for full protocol and examples.
 
 ## Coding Standards
 
-@.claude/docs/coding-standards.md
+Full text: `.claude/docs/coding-standards.md` (read on demand). In short:
+
+- Doc comments on public APIs; gameplay values data-driven, never hardcoded;
+  dependency injection over singletons.
+- ADRs by `modes.workflow`: none required at `minimal` (brief + decision log).
+  No GDD at `minimal`: `design/game-brief.md` is the design record.
+- Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
+  `refactor:`), story or task ID in the body.
+- Verification-driven: tests first for gameplay systems; screenshots for UI.
+- **A parse check is not a run.** Every player-observable story is launched and
+  observed, with a retained screenshot in `production/qa/evidence/`
+  (`.claude/docs/run-and-observe.md`); not waived at `qa.level: minimal`.
+- Evidence by story type: Logic → unit test; Integration → integration test or
+  playtest; Visual/Feel and UI → retained screenshot (BLOCKING); Config/Data →
+  smoke check (ADVISORY). `testing.strict.*` overrides; `/smoke-check` blocks.
+- Tests: deterministic, isolated, no external I/O, fixtures not magic numbers;
+  naming per `.claude/rules/test-standards.md`. Never disable a failing test.
+- Godot CI: `godot --headless -s -d --remote-debug tcp://127.0.0.1:0
+  res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests --ignoreHeadlessMode`
 
 ## Context Management
 
