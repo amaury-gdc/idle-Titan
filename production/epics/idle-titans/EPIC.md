@@ -26,6 +26,8 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 
 ## Stories
 
+Stories terminées 001 à 018 : fichiers dans `production/archive/idle-titans/` (index : `INDEX.md`).
+
 | # | Story | Type | Status | ADR |
 |---|-------|------|--------|-----|
 | 001 | Données, état et sauvegarde | Integration | Complete | N/A |
@@ -46,7 +48,7 @@ Fondations (données, état, sauvegarde), puis boucle, compagnons (mesure de la 
 | 016 | Éveil des compagnons (hors brief MVP) | Logic | Complete | N/A |
 | 017 | Interface de l'éveil et grands nombres (hors brief MVP) | UI | Complete | N/A |
 | 018 | Arbre v2, format, verrous et rendu des points (hors brief MVP) | Logic | Complete | N/A |
-| 019 | Arbre v2, effets, contenu et écran (hors brief MVP) | UI | Ready | N/A |
+| 019 | Arbre v2, effets, contenu et écran (hors brief MVP) | UI | Complete | N/A |
 | 020 | Calibrage unique de l'économie (hors brief MVP) | Config/Data | Ready | N/A |
 | 021 | Variété des monstres (hors brief MVP) | Visual/Feel | Ready | N/A |
 | 022 | Écran allumé et mode économie (hors brief MVP) | UI | Ready | N/A |

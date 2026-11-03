@@ -1,12 +1,12 @@
 # Story 019: Arbre v2, effets, contenu et écran
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: UI
 > **Estimate**: L
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-02
+> **Last Updated**: 2026-11-03
 
 ## Context
 
@@ -67,13 +67,20 @@
 **Story Type**: UI
 **Required evidence**: captures dans `production/qa/evidence/story-019-talent-tree-content/`, tests dans `tests/unit/talents/`.
 
-**Status**: [ ] Not yet created
+**Status**: [x] Created: 192 captures dans `production/qa/evidence/story-019-talent-tree-content/` (stamp à jour), tests dans `tests/unit/talents/` et `tests/unit/ui/`
 
 ---
 
 ## Dependencies
 
-- Depends on: `production/epics/idle-titans/story-018-talent-tree-format.md`
+- Depends on: `production/archive/idle-titans/story-018-talent-tree-format.md`
 - Unlocks: `production/epics/idle-titans/story-020-economy-calibration.md`
 
 ---
+
+## Completion Notes
+**Completed**: 2026-11-03
+**Criteria**: 12/12 passing (aucun différé)
+**Deviations**: aucune bloquante. Limites connues : Rythme sans retour visuel à l'écran ; l'acheteur glouton du simulateur ne prend ni sommets ni Rythme (mesurer avec `--order` en 020) ; chaînes antérieures à la 019 sans espace insécable avant « : » ; essai sur téléphone de référence pas encore fait. Décisions : Négociation hors coût d'éveil (spec corrigée), 69 points au total dans l'arbre, Rythme attend le premier clic après les 5 s
+**Test Evidence**: 192 captures dans `production/qa/evidence/story-019-talent-tree-content/` (stamp à jour) ; tests dans `tests/unit/talents/` et `tests/unit/ui/` ; suite 825/825
+**Reviewed by**: self, no independent review
