@@ -20,7 +20,10 @@ python -m http.server 8765 --bind 127.0.0.1 --directory build/web
 node tools/web/capture.mjs http://127.0.0.1:8765/index.html production/qa/evidence/<story> lot1 390x742@2m 1280x720@1
 node tools/web/capture.mjs <url> <dossier> lot3 "390x742@2m+330,85:combat+330,85:confirmer+w3000:retour"
 node tools/web/perf.mjs reference=http://127.0.0.1:8767/index.html apres=http://127.0.0.1:8766/index.html touch:reference:portrait=195,197
+node tools/web/capture.mjs <url> <dossier> lot4 "390x742@2m+kDigit1:w1+kDigit2:etats+h321,294,900:bulle+w300:relache"
 ```
+
+Étapes de `capture.mjs` : `+X,Y:nom` (toucher), `+wMS:nom` (attente), `+hX,Y,MS:nom` (appui long, capture pendant l'appui), `+kCode:nom` (touche du clavier, code DOM : `Digit1`, `Tab`, `Enter`).
 
 ## Variables d'environnement
 
@@ -31,6 +34,7 @@ node tools/web/perf.mjs reference=http://127.0.0.1:8767/index.html apres=http://
 | `BROWSER_WINDOW_POSITION` | `x,y` en pixels d'écran : où s'ouvre la fenêtre visible, par exemple sur l'écran de VS Code. Coordonnées négatives acceptées (écran à gauche du principal). Par défaut, Windows choisit. |
 | `BROWSER_TIMEOUT_MS` | Durée maximale d'un lancement : 600000 (10 min) par défaut. Au-delà, le navigateur est fermé et le script sort en erreur. |
 | `PERF_PASSES`, `PERF_RATES`, `PERF_MEASURE_MS` | Pour `perf.mjs` : passages (5), ralentissements du processeur (`1,4`), durée d'un passage (10000 ms). |
+| `PERF_KEYS` | Pour `perf.mjs` : touches chiffres appuyées après chaque chargement, par exemple `Digit1` pour mettre « Gros coup » en recharge pendant la mesure. |
 
 ## Lire une mesure de `perf.mjs`
 

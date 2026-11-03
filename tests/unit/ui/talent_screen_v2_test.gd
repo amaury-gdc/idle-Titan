@@ -324,7 +324,8 @@ func test_locked_skill_keeps_its_button_and_reads_a_debloquer() -> void:
 
 	# Assert: three buttons in the order of the keys, the locked one usable
 	assert_int(bar._buttons_box.get_child_count()).is_equal(3)
-	assert_str(bar.button_of("damage_buff").text).ends_with("À débloquer")
+	assert_str(bar.button_of("damage_buff").accessibility_name).ends_with("À débloquer")
+	assert_int((bar.button_of("damage_buff") as SkillOrb).look()).is_equal(SkillOrb.Look.LOCKED)
 	assert_bool(bar.button_of("damage_buff").disabled).is_false()
 	assert_array(unlocks).contains_exactly(["damage_buff"])
 	assert_array(activations).is_empty()
@@ -347,7 +348,9 @@ func test_passive_skill_reads_passif_and_cannot_be_pressed() -> void:
 	var bar: SkillBar = _bar()
 
 	# Assert
-	assert_str(bar.button_of("damage_buff").text).ends_with("Passif")
+	assert_str(bar.button_of("damage_buff").accessibility_name).ends_with("Passif")
+	assert_int((bar.button_of("damage_buff") as SkillOrb).look()).is_equal(SkillOrb.Look.PASSIVE)
+	assert_str(bar.hint_text("damage_buff")).contains("Passif")
 	assert_bool(bar.button_of("damage_buff").disabled).is_true()
 	assert_object(bar.button_of("damage_buff")).is_same(bar._buttons_box.get_child(1))
 

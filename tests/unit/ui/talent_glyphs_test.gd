@@ -73,7 +73,7 @@ func _texts_of(talents: Dictionary, stage: int, seen: int) -> PackedStringArray:
 	add_child(bar)
 	bar.setup(skills)
 	for skill: Skill in skills.skills():
-		texts.append(bar.button_of(skill.id).text)
+		texts.append(bar.button_of(skill.id).accessibility_name)
 		texts.append(bar.hint_text(skill.id))
 	return texts
 

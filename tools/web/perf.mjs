@@ -18,7 +18,9 @@
 // never hit, and seemed cheaper than it is.
 //
 // Usage: node tools/web/perf.mjs <label=url> [<label=url> ...] [touch:<label>:<shape>=X,Y ...]
-// Environment: PERF_PASSES (5), PERF_RATES ("1,4"), PERF_MEASURE_MS (10000).
+// Environment: PERF_PASSES (5), PERF_RATES ("1,4"), PERF_MEASURE_MS (10000), PERF_KEYS (none): DOM
+// codes of digit keys pressed after each load, before the measure ("Digit1": "Gros coup" recharges
+// during the pass, so its ring moves).
 // Output: one JSON line per build, shape and rate, then a table with the median busy share.
 import { withBrowser, sleep } from "./browser.mjs";
 
@@ -29,6 +31,7 @@ const SHAPES = [
 const PASSES = Number(process.env.PERF_PASSES) || 5;
 const RATES = (process.env.PERF_RATES || "1,4").split(",").map(Number);
 const MEASURE_MS = Number(process.env.PERF_MEASURE_MS) || 10000;
+const KEYS = (process.env.PERF_KEYS || "").split(",").filter((k) => /^Digit\d$/.test(k));
 const LOAD_MS = 9000;
 const TOUCH_MS = 75;
 const SLOW_FRAME_MS = 33.4;
@@ -91,6 +94,9 @@ try {
           console.log(`renderer: ${renderer}`);
           if (/swiftshader|software|basic render/i.test(renderer)) console.log("WARNING: software rendering, the measure is not representative");
         }
+        for (const code of KEYS)
+          for (const type of ["keyDown", "keyUp"])
+            await page.send("Input.dispatchKeyEvent", { type, code, key: code.slice(5), windowsVirtualKeyCode: 48 + +code.slice(5) });
         await page.send("Emulation.setCPUThrottlingRate", { rate });
         const visibility = (await page.send("Runtime.evaluate", { expression: RECORD, returnByValue: true })).result.value;
         if (visibility !== "visible") console.log(`WARNING: page ${visibility} during ${build.label} ${shape.name} x${rate}`);

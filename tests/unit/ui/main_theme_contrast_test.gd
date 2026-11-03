@@ -169,6 +169,24 @@ func test_active_skill_text_reads() -> void:
 	assert_float(_contrast(_text("font_disabled_color", "SkillActive"), _background("disabled", "SkillActive"))).is_greater_equal(MIN_CONTRAST)
 
 
+func test_skill_orb_rings_stand_out() -> void:
+	# The ready ring on the game zone, the arcs on their track (story 019b, lot 4).
+	assert_float(_contrast(UiPalette.YELLOW, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	assert_float(_contrast(UiPalette.YELLOW, UiPalette.BUTTON)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.BUTTON)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_skill_orb_icons_stand_out_of_the_round() -> void:
+	for icon: Color in [Color.WHITE, UiPalette.TEXT_MUTED, UiPalette.TEXT_DISABLED]:
+		for round_fill: Color in [UiPalette.ROW, UiPalette.ROW_HOVER]:
+			assert_float(_contrast(icon, round_fill)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_skill_orb_seconds_read() -> void:
+	assert_float(_contrast(UiPalette.ON_YELLOW, UiPalette.YELLOW)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(Color.WHITE, UiPalette.BACKGROUND)).is_greater_equal(MIN_CONTRAST)
+
+
 func test_selected_segment_is_inverted_and_reads() -> void:
 	var fill: Color = _background("pressed", "SegmentButton")
 	assert_float(_contrast(_text("font_pressed_color", "SegmentButton"), fill)).is_greater_equal(MIN_CONTRAST)

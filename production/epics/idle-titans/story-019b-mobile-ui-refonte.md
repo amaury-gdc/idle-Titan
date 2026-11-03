@@ -145,6 +145,24 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - `lot3-nettete-souris.png` : souris avant et après, agrandies ×3, aux 3 tailles de portrait. Elles sont aussi nettes, avec des bords plus lisses.
   - Clignotement : 253 images enregistrées pendant 6 redimensionnements, rotation comprise ; les souris ne disparaissent dans aucune.
   - Les captures viennent d'une copie jetable avec une partie préparée : étage 199, mode farm, 8 compagnons niveau 1.
+- Lot 4 (2026-11-04) :
+  - **Ronds.** `SkillOrb` (bouton sans texte) dessine son état : prête (anneau plein jaune et halo), en cours (arc jaune du temps restant, pastille jaune de secondes), recharge (arc gris de la part faite, pastille sombre), cadenas, passif (icône grise sans anneau). Icônes `UiIcon` : étoile (Gros coup), éclair (Frénésie), pièce (Bonus d'or), cadenas ; `UiIcon.draw_kind` permet de les dessiner depuis un autre contrôle.
+  - **Nom.** Le nom n'est plus dessiné : il ouvre la bulle (« Nom » puis l'effet ; « Passif : … » pour une compétence passive) et commence le nom accessible (« Frénésie, Dans 42 s »). Touches 1/2/3 inchangées.
+  - **Appui.** Il agit au relâchement. La zone touchable est un disque de 64 u (32 u de rayon, moins dans une cellule étroite), et non toute la cellule : un doigt qui sort du disque annule l'appui. Un appui long ouvre la bulle et le relâchement n'active rien. **Écart avec le plan** (qui prévoyait toute la cellule), pour que « sortir du rond » ait un sens.
+  - **Coût.** L'arc avance par pas de 1/120 de tour, et un rond n'est redessiné que quand son pas, ses secondes ou son état changent.
+  - **Place.** La rangée tient 5 ronds de 56 u à 320 de large (testé). En paysage, les ronds sont empilés dans la colonne, en attendant le lot 9.
+  - **Tests.** `skill_bar_rounds_test.gd` (12) : états, nom accessible, icônes, zone, place pour 5, appui au relâchement, doigt qui sort, appui long. Les appuis passent par le vrai viewport (`push_input`). Le test du doigt qui sort et celui de l'appui long ont été vus en échec contre un sabotage (zone rectangulaire, bulle sans `_forget_button_press`), puis le code a été remis. Contraste : anneaux, icônes et pastille. `talent_screen_v2_test` et `talent_glyphs_test` lisent maintenant le nom accessible au lieu du texte du bouton. Suite 881/881.
+  - **Outils.** `capture.mjs` : étapes `+hX,Y,MS:nom` (appui long, capture pendant l'appui) et `+kCode:nom` (touche). `perf.mjs` : `PERF_KEYS` (touches après chargement).
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`36530d8`), occupation médiane du fil principal (`lot4-fluidite-*.txt`) :
+
+    | Mesure | Portrait (réf. / lot 4) | Paysage (réf. / lot 4) |
+    |---|---|---|
+    | Sans fenêtre | 8,6 / 8,8 % | 8,1 / 8,3 % |
+    | Sans fenêtre, Gros coup en recharge (`PERF_KEYS=Digit1`) | 8,1 / 8,9 % | 8,1 / 8,7 % |
+    | Fenêtre visible | 8,5 / 8,5 % | 8,6 / 8,9 % |
+
+    Aucune image de plus de 33 ms pour le lot 4. Écart maximal +0,8 point, sous le critère de 1,5 point. Le niveau absolu (≈ 8 % contre ≈ 20 % au lot 3) a changé d'une série à l'autre, pour les deux versions : on ne compare qu'à l'intérieur d'une série. Les touchers tombent bien sur le monstre (PV 22 → 20 après deux touchers, capture de contrôle).
+  - **Preuves.** Captures `lot4-*` (partie préparée, Frénésie et Bonus d'or débloqués) : état initial, puis touches 1 et 2 (`-etats` : recharge, en cours, prête), appui long sur Bonus d'or (`-bulle`), après relâchement (`-relache` : toujours prête). Captures `lot4c-*` (Instinct de meute) : prête, passif, cadenas. Aux 5 tailles ; pas d'appui long en paysage. Aucune erreur console, aucun défilement horizontal.
 
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
@@ -162,6 +180,12 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - pendant le combat, le chrono reste lisible, avec les secondes en chiffres ;
   - « Confirmer ? » se distingue bien d'« Abandonner ».
 - Tapoter vite le monstre pendant une dizaine de secondes : pas d'à-coup visible ; les chiffres et les billes restent fluides.
+- Compétences en ronds (lot 4) :
+  - un toucher bref sur un rond prêt l'active au relâchement ;
+  - poser le doigt sur un rond, le glisser hors du rond puis lever : rien ne s'active ;
+  - appui long (une demi-seconde) : la bulle montre le nom puis l'effet, et lever le doigt n'active rien ; le toucher suivant ferme la bulle sans rien activer ;
+  - les secondes de la pastille se lisent ; on distingue « en cours » (jaune) de « en recharge » (sombre) ;
+  - un rond à cadenas ouvre l'onglet Talents sur le talent qui le débloque.
 
 ---
 
