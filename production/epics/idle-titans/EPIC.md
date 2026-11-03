@@ -49,6 +49,7 @@ Stories terminées 001 à 018 : fichiers dans `production/archive/idle-titans/` 
 | 017 | Interface de l'éveil et grands nombres (hors brief MVP) | UI | Complete | N/A |
 | 018 | Arbre v2, format, verrous et rendu des points (hors brief MVP) | Logic | Complete | N/A |
 | 019 | Arbre v2, effets, contenu et écran (hors brief MVP) | UI | Complete | N/A |
+| 019b | Refonte UI/UX mobile (hors brief MVP) | UI | In Progress | N/A |
 | 020 | Calibrage unique de l'économie (hors brief MVP) | Config/Data | Ready | N/A |
 | 021 | Variété des monstres (hors brief MVP) | Visual/Feel | Ready | N/A |
 | 022 | Écran allumé et mode économie (hors brief MVP) | UI | Ready | N/A |

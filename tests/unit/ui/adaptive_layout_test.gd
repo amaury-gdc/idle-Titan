@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 ## Unit tests for the pure decisions of the adaptive main screen: the shape thresholds and their
-## dead zone, the scale and its two bounds, the portrait monster row, the modal rectangle and the
-## room of the loot message.
+## dead zone, the scale and its two bounds, the portrait scene and panel (story 019b), the modal
+## rectangle and the room of the loot message.
 ##
 ## Why the thresholds stand above 1 (independent review of story 010): a square window, or one a
 ## little wider than tall, has no room for a 60/40 split with 3 columns, so it reads better in rows.
@@ -17,7 +17,6 @@ const HEIGHT: float = 1000.0
 const TOLERANCE: float = 0.001
 const CAP: float = AdaptiveLayout.MAX_PORTRAIT_CSS_PER_UNIT
 const FLOOR: float = AdaptiveLayout.MIN_CSS_PER_UNIT
-const ORB_OUTLINE: float = CompanionOrbs.OUTLINE_WIDTH
 
 
 func _css(ratio: float) -> Vector2:
@@ -137,29 +136,45 @@ func test_css_per_unit_floor_holds_on_a_small_window() -> void:
 	assert_float(AdaptiveLayout.css_per_unit(Vector2(320.0, 480.0), PORTRAIT)).is_equal(FLOOR)
 
 
-func test_monster_row_tall_screen_keeps_its_full_height() -> void:
-	assert_float(AdaptiveLayout.portrait_monster_row(844.0)).is_equal(AdaptiveLayout.MONSTER_ROW_MAX)
+func test_scene_spec_phone_gets_the_heights_of_the_spec() -> void:
+	# 390x742: header 52, scene 208, skills 68, panel 358, tabs 56 (story 019b).
+	assert_float(AdaptiveLayout.portrait_scene(742.0)).is_equal(208.0)
+	assert_float(AdaptiveLayout.portrait_panel(742.0)).is_equal(358.0)
 
 
-func test_monster_row_short_screen_stops_at_its_minimum() -> void:
-	assert_float(AdaptiveLayout.portrait_monster_row(500.0)).is_equal(AdaptiveLayout.MONSTER_ROW_MIN)
+func test_scene_tall_phone_gives_the_surplus_to_the_panel() -> void:
+	assert_float(AdaptiveLayout.portrait_scene(866.0)).is_equal(AdaptiveLayout.SCENE_MAX)
+	assert_float(AdaptiveLayout.portrait_panel(866.0)).is_equal(482.0)
 
 
-func test_monster_row_gives_way_before_the_management_zone() -> void:
-	var height: float = 640.0
-	var row: float = AdaptiveLayout.portrait_monster_row(height)
-	var left: float = height - AdaptiveLayout.HEADER_HEIGHT - AdaptiveLayout.portrait_game_height(row)
-	assert_float(row).is_less(AdaptiveLayout.MONSTER_ROW_MAX)
-	assert_float(row).is_greater(AdaptiveLayout.MONSTER_ROW_MIN)
-	assert_float(left).is_equal_approx(AdaptiveLayout.MANAGEMENT_MIN_HEIGHT, TOLERANCE)
+func test_scene_gives_way_before_the_panel() -> void:
+	var height: float = AdaptiveLayout.logical_size(Vector2(360.0, 640.0), PORTRAIT).y
+	var scene: float = AdaptiveLayout.portrait_scene(height)
+	assert_float(scene).is_less(AdaptiveLayout.SCENE_MAX)
+	assert_float(scene).is_greater(AdaptiveLayout.SCENE_MIN)
+	assert_float(AdaptiveLayout.portrait_panel(height)).is_greater_equal(height * AdaptiveLayout.PANEL_MIN_SHARE)
 
 
-func test_short_phone_keeps_two_and_a_half_list_rows() -> void:
+func test_short_phone_keeps_its_panel_share_and_two_and_a_half_rows() -> void:
+	# 320x568 at the floor: 645 u tall.
 	var height: float = AdaptiveLayout.logical_size(Vector2(320.0, 568.0), PORTRAIT).y
-	var row: float = AdaptiveLayout.portrait_monster_row(height)
-	var management: float = height - AdaptiveLayout.HEADER_HEIGHT - AdaptiveLayout.portrait_game_height(row)
-	var list: float = management - 120.0
-	assert_float(list / 56.0).is_greater_equal(2.5)
+	var panel: float = AdaptiveLayout.portrait_panel(height)
+	assert_float(AdaptiveLayout.portrait_scene(height)).is_equal(178.0)
+	assert_float(panel).is_greater_equal(height * AdaptiveLayout.PANEL_MIN_SHARE)
+	assert_float(panel).is_greater_equal(AdaptiveLayout.PANEL_MIN_HEIGHT)
+
+
+func test_scene_very_short_screen_stops_at_its_minimum() -> void:
+	# Under the minimum of the scene the panel is what gives way: 500 u leave it 164 u.
+	assert_float(AdaptiveLayout.portrait_scene(500.0)).is_equal(AdaptiveLayout.SCENE_MIN)
+	assert_float(AdaptiveLayout.portrait_panel(500.0)).is_equal(164.0)
+
+
+func test_portrait_rows_add_up_to_the_screen() -> void:
+	for height: float in [500.0, 645.0, 693.0, 742.0, 866.0]:
+		var rows: float = AdaptiveLayout.HEADER_HEIGHT + AdaptiveLayout.portrait_game_height(AdaptiveLayout.portrait_scene(height)) \
+				+ AdaptiveLayout.portrait_panel(height) + AdaptiveLayout.TAB_ROW_HEIGHT
+		assert_float(rows).is_equal_approx(height, TOLERANCE)
 
 
 func test_modal_rect_wide_view_is_capped_and_centered() -> void:
@@ -187,44 +202,41 @@ func test_orb_radius_follows_the_box_between_its_bounds() -> void:
 	assert_float(GameZone.orb_pitch(450.0)).is_equal_approx(GameZone.ORB_PITCH_MIN * 1.5, TOLERANCE)
 
 
-# The spheres of a portrait zone: 2 by 2 on each side of a box of [param box], as GameZone puts them.
-func _portrait_orbs(zone: Vector2, row: float, box: float) -> PackedVector2Array:
-	var enemy: Rect2 = GameZone.blocks(PORTRAIT, zone, row)["enemy"]
-	var pitch: float = GameZone.orb_pitch(box)
-	var flank: float = (enemy.position.x + enemy.get_center().x - box / 2.0) / 2.0
-	var orbs: PackedVector2Array = PackedVector2Array()
-	for x: float in [flank, enemy.get_center().x * 2.0 - flank]:
-		for column: float in [-0.5, 0.5]:
-			for line: float in [-0.5, 0.5]:
-				orbs.append(Vector2(x + column * pitch, enemy.get_center().y + line * pitch))
-	return orbs
+# The monster box of a portrait zone: the height of its room, at most BOX_ZONE_RATIO of the width.
+func _portrait_box(zone: Vector2, scene: float) -> float:
+	var enemy: Rect2 = GameZone.blocks(PORTRAIT, zone, scene)["enemy"]
+	return minf(enemy.size.y, zone.x * GameZone.BOX_ZONE_RATIO)
 
 
-func _assert_clear_of_orbs(slot: Rect2, orbs: PackedVector2Array, box: float) -> void:
-	var reach: float = GameZone.orb_radius(box) + ORB_OUTLINE
-	for orb: Vector2 in orbs:
-		assert_bool(slot.intersects(Rect2(orb - Vector2.ONE * reach, Vector2.ONE * reach * 2.0))).is_false()
+# The portrait companions are mice (story 019b): their silhouettes, outline included.
+func _assert_clear_of_mice(slot: Rect2, zone: Vector2, scene: float, box: float) -> void:
+	var half: Vector2 = MouseFace.half_extent(GameZone.portrait_mouse_size(zone, scene))
+	for mouse: Vector2 in GameZone.portrait_mouse_centers(zone, scene, box):
+		var where: String = "slot %s, mouse %s, zone %s, scene %s" % [slot, Rect2(mouse - half, half * 2.0), zone, scene]
+		assert_bool(slot.intersects(Rect2(mouse - half, half * 2.0))).override_failure_message(where).is_false()
 
 
-func test_loot_slot_portrait_never_reaches_a_sphere() -> void:
-	for row: float in [120.0, 170.0]:
-		var zone: Vector2 = Vector2(363.0, AdaptiveLayout.portrait_game_height(row))
-		var box: float = row
-		for free: bool in [true, false]:
-			var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, row, box, free)
-			_assert_clear_of_orbs(slot, _portrait_orbs(zone, row, box), box)
+func test_loot_slot_portrait_never_reaches_a_mouse() -> void:
+	for width: float in [363.0, 390.0]:
+		for scene: float in [AdaptiveLayout.SCENE_MIN, AdaptiveLayout.SCENE_MAX]:
+			var zone: Vector2 = Vector2(width, AdaptiveLayout.portrait_game_height(scene))
+			var box: float = _portrait_box(zone, scene)
+			for free: bool in [true, false]:
+				var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, scene, box, free)
+				_assert_clear_of_mice(slot, zone, scene, box)
 
 
-func test_loot_slot_portrait_free_band_starts_in_the_band() -> void:
-	var zone: Vector2 = Vector2(390.0, AdaptiveLayout.portrait_game_height(170.0))
-	var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, 170.0, 170.0, true)
-	assert_float(slot.position.y).is_equal(AdaptiveLayout.ROW_GAP)
+func test_loot_slot_portrait_free_band_starts_at_the_top_of_the_scene() -> void:
+	var zone: Vector2 = Vector2(390.0, AdaptiveLayout.portrait_game_height(AdaptiveLayout.SCENE_MAX))
+	var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, AdaptiveLayout.SCENE_MAX, _portrait_box(zone, AdaptiveLayout.SCENE_MAX), true)
+	assert_float(slot.position.y).is_equal(GameZone.PADDING)
 
 
-func test_loot_slot_portrait_occupied_band_stays_under_it() -> void:
-	var zone: Vector2 = Vector2(390.0, AdaptiveLayout.portrait_game_height(170.0))
-	var rects: Dictionary = GameZone.blocks(PORTRAIT, zone, 170.0)
-	var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, 170.0, 170.0, false)
+func test_loot_slot_portrait_occupied_band_stays_under_the_corner() -> void:
+	var scene: float = AdaptiveLayout.SCENE_MAX
+	var zone: Vector2 = Vector2(390.0, AdaptiveLayout.portrait_game_height(scene))
+	var rects: Dictionary = GameZone.blocks(PORTRAIT, zone, scene)
+	var slot: Rect2 = GameZone.loot_slot_for(PORTRAIT, zone, scene, _portrait_box(zone, scene), false)
 	assert_float(slot.position.y).is_greater_equal((rects["challenge"] as Rect2).end.y)
 	assert_bool((rects["enemy"] as Rect2).encloses(slot)).is_true()
 

@@ -1,8 +1,8 @@
 class_name AdaptiveLayout
 extends RefCounted
 ## The pure decisions of the adaptive main screen (story 010, design/ux/main-screen-adaptive.md):
-## portrait or landscape, the logical size of the window, the height of the portrait monster row
-## and the rectangle of a modal panel. Nothing here touches a node, so all of it is unit-testable;
+## portrait or landscape, the logical size of the window, the heights of the portrait scene and
+## panel (story 019b) and the rectangle of a modal panel. Nothing here touches a node, so all of it is unit-testable;
 ## [code]main_screen.gd[/code] reads the window and applies the answers.
 ##
 ## The shape has a dead zone between [constant TO_PORTRAIT_BELOW] and [constant TO_LANDSCAPE_ABOVE]
@@ -36,22 +36,20 @@ const MIN_CSS_PER_UNIT: float = 0.88
 ## Ceiling of the scale in portrait: past it a tablet gets more room, not a bigger phone screen
 ## (display setting, not a gameplay value).
 const MAX_PORTRAIT_CSS_PER_UNIT: float = 1.28
-## Height of the header, in both shapes.
-const HEADER_HEIGHT: float = 56.0
-## Rows of the portrait game zone. The monster row gives way before the list does.
-const ACTION_ROW_HEIGHT: float = 50.0
-const HP_ROW_HEIGHT: float = 24.0
-const SKILL_ROW_HEIGHT: float = 52.0
-const FOOT_ROW_HEIGHT: float = 50.0
-const MONSTER_ROW_MAX: float = 170.0
-const MONSTER_ROW_MIN: float = 120.0
-## Space between two rows of the portrait game zone, and above the first and under the last.
+## Height of the header, in both shapes (story 019b).
+const HEADER_HEIGHT: float = 52.0
+## Fixed rows of the portrait screen (story 019b): the skills under the scene, the tabs at the bottom.
+const SKILL_ROW_HEIGHT: float = 68.0
+const TAB_ROW_HEIGHT: float = 56.0
+## The scene (monster, companions, HP) gives way before the panel does, between these heights.
+const SCENE_MAX: float = 208.0
+const SCENE_MIN: float = 160.0
+## The panel keeps at least this share of the screen height, and never less than
+## [constant PANEL_MIN_HEIGHT]: its handle (22 u), its header (46 u) and 2,5 rows of 70 u.
+const PANEL_MIN_SHARE: float = 0.45
+const PANEL_MIN_HEIGHT: float = 243.0
+## Space between two blocks of the portrait game zone.
 const ROW_GAP: float = 4.0
-## Number of gaps of the portrait game zone (5 rows, so 6 with both ends).
-const ROW_GAPS: int = 6
-## Height the management zone keeps before the monster row shrinks: 2,5 list rows of 56 u, the
-## selector and its gap (56 u), the list margins (8 u) and the tabs (56 u).
-const MANAGEMENT_MIN_HEIGHT: float = 260.0
 ## A modal panel is at most this wide, and leaves [constant MODAL_MARGIN] on each side.
 const MODAL_MAX_WIDTH: float = 720.0
 const MODAL_MARGIN: float = 16.0
@@ -112,17 +110,25 @@ static func logical_size(css_size: Vector2, shape: Shape) -> Vector2:
 	return css_size / css_per_unit(css_size, shape)
 
 
-## Height of the portrait monster row for a screen [param logical_height] units tall.
-static func portrait_monster_row(logical_height: float) -> float:
-	var free: float = logical_height - HEADER_HEIGHT - MANAGEMENT_MIN_HEIGHT - portrait_game_height(0.0)
-	# Rounded down: the window has whole units, and the fraction must not come out of the list.
-	return clampf(floorf(free), MONSTER_ROW_MIN, MONSTER_ROW_MAX)
+## Height of the portrait scene for a screen [param logical_height] units tall (story 019b): what
+## the header, the skills, the tabs and the smallest panel leave, between [constant SCENE_MIN] and
+## [constant SCENE_MAX]. Every unit past the top goes to the panel.
+static func portrait_scene(logical_height: float) -> float:
+	var panel_min: float = maxf(ceilf(logical_height * PANEL_MIN_SHARE), PANEL_MIN_HEIGHT)
+	var free: float = logical_height - HEADER_HEIGHT - SKILL_ROW_HEIGHT - TAB_ROW_HEIGHT - panel_min
+	# Rounded down: the window has whole units, and the fraction must not come out of the panel.
+	return clampf(floorf(free), SCENE_MIN, SCENE_MAX)
 
 
-## Height of the portrait game zone with a monster row of [param monster_row].
-static func portrait_game_height(monster_row: float) -> float:
-	return ACTION_ROW_HEIGHT + monster_row + HP_ROW_HEIGHT + SKILL_ROW_HEIGHT + FOOT_ROW_HEIGHT \
-			+ ROW_GAP * ROW_GAPS
+## Height of the portrait panel, its handle and header included, the tabs not: what the scene
+## leaves on a screen [param logical_height] units tall.
+static func portrait_panel(logical_height: float) -> float:
+	return logical_height - HEADER_HEIGHT - portrait_game_height(portrait_scene(logical_height)) - TAB_ROW_HEIGHT
+
+
+## Height of the portrait game zone with a scene of [param scene]: the scene and the skill row.
+static func portrait_game_height(scene: float) -> float:
+	return scene + SKILL_ROW_HEIGHT
 
 
 ## Where a modal panel goes in a view of [param view] units: centered, as wide as the view allows

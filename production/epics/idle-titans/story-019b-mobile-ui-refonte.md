@@ -1,0 +1,171 @@
+# Story 019b: Refonte UI/UX mobile
+
+> **Epic**: Idle Titans (MVP)
+> **Status**: In Progress
+> **Layer**: Presentation
+> **Type**: UI
+> **Estimate**: XL
+> **Manifest Version**: N/A (minimal — no control manifest)
+> **Last Updated**: 2026-11-03
+
+## Context
+
+**GDD**: N/A (minimal) ; maquette validée `production/design/ui-refonte/` (option B, compétences fixes), spec UX de base `design/ux/main-screen-adaptive.md`
+**Requirement**: hors brief MVP, écran mobile peu lisible ; reprendre la hiérarchie de TT2 (panneau déployable, lignes à structure fixe, un seul bouton d'achat, onglets colorés) demandée par Amaury
+
+**ADR Governing Implementation**: N/A (minimal — no ADRs)
+**ADR Decision Summary**: N/A (minimal — no ADRs)
+**ADR Version**: N/A (minimal — no ADRs)
+
+**Engine**: Godot 4.7.2 | **Risk**: HIGH
+**Engine Notes**: Consulter `docs/engine-reference/godot/` avant tout appel d'API. Export web : stretch `canvas_items` / `expand` / `fractional`, échelle pilotée par `AdaptiveLayout` (plancher 0,88 px CSS par u).
+
+**Control Manifest Rules (this layer)**: N/A (minimal — no control manifest)
+
+Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` et `accessibility-specialist`, 2026-11-03, avant toute écriture.
+
+---
+
+## Spec retenue (portrait 390x742 u, proportionnelle ailleurs)
+
+- **Échelle** : la largeur fixe l'échelle (base 390 u de large), la hauteur se répartit. Fixe : en-tête 52 + compétences 68 + onglets 56. Panneau ≥ max(45 % de la hauteur, 243 u) ; scène bornée entre 160 et 208 u, elle cède avant le panneau ; tout surplus va au panneau.
+- **En-tête 52 u** : « Étage N » + « Record N » (14 u) à gauche ; or au centre (26 u, pièce, contour noir) avec le **DPS total en 14 u dessous, visible sur les 3 onglets** ; réglages à droite (roue, 44 u visuels).
+- **Scène** : monstre centré ; 8 souris vectorielles de 38 u (4 à gauche, 4 à droite, décoratives : ni toucher ni focus) ; PV 30 u en bas, texte 16 u contouré ; bouton « Boss » 44 u en surimpression en haut à droite, visible quand `farming` ; pendant le combat ce coin devient « Abandonner », et le chrono est une bande fine au-dessus des PV, avec les secondes en chiffres.
+- **Compétences** : rangée fixe 68 u, 3 ronds de 56 u (rangée dessinée pour 5 sans refonte) : anneau de recharge, pastille de secondes (14 u), halo + anneau plein quand prête, cadenas tant qu'un talent ne l'a pas débloquée, état Passif (icône grisée sans anneau, « Passif » dans la bulle). Icône seule ; le nom reste dans la bulle (appui long, focus) et dans le nom accessible. Touches 1/2/3 inchangées.
+- **Panneau** : poignée 22 u (zone tactile de toute sa bande) qui replie et déploie ; repli mémorisé dans `DisplaySettings` ; toucher un onglet déploie. En-tête 46 u propre à chaque onglet. Pas de poignée en paysage.
+- **Souris** : en-tête « DPS total » + un bouton « Achat ×N » ; un appui avance ×1 → ×10 → ×100 → Max → Palier → ×1, icône de rotation à la place du chevron. ×100 ajouté en fin de `BuyQuote.Mode` pour garder le mode déjà enregistré. Lignes 70 u : portrait 52 u (vectoriel, prévu pour des textures), nom gras 16 u + « Niv. N » bleu, « DPS · part % » gris 14 u (part du DPS des compagnons), ligne d'éveil (barre + « Éveil N ») ; bouton 112x56 u : coût (16 u gras) / « +X DPS » (14 u). États : jaune (payable), gris (pas assez, bord), violet « Éveil II + coût » avec « Niveau bloqué : éveil requis », « Max » (mode Palier après le dernier palier) ; niveau 0 : « Acheter ».
+- **« +X DPS »** : calcul d'interface en lecture seule, DPS actuel × (`Companion.damage_at_level` au niveau visé ÷ au niveau actuel) − DPS actuel.
+- **Objets** : 4 emplacements équipés (48 u visuels, bord de rareté) + « Sac N / 12 » (`inventory_capacity`) ; lignes 70 u : bande de rareté, nom + rareté en toutes lettres, bonus gras, ligne grise « Équipé : +X % » (pas de niveau d'objet dans les données) ; « Équiper » (vert) équipe depuis la ligne, le reste de la ligne ouvre la comparaison ; « Équipé » grisé avec coche.
+- **Talents** : écran de la story 019 conservé (fonctions, tests, noms uniques), mis dans la coquille ; « N points à dépenser » (32 u jaune), Reset sur 2 lignes ; 3 branches aux noms actuels ; tuiles 64 u minimum, extensibles ; coût réel ; coche en plus du mot d'état.
+- **Onglets bas 56 u** : Souris / Objets / Talents, icône + libellé, liseré par onglet, actif plus clair, pastille rouge numérotée avec bord clair.
+- **Réglages** : « Défi auto », version, et un bouton « Plein écran » (API Fullscreen sur geste).
+- **Paysage 1280x720** : en-tête pleine largeur ; à gauche la scène et les compétences (environ 540 u) ; à droite le panneau (environ 720 u) avec ses onglets ; talents en arbre complet.
+- **Couleurs** : fond #0F1220, panneau #171B33, ligne #1F2445, jaune #FFC247 (texte #1A1300), bleu #7CC0FF, gris texte #A9B1CC, violet #6E40E8, vert #167A42, rouge boss #B3261E ; texte grisé sur bouton gris ≥ #9AA1BC ; bord « Commun » éclairci à ≥ 3:1.
+- **Accessibilité** : cibles visuelles de 44 u et 48 u avec zone tactile invisible de 50 u (44 px CSS au plancher) ; 16 u minimum pour noms, coûts et actions ; 14 u pour le secondaire signalé : « Record N », DPS de l'en-tête, « DPS · part % », « +X DPS », ligne grise des objets, pastille de secondes, « x / y points ». La couleur n'est jamais le seul signal.
+
+## Acceptance Criteria
+
+- [ ] Portrait : en-tête, scène, compétences, panneau et onglets aux hauteurs de la spec à 390x742 ; règle de repli testée à 360x640 et 320x568.
+- [ ] Aucun débordement horizontal de 320 à 2560 de large, avec « Étage 999 » et « 999,9 Qa ».
+- [ ] Le DPS total est visible dans l'en-tête sur les 3 onglets.
+- [ ] Boss visible seulement si `farming` ; pendant le combat, « Abandonner » et un chrono en bande fine avec les secondes ; rien ne se décale quand il apparaît.
+- [ ] Compétences en ronds aux états prêt, recharge, cadenas et passif, nom dans la bulle ; touches 1/2/3 inchangées.
+- [ ] Poignée qui replie et déploie au toucher et au clavier, état mémorisé ; panneau replié sans contrôle focalisable caché.
+- [ ] Un seul bouton d'achat qui cycle ×1, ×10, ×100, Max, Palier ; ancien mode enregistré relu sans décalage.
+- [ ] « +X DPS » égal au gain réel après achat (test, Champion excepté).
+- [ ] Lignes Souris, Objets et Talents conformes à la spec ; « Équiper » sur la ligne, comparaison toujours accessible.
+- [ ] Talents : fonctions, noms uniques et tests de la story 019 conservés (adaptés, jamais désactivés).
+- [ ] « Défi auto », version et « Plein écran » dans Réglages, plus sur l'écran principal.
+- [ ] Contraste ≥ 4,5:1 pour tout texte et ≥ 3:1 pour les signaux non textuels, couverts par `main_theme_contrast_test.gd`.
+- [ ] Cibles ≥ 44 px CSS, textes ≥ 14 u, contrôlés par la sonde dans l'export.
+- [ ] Captures dans l'export à 390x742, 360x640, 412x915, 1280x720, plus 320x568, et audit des 18 tailles de la story 019.
+- [ ] Essai sur le téléphone d'Amaury après le lot 5, avant les lots 6 à 9.
+
+---
+
+## Out of Scope
+
+- Mode économie (story 022), monstres (021), courbes d'économie (020), contenu de l'arbre de talents (noms et nombre des branches).
+- Installation sur l'écran d'accueil (PWA, manifest).
+- Vrais dessins des souris : vectoriel simple en attendant.
+
+---
+
+## Lots
+
+0. Fiche et EPIC.
+1. Jetons de couleur et test de contraste.
+2. Hauteurs en portrait, en-tête (DPS sous l'or), Réglages (Défi auto, version, Plein écran).
+3. Scène : souris, Boss conditionnel, Abandonner et chrono.
+4. Compétences en ronds.
+5. Coquille du panneau (poignée, en-tête par onglet, Achat ×N), onglets du bas. **Essai téléphone.**
+6. Lignes Souris et test du « +X DPS ».
+7. Objets.
+8. Talents dans la coquille, audit des 18 tailles.
+9. Paysage, audit final, preuves.
+
+---
+
+## Files
+
+- `src/ui/main_theme.tres`, `adaptive_layout.gd`, `game_zone.gd`, `main_screen.gd`, `main_screen.tscn`, `save_screen.gd`, `save_screen.tscn`, `companion_orbs.gd`, `boss_timer.gd`, `boss_timer.tscn`, `skill_bar.gd`, `skill_bar.tscn`, `management_tabs.gd`, `companion_panel.gd`, `companion_panel.tscn`, `buy_quote.gd`, `inventory_screen.gd`, `inventory_screen.tscn`, `talent_screen.gd`, `talent_screen.tscn`
+- `src/core/display_settings.gd` (repli du panneau, mode ×100)
+- Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd`
+
+## QA Test Cases
+
+*Panneau replié puis rotation ; boss qui apparaît pendant un tapotage ; glissé dans la liste sans achat ; appui long sur une compétence ; ×100 avec moins de 100 niveaux possibles ; ancien mode d'achat enregistré ; sac plein ; noms les plus longs à 320 px ; zoom Chrome 150 %.*
+
+---
+
+## Test Evidence
+
+**Story Type**: UI
+**Required evidence**: captures dans `production/qa/evidence/story-019b-mobile-ui-refonte/`, tests dans `tests/unit/ui/`.
+
+**Status**: [ ] En cours. Lot 1 fait : captures `lot1-*` à 390x742, 360x640, 412x915, 1280x720 et 320x568 (export web, Edge headless, aucune erreur console, scrollWidth = innerWidth), `stamp.txt` ; suite 832/832.
+
+**Journal des lots**
+
+- Lot 1 (2026-11-03) : `src/ui/ui_palette.gd` (jetons), `main_theme.tres` (mêmes types, nouvelles valeurs ; `BuyButton` jaune à texte #1A1300 ; `ToggleButton` et `EquipButton` verts ; `AwakenButton` violet ; pastille rouge à bord blanc ; `TEXT_DISABLED` réservé à l'état désactivé ; anneau de focus blanc à ombre #0F1220), `main_screen.tscn`, `game_zone.gd`. Écart : fond de la jauge des PV #2E0C10 au lieu de #4A1418 (2,67:1 contre la jauge, vu en échec). Inchangés jusqu'à leur lot : branches de talents (8), orange du DPS (2), compétence active (4). Captures sur partie neuve : vert, violet et pastille couverts par les tests seulement.
+- Lot 2 (2026-11-03) : `AdaptiveLayout.portrait_scene` / `portrait_panel` (742 → 208 / 358 ; 693 → 205 / 312 ; 645 → 178 / 291 ; 866 → 208 / 482) ; `GameZone` portrait = scène + rangée de compétences 68 u, PV 30 u en bas, chrono en bande de 22 u au-dessus (secondes en chiffres, `BossTimer.set_compact`), coin « Boss » / « Abandonner » en haut à droite (104 x 50 u, au-dessus du monstre dans l'arbre pour rester touchable) ; « Abandonner » demande « Confirmer ? » pendant 3 s (`ConfirmPress`, aucune protection n'existait) ; en-tête d'une ligne : étage 20 + « Record » 14, bouton central (pièce, or 26 contouré, DPS 14, triangle « s'ouvre », nom accessible « Détail du DPS », 50 u de haut), roue de 50 u (nom accessible « Réglages ») ; `UiIcon` (roue, pièce, triangle) ; Réglages : « Défi auto », « Plein écran » (export web et `document.fullscreenEnabled` seulement, état relu à chaque redimensionnement). Écarts : le placement de Boss, Abandonner et du chrono avancé du lot 3 au lot 2 ; coin dessiné à 50 u (44 u visuels au lot 3) ; coin à 104 u au lieu de 112 (chevauchait le monstre à 363 u, vu en échec). Paysage : version et « Défi auto » retirés, compétences sur toute la colonne. Suite 854/854. Captures `lot2-*` aux 5 tailles et `-reglages` à 390x742 et 1280x720. **Pas de capture d'un combat de boss** (partie neuve, étage 1) : couverts par `game_zone_layout_test` et `confirm_press_test`, à capturer au lot 3. Limite connue : à 178 u de scène et moins, les orbes actuelles touchent de quelques unités le bas du coin et la bande du chrono ; les souris du lot 3 seront placées à nouveau.
+- Lot 3 (2026-11-03) :
+  - **Souris.** `MouseFace` dessine une souris de 11 cercles : tête, oreilles à intérieur rose, yeux, nez, contour. `CompanionOrbs` ne dessine plus ces cercles à chaque image. Chaque souris est peinte une fois dans un atlas, au double des pixels de l'écran. L'atlas n'est repeint que si la taille des souris ou des pixels change. Deux atlas alternent : l'ancien reste affiché, étiré, jusqu'au rendu du nouveau.
+  - **Placement.** `GameZone` donne aux souris 38 u, 20 u au minimum, autour du monstre. Elles ne touchent ni le coin, ni les PV, ni le chrono, ni le monstre : c'est testé à 178, 190, 205 et 208 u de scène, à 363 et 390 de large.
+  - **Coin Boss / Abandonner.** Il est dessiné à 44 u dans une zone touchable de 50 u (`expand_margin` négatif), avec la flèche `UiIcon.ARROW`. L'état « Confirmer ? » a un bord blanc.
+  - **Chrono.** Jaune, rouge à la fin, sur fond `PANEL`.
+  - **Outils.** `tools/web/` contient `browser.mjs`, `capture.mjs`, `perf.mjs` et un README. Edge y est toujours fermé, avec un profil temporaire. Variables : `BROWSER_PATH`, `BROWSER_HEADLESS`, `BROWSER_WINDOW_POSITION`, `BROWSER_TIMEOUT_MS`.
+
+  Fluidité, processeur ×4, 5 passages alternés avec la référence (dernier commit), occupation médiane du fil principal (`lot3-fluidite-headless.txt`, `lot3-fluidite-fenetre.txt`) :
+
+  | Mesure | Portrait (réf. / lot 3) | Paysage (réf. / lot 3) |
+  |---|---|---|
+  | Sans fenêtre | 21,4 / 20,9 % | 20,9 / 20,5 % |
+  | Fenêtre visible | 18,8 / 17,6 % | 19,1 / 17,9 % |
+
+  En fenêtre visible, il y a 0 à 2 images de plus de 33 ms par passage dans les deux versions, et l'image médiane est à 16,7 ms. Critère retenu : pas plus de 1,5 point au-dessus de la référence ; il est atteint.
+
+  **Erreur de mesure, corrigée :**
+  - Jusqu'ici, la mesure touchait toujours (195, 126). En portrait, ce point est au-dessus du monstre de la référence, qui est vers (195, 197). La référence en portrait ne recevait donc aucun coup et paraissait moins coûteuse.
+  - Ces résultats étaient donc faux : l'écart « 1 à 5 contre 18 à 32 images de plus de 33 ms » de la première mesure, et les « +1,5 point des lots 1 et 2 ».
+  - Ce qui reste valable : le coût des souris dessinées en cercles, mesuré entre variantes de la même disposition. Il valait environ 1,5 point, et c'est ce qu'enlève l'atlas.
+  - L'erreur a été trouvée en comptant les redessins par nœud : le monstre de la référence n'était jamais redessiné.
+  - `perf.mjs` accepte maintenant `touch:<version>:<forme>=X,Y`.
+
+  Sans fenêtre, les temps d'image ne montrent rien : on compare sur l'occupation.
+
+  **Écart avec le plan :** le dessin vectoriel reste la source, mais l'affichage passe par l'atlas.
+
+  **Tests :**
+  - 5 tests d'atlas dans `visual_feedback_test.gd`. En headless, Godot ne rend rien : le test vérifie la préparation de l'atlas, pas son affichage. Le premier test d'affichage a échoué pour cette raison et a été remplacé.
+  - Suite 866/866.
+
+  **Preuves :**
+  - Captures `lot3-*`, refaites avec l'atlas : combat, « Confirmer ? » et retour à 390x742, 360x640 et 320x568 ; 412x915 ; 1280x720 combat et « Confirmer ? ». Aucune erreur console, aucun défilement horizontal.
+  - `lot3-nettete-souris.png` : souris avant et après, agrandies ×3, aux 3 tailles de portrait. Elles sont aussi nettes, avec des bords plus lisses.
+  - Clignotement : 253 images enregistrées pendant 6 redimensionnements, rotation comprise ; les souris ne disparaissent dans aucune.
+  - Les captures viennent d'une copie jetable avec une partie préparée : étage 199, mode farm, 8 compagnons niveau 1.
+
+## Vérifications sur téléphone (à la charge d'Amaury)
+
+- Après le lot 5 : cette liste sera complétée à chaque lot.
+- **Plein écran, à vérifier à la main** : Réglages → « Plein écran : NON » → toucher : la barre du navigateur disparaît et le libellé passe à OUI ; quitter par le geste retour : le libellé revient à NON sans toucher le bouton ; aucun décalage de la mise en page après la sortie.
+- « Abandonner » pendant un boss : un toucher affiche « Confirmer ? », un second dans les 3 s abandonne, sans second toucher il revient à « Abandonner ».
+- En-tête : toucher l'or ouvre le détail du DPS, un second toucher le ferme ; la roue ouvre Réglages ; les deux se touchent au pouce sans viser.
+- « Défi auto » dans Réglages garde son état après rechargement de la page.
+- Souris à côté du monstre :
+  - nettes, sans flou, en portrait et après rotation ;
+  - aucune ne disparaît ni ne clignote quand on tourne le téléphone ;
+  - aucune ne touche le monstre, le coin Boss, les PV ou le chrono.
+- Boss :
+  - le coin « Boss » se touche au pouce, sans viser ;
+  - pendant le combat, le chrono reste lisible, avec les secondes en chiffres ;
+  - « Confirmer ? » se distingue bien d'« Abandonner ».
+- Tapoter vite le monstre pendant une dizaine de secondes : pas d'à-coup visible ; les chiffres et les billes restent fluides.
+
+---
+
+## Dependencies
+
+- Depends on: `production/epics/idle-titans/story-019-talent-tree-content.md`
+- Unlocks: None

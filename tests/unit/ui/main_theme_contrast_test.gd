@@ -1,12 +1,27 @@
 extends GdUnitTestSuite
 ## Unit tests for the contrast of the shared theme and the talent colours, read from the real
 ## resource: WCAG 2.1 AA, 4.5:1 for text (spec, Accessibility).
-## Story: production/epics/idle-titans/story-010-adaptive-layout.md.
+## Stories: production/archive/idle-titans/story-010-adaptive-layout.md,
+## production/epics/idle-titans/story-019b-mobile-ui-refonte.md (colour tokens, focus ring).
 
 const THEME_PATH: String = "res://src/ui/main_theme.tres"
 const MIN_CONTRAST: float = 4.5
 ## WCAG 2.1 AA for what is not text.
 const MIN_NON_TEXT_CONTRAST: float = 3.0
+## Tolerance of a colour written with 6 decimals in the theme file.
+const COLOR_TOLERANCE: float = 0.002
+## Buttons whose fill carries a white text.
+const WHITE_TEXT_BUTTONS: Array[String] = ["AwakenButton", "EquipButton", "ChallengeButton", "DangerButton"]
+## Every (style, type) a focused control can sit on, and the panels around them.
+const FOCUS_BACKGROUNDS: Array[Array] = [
+	["normal", "Button"], ["hover", "Button"], ["disabled", "Button"],
+	["normal", "BuyButton"], ["hover", "BuyButton"], ["pressed", "BuyButton"],
+	["normal", "AwakenButton"], ["normal", "EquipButton"], ["normal", "ChallengeButton"],
+	["normal", "DangerButton"], ["pressed", "TabButton"], ["pressed", "SegmentButton"],
+	["normal", "ItemRow"], ["hover", "ItemRow"], ["normal", "TalentOwned"],
+	["normal", "TalentBuyable"], ["normal", "TalentLocked"], ["panel", "HeaderPanel"],
+	["panel", "ManagementPanel"],
+]
 
 var _theme: Theme
 
@@ -39,9 +54,95 @@ func test_contrast_formula_black_on_white_is_21() -> void:
 
 
 func test_buy_button_text_reads_in_every_state() -> void:
+	var texts: Dictionary = {"normal": "font_color", "hover": "font_hover_color", "pressed": "font_pressed_color"}
+	for style: String in texts:
+		assert_float(_contrast(_text(texts[style], "BuyButton"), _background(style, "BuyButton"))).is_greater_equal(MIN_CONTRAST)
+
+
+func test_white_text_buttons_read_in_every_state() -> void:
 	var text: Color = _text("font_color", "Button")
-	for style: String in ["normal", "hover", "pressed"]:
-		assert_float(_contrast(text, _background(style, "BuyButton"))).is_greater_equal(MIN_CONTRAST)
+	for type: String in WHITE_TEXT_BUTTONS:
+		for style: String in ["normal", "hover", "pressed"]:
+			assert_float(_contrast(text, _background(style, type))).is_greater_equal(MIN_CONTRAST)
+
+
+func test_corner_buttons_read_in_every_state() -> void:
+	var text: Color = _text("font_color", "Button")
+	for type: String in ["CornerChallenge", "CornerButton", "CornerConfirm"]:
+		for style: String in ["normal", "hover", "pressed"]:
+			assert_float(_contrast(text, _background(style, type))).override_failure_message(type + "/" + style).is_greater_equal(MIN_CONTRAST)
+
+
+func test_corner_is_drawn_44_units_in_a_touch_area_of_50() -> void:
+	# The corner of GameZone is 50 u tall; its styles draw 3 u less above and below (story 019b).
+	for type: String in ["CornerChallenge", "CornerButton", "CornerConfirm"]:
+		for style: String in ["normal", "hover", "pressed"]:
+			var box: StyleBoxFlat = _theme.get_stylebox(style, type)
+			var drawn: float = GameZone.CORNER_HEIGHT + box.expand_margin_top + box.expand_margin_bottom
+			assert_float(drawn).override_failure_message(type + "/" + style).is_equal(44.0)
+
+
+func test_confirm_state_is_told_by_a_white_edge_too() -> void:
+	var confirm: StyleBoxFlat = _theme.get_stylebox("normal", "CornerConfirm")
+	var neutral: StyleBoxFlat = _theme.get_stylebox("normal", "CornerButton")
+	assert_int(confirm.border_width_top).is_greater(neutral.border_width_top)
+	assert_float(_contrast(confirm.border_color, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_enabled_button_keeps_a_light_text() -> void:
+	# The muted grey belongs to the disabled state only (story 019b): an enabled button stays light.
+	assert_bool(_text("font_disabled_color", "Button").is_equal_approx(UiPalette.TEXT_DISABLED)).is_true()
+	for item: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		var text: Color = _text(item, "Button")
+		assert_float(_luminance(text)).is_greater(_luminance(UiPalette.TEXT_DISABLED))
+		assert_float(_contrast(text, _background("normal", "Button"))).is_greater_equal(MIN_CONTRAST)
+
+
+func test_rarity_edges_stand_out_of_the_row() -> void:
+	for type: String in ["ItemRowCommon", "ItemRowRare", "ItemRowLegendary"]:
+		var row: StyleBoxFlat = _theme.get_stylebox("normal", type)
+		assert_float(_contrast(row.border_color, row.bg_color)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_focus_ring_shows_on_every_background() -> void:
+	# The ring is white with a dark shadow: on a light fill (yellow) the shadow is what shows.
+	var ring: StyleBoxFlat = _theme.get_stylebox("focus", "Button")
+	assert_bool(ring.draw_center).is_false()
+	assert_int(ring.border_width_top).is_greater_equal(2)
+	assert_int(ring.shadow_size).is_greater(0)
+	for pair: Array in FOCUS_BACKGROUNDS:
+		var fill: Color = _background(pair[0], pair[1])
+		var best: float = maxf(_contrast(ring.border_color, fill), _contrast(ring.shadow_color, fill))
+		assert_float(best).override_failure_message("ring on %s/%s" % [pair[1], pair[0]]).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_hp_text_reads_on_the_gauge() -> void:
+	assert_float(_contrast(Color.WHITE, UiPalette.HP_RED)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.HP_RED, UiPalette.HP_BACK)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_theme_matches_the_palette() -> void:
+	var pairs: Array[Array] = [
+		[_background("panel", "HeaderPanel"), UiPalette.BACKGROUND],
+		[_background("panel", "ManagementPanel"), UiPalette.PANEL],
+		[_background("normal", "ItemRow"), UiPalette.ROW],
+		[_background("normal", "Button"), UiPalette.BUTTON],
+		[_background("normal", "BuyButton"), UiPalette.YELLOW],
+		[_text("font_color", "BuyButton"), UiPalette.ON_YELLOW],
+		[_background("normal", "AwakenButton"), UiPalette.VIOLET],
+		[_background("normal", "EquipButton"), UiPalette.GREEN],
+		[_background("normal", "ChallengeButton"), UiPalette.RED],
+		[_background("panel", "DotPanel"), UiPalette.RED],
+		[_background("normal", "TalentOwned"), UiPalette.OWNED_BG],
+		[_text("font_color", "ItemRowCommon"), UiPalette.COMMON],
+		[_text("font_color", "ItemRowRare"), UiPalette.BLUE],
+		[_text("font_color", "PaneText"), UiPalette.TEXT_MUTED],
+	]
+	for pair: Array in pairs:
+		var got: Color = pair[0]
+		var want: Color = pair[1]
+		for channel: int in 3:
+			assert_float(got[channel]).is_equal_approx(want[channel], COLOR_TOLERANCE)
 
 
 func test_buy_hover_is_darker_than_normal() -> void:
@@ -80,10 +181,17 @@ func test_selected_tab_has_a_bar_and_reads() -> void:
 	assert_float(_contrast(_text("font_pressed_color", "TabButton"), selected.bg_color)).is_greater_equal(MIN_CONTRAST)
 
 
-func test_notification_dot_has_a_dark_edge() -> void:
+func test_notification_dot_has_an_edge_that_reads() -> void:
 	var dot: StyleBoxFlat = _theme.get_stylebox("panel", "DotPanel")
 	assert_int(dot.border_width_top).is_greater(0)
 	assert_float(_contrast(dot.bg_color, dot.border_color)).is_greater_equal(MIN_CONTRAST)
+
+
+func test_notification_dot_edge_stands_out_of_the_tabs() -> void:
+	# Red on the dark tab bar is under 3:1 (2.59): the light edge is what makes the dot visible.
+	var dot: StyleBoxFlat = _theme.get_stylebox("panel", "DotPanel")
+	for fill: Color in [_background("panel", "ManagementPanel"), _background("pressed", "TabButton")]:
+		assert_float(_contrast(dot.border_color, fill)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
 func test_talent_states_read() -> void:

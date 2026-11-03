@@ -17,8 +17,12 @@ extends Control
 
 ## Below this share of the time left the bar turns red (display setting, not balance).
 const LOW_TIME_RATIO: float = 0.25
-const COLOR_FILL: Color = Color(0.85, 0.45, 0.1)
-const COLOR_FILL_LOW: Color = Color(0.9, 0.12, 0.12)
+## Font sizes of the banner and of the thin portrait band (story 019b).
+const FONT_SIZE: int = 24
+const COMPACT_FONT_SIZE: int = 16
+## Colours of the bar (story 019b): the texts are white with a black outline over both.
+const COLOR_FILL: Color = UiPalette.YELLOW
+const COLOR_FILL_LOW: Color = UiPalette.RED
 
 @onready var _fill: ColorRect = %Fill
 @onready var _countdown: Label = %CountdownLabel
@@ -40,3 +44,10 @@ func show_fight(time_left: float, total: float) -> void:
 ## Hides the banner.
 func hide_fight() -> void:
 	visible = false
+
+
+## Fits the texts to the thin band of the portrait scene ([param compact]) or to the landscape
+## banner. The seconds stay in figures in both.
+func set_compact(compact: bool) -> void:
+	for label: Label in [_marking, _countdown]:
+		label.add_theme_font_size_override("font_size", COMPACT_FONT_SIZE if compact else FONT_SIZE)

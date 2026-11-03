@@ -1,8 +1,10 @@
 extends Control
-## Main screen of Idle Titans (stories 002, 003, 004, 004b, 010): a header (stage, best stage, gold,
-## DPS, "Réglages"), a [GameZone] (enemy, HP bar, boss banner or "Défier le boss", skills, the
-## "Défi automatique" toggle, the version) and a [ManagementTabs] zone (the tab bar over the companion
-## list, the [InventoryScreen] and the [TalentScreen]). The game never waits for a tab (story 011,
+## Main screen of Idle Titans (stories 002, 003, 004, 004b, 010, 019b): a one-line header (stage and
+## best stage; gold and DPS in a button that opens the detail of the DPS; the gear of "Réglages"), a
+## [GameZone] (enemy, HP bar, boss timer, "Boss" or "Abandonner" in a corner, skills) and a
+## [ManagementTabs] zone (the tab bar over the companion list, the [InventoryScreen] and the
+## [TalentScreen]). "Défi auto" and the version live in "Réglages". "Abandonner" asks for a second
+## press within [constant ConfirmPress.WINDOW_SECONDS]. The game never waits for a tab (story 011,
 ## D1): only "Réglages", which opens the [SaveScreen], and the return message stop it, and they are
 ## the two modal windows left. The loot message comes during the fight, so it lives here and not in
 ## the inventory, takes no mouse and no focus, and hides by itself.
@@ -87,17 +89,17 @@ const OFFLINE_PANEL_HEIGHT: float = 300.0
 ## widest text of [method BigNumber.format] up to stage 300, the same as the companion buttons.
 const HEADER_LONGEST_VALUE: String = CompanionPanel.LONGEST_COST
 const HEADER_LONGEST_STAGE: int = 999
-## Space between a caption and its value in a one-line header cell (display setting).
-const HEADER_CELL_GAP: int = 6
-## Room around the text of the "Réglages" button (display setting).
-const HEADER_BUTTON_MARGIN: float = 12.0
-## Room around the text of the DPS button (display setting).
+## Room on each side of the gold and DPS inside their button (display setting).
 const HEADER_DPS_MARGIN: float = 8.0
+## Sizes of the coin and of the "opens" sign beside the gold and the DPS, and their gaps (as in
+## main_screen.tscn).
+const HEADER_COIN_WIDTH: float = 22.0
+const HEADER_COIN_GAP: float = 6.0
+const HEADER_OPEN_WIDTH: float = 10.0
+const HEADER_OPEN_GAP: float = 4.0
 ## The font sizes of the spec, in logical units.
 const FONT_16: int = 16
 const FONT_20: int = 20
-const FONT_24: int = 24
-const FONT_32: int = 32
 const SECONDS_PER_MINUTE: int = 60
 const SECONDS_PER_HOUR: int = 3600
 
@@ -147,16 +149,13 @@ var _version_notice_open: bool = false
 # Height the window of the return message asks for: its content, at least OFFLINE_PANEL_HEIGHT; the
 # view caps it (AdaptiveLayout.modal_rect).
 var _message_window_height: float = OFFLINE_PANEL_HEIGHT
+# The first press of "Abandonner" waits here for its confirmation.
+var _abandon_confirm: ConfirmPress = ConfirmPress.new()
 
 @onready var _layout: Control = %Layout
 @onready var _split: BoxContainer = %Split
 @onready var _game_zone: GameZone = %GameZone
 @onready var _tabs: ManagementTabs = %ManagementTabs
-@onready var _stage_cell: BoxContainer = %StageCell
-@onready var _gold_cell: BoxContainer = %GoldCell
-@onready var _dps_cell: BoxContainer = %DpsCell
-@onready var _gold_caption: Label = %GoldCaption
-@onready var _dps_caption: Label = %DpsCaption
 @onready var _stage_label: Label = %StageLabel
 @onready var _gold_label: Label = %GoldLabel
 @onready var _dps_button: Button = %DpsButton
@@ -172,11 +171,9 @@ var _message_window_height: float = OFFLINE_PANEL_HEIGHT
 @onready var _boss_timer: BossTimer = %BossTimer
 @onready var _challenge_button: Button = %ChallengeButton
 @onready var _abandon_button: Button = %AbandonButton
-@onready var _auto_toggle: Button = %AutoChallengeToggle
 @onready var _boss_hint_label: Label = %BossHintLabel
 @onready var _talent_screen: TalentScreen = %TalentScreen
 @onready var _inventory_screen: InventoryScreen = %InventoryScreen
-@onready var _version_label: Label = %VersionLabel
 @onready var _save_button: Button = %SaveButton
 @onready var _save_screen: SaveScreen = %SaveScreen
 @onready var _orbs: CompanionOrbs = %CompanionOrbs
@@ -191,8 +188,10 @@ var _message_window_height: float = OFFLINE_PANEL_HEIGHT
 
 
 func _ready() -> void:
-	_version_label.text = tr("v%s") % _game_version()
-	_save_button.text = tr("Réglages")
+	# Icons only: the names are what a screen reader and a pointer read.
+	_save_button.tooltip_text = tr("Réglages")
+	_save_button.accessibility_name = tr("Réglages")
+	_dps_button.accessibility_name = tr("Détail du DPS")
 	# Before anything else and without waiting a frame: no wrong layout may ever be shown.
 	_sync_window()
 	get_window().size_changed.connect(_sync_window)
@@ -243,9 +242,8 @@ func _ready() -> void:
 	_floors.boss_failed.connect(_on_boss_failed)
 	_challenge_button.pressed.connect(_on_challenge_pressed)
 	_abandon_button.pressed.connect(_on_abandon_pressed)
-	_auto_toggle.set_pressed_no_signal(_floors.auto_challenge())
-	_refresh_auto_toggle()
-	_auto_toggle.toggled.connect(_on_auto_toggled)
+	_save_screen.set_auto_challenge(_floors.auto_challenge())
+	_save_screen.auto_challenge_toggled.connect(_on_auto_toggled)
 	_enemy.clicked.connect(_on_enemy_clicked)
 	_companions = CompanionManager.new(_game, combat, _floors)
 	_companions.companion_leveled_up.connect(_on_companion_leveled_up)
@@ -278,10 +276,13 @@ func _ready() -> void:
 	_inventory.loot_received.connect(_on_loot_received)
 	_inventory_screen.equip_requested.connect(_on_equip_requested)
 	_inventory_screen.setup(_inventory)
-	_tabs.link_focus(_auto_toggle, _dps_button)
+	# The last skill of the bar ends the game zone for the keyboard, now that "Défi auto" left it.
+	_tabs.link_focus(_skill_bar.button_of(_skills.skills()[-1].id), _dps_button)
 	_save_screen.copy_requested.connect(_on_save_copy_requested)
 	_save_screen.reset_confirmed.connect(_on_save_reset_confirmed)
 	_save_screen.effects_toggled.connect(_on_effects_toggled)
+	_save_screen.fullscreen_toggled.connect(_on_fullscreen_toggled)
+	_refresh_fullscreen()
 	_save_screen.closed.connect(_on_save_screen_closed)
 	_save_screen.setup(_game_version())
 	_save_button.pressed.connect(_on_save_button_pressed)
@@ -393,10 +394,12 @@ func _sync_window() -> void:
 		_apply_shape()
 	_bubble.set_css_per_unit(AdaptiveLayout.css_per_unit(css_size, shape))
 	var logical_height: float = AdaptiveLayout.logical_size(css_size, shape).y
-	_game_zone.set_layout(shape, AdaptiveLayout.portrait_monster_row(logical_height))
+	_game_zone.set_layout(shape, AdaptiveLayout.portrait_scene(logical_height))
 	var content: Vector2i = AdaptiveLayout.content_size(css_size, shape)
 	if get_window().content_scale_size != content:
 		get_window().content_scale_size = content
+	# Leaving full screen (back gesture, Escape) resizes the window and never touches the toggle.
+	_refresh_fullscreen()
 	_syncing_window = false
 
 
@@ -413,20 +416,10 @@ func _apply_shape() -> void:
 	var portrait: bool = _shape == AdaptiveLayout.Shape.PORTRAIT
 	_split.vertical = portrait
 	_game_zone.size_flags_vertical = Control.SIZE_FILL if portrait else Control.SIZE_EXPAND_FILL
-	for cell: BoxContainer in [_stage_cell, _gold_cell, _dps_cell]:
-		cell.vertical = portrait
-		cell.add_theme_constant_override("separation", 0 if portrait else HEADER_CELL_GAP)
-	_gold_caption.text = tr("Or") if portrait else tr("Or :")
-	_dps_caption.text = tr("DPS") if portrait else tr("DPS :")
-	var title_size: int = FONT_20 if portrait else FONT_32
-	var dps_size: int = FONT_16 if portrait else FONT_24
+	# The header is the same line in both shapes (story 019b): its sizes are in main_screen.tscn.
 	var body_size: int = FONT_16 if portrait else FONT_20
-	_set_font_size([_stage_label, _gold_label], title_size)
-	_set_font_size([_gold_caption], FONT_16 if portrait else title_size)
-	_set_font_size([_dps_caption, _dps_label], dps_size)
-	_set_font_size([_score_label], FONT_16)
-	_set_font_size([_save_button, _hp_label, _abandon_button, _auto_toggle], body_size)
-	_set_font_size([_challenge_button], body_size)
+	_set_font_size([_hp_label, _abandon_button, _challenge_button], body_size)
+	_boss_timer.set_compact(portrait)
 	_reserve_header_widths()
 	_skill_bar.set_compact(portrait)
 	if _floors != null:
@@ -444,13 +437,11 @@ func _reserve_header_widths() -> void:
 	_stage_label.custom_minimum_size.x = _text_width(_stage_label, tr("Étage %d") % HEADER_LONGEST_STAGE)
 	_score_label.custom_minimum_size.x = _text_width(_score_label, _record_text(HEADER_LONGEST_STAGE))
 	_gold_label.custom_minimum_size.x = _text_width(_gold_label, HEADER_LONGEST_VALUE)
-	_dps_label.custom_minimum_size.x = _text_width(_dps_label, HEADER_LONGEST_VALUE)
+	_dps_label.custom_minimum_size.x = _text_width(_dps_label, _dps_text(HEADER_LONGEST_VALUE))
 	# The labels sit inside the button: it cannot take its width from them by itself.
-	var dps_width: float = _dps_label.custom_minimum_size.x + HEADER_DPS_MARGIN
-	if _shape != AdaptiveLayout.Shape.PORTRAIT:
-		dps_width += _text_width(_dps_caption, _dps_caption.text) + HEADER_CELL_GAP
-	_dps_button.custom_minimum_size.x = dps_width
-	_save_button.custom_minimum_size.x = _text_width(_save_button, _save_button.text) + HEADER_BUTTON_MARGIN
+	var gold_row: float = HEADER_COIN_WIDTH + HEADER_COIN_GAP + _gold_label.custom_minimum_size.x
+	var dps_row: float = _dps_label.custom_minimum_size.x + HEADER_OPEN_GAP + HEADER_OPEN_WIDTH
+	_dps_button.custom_minimum_size.x = maxf(gold_row, dps_row) + HEADER_DPS_MARGIN * 2.0
 
 
 func _text_width(control: Control, text: String) -> float:
@@ -460,8 +451,11 @@ func _text_width(control: Control, text: String) -> float:
 
 
 func _record_text(stage: int) -> String:
-	var record: String = tr("record %d") % stage
-	return record if _shape == AdaptiveLayout.Shape.PORTRAIT else tr("· %s") % record
+	return tr("Record %d") % stage
+
+
+func _dps_text(value: String) -> String:
+	return tr("%s DPS") % value
 
 
 # The overlays that take their size from the screen and not from a container.
@@ -833,7 +827,7 @@ func _sync_effects_layout() -> void:
 	var to_orbs: Transform2D = _orbs.get_global_transform().affine_inverse()
 	_orbs.set_target_point(to_orbs * anchor)
 	var slots: PackedVector2Array = (to_orbs * _game_zone.get_global_transform()) * _game_zone.orb_slots()
-	_orbs.set_slots(slots, GameZone.orb_radius(_enemy.box_size()))
+	_orbs.set_slots(slots, _game_zone.orb_slot_radius())
 	_place_loot_toast()
 
 
@@ -948,17 +942,45 @@ func _on_challenge_pressed() -> void:
 	_floors.challenge_boss()
 
 
+# A stray touch near the monster must not end a fight: the first press only asks to confirm.
 func _on_abandon_pressed() -> void:
-	_floors.abandon_boss()
+	if _abandon_confirm.press(_now_seconds()):
+		_floors.abandon_boss()
+	_refresh_boss()
+
+
+func _now_seconds() -> float:
+	return Time.get_ticks_msec() / 1000.0
 
 
 func _on_auto_toggled(enabled: bool) -> void:
 	_floors.set_auto_challenge(enabled)
-	_refresh_auto_toggle()
+	_save_screen.set_auto_challenge(_floors.auto_challenge())
 
 
-func _refresh_auto_toggle() -> void:
-	_auto_toggle.text = tr("Défi auto : OUI") if _floors.auto_challenge() else tr("Défi auto : NON")
+# Only the export can go full screen, and only where the browser allows it (not on an iPhone).
+func _fullscreen_available() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	# A String, as in _prefers_reduced_motion: a JavaScript boolean does not come back equal to true.
+	return JavaScriptBridge.eval("document.fullscreenEnabled ? 'yes' : ''", true) == "yes"
+
+
+func _is_fullscreen() -> bool:
+	if OS.has_feature("web"):
+		return JavaScriptBridge.eval("document.fullscreenElement ? 'yes' : ''", true) == "yes"
+	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+
+
+func _refresh_fullscreen() -> void:
+	_save_screen.set_fullscreen(_fullscreen_available(), _is_fullscreen())
+
+
+# The press is a user gesture, which the browser requires. The window then resizes, and
+# _sync_window tells the real state to the toggle.
+func _on_fullscreen_toggled(enabled: bool) -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if enabled else DisplayServer.WINDOW_MODE_WINDOWED)
+	_refresh_fullscreen()
 
 
 func _on_companion_buy_requested(id: String, count: int) -> void:
@@ -1040,8 +1062,17 @@ func _refresh() -> void:
 
 
 func _refresh_boss() -> void:
-	_abandon_button.visible = _floors.is_boss_fight()
-	if _floors.is_boss_fight():
+	var fighting: bool = _floors.is_boss_fight()
+	_abandon_button.visible = fighting
+	if not fighting:
+		# A fight that ended forgets its first press: the next one starts from "Abandonner".
+		_abandon_confirm.cancel()
+	# A non-breaking space before the question mark: it never starts a line. The word says the state;
+	# the dark red and the white edge only add to it.
+	var armed: bool = _abandon_confirm.is_armed(_now_seconds())
+	_abandon_button.text = tr("Confirmer ?") if armed else tr("Abandonner")
+	_abandon_button.theme_type_variation = &"CornerConfirm" if armed else &"CornerButton"
+	if fighting:
 		_boss_timer.show_fight(_floors.boss_time_left(), _floors.boss_timer_seconds())
 	else:
 		_boss_timer.hide_fight()
@@ -1052,6 +1083,6 @@ func _refresh_dps() -> void:
 	_floors.set_click_dps(clicks_without_buff)
 	var from_companions: BigNumber = _floors.buffed_damage(_companions.total_power())
 	var from_clicks: BigNumber = _floors.buffed_damage(clicks_without_buff)
-	_dps_label.text = from_companions.add(from_clicks).format()
+	_dps_label.text = _dps_text(from_companions.add(from_clicks).format())
 	var click_damage: BigNumber = _floors.buffed_damage(_floors.click_damage())
 	_dps_button.tooltip_text = tr("Compagnons : %s\nDPS des clics : %s\nDégâts de clic : %s") % [from_companions.format(), from_clicks.format(), click_damage.format()]

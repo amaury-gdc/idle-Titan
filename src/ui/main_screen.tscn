@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://src/ui/game_zone.gd" id="11_zone"]
 [ext_resource type="Script" path="res://src/ui/management_tabs.gd" id="12_tabs"]
 [ext_resource type="Script" path="res://src/ui/hint_bubble.gd" id="13_bubble"]
+[ext_resource type="Script" path="res://src/ui/ui_icon.gd" id="14_icon"]
 
 [node name="MainScreen" type="Control"]
 layout_mode = 3
@@ -31,7 +32,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.0392157, 0.0509804, 0.0901961, 1)
+color = Color(0.058824, 0.070588, 0.12549, 1)
 
 [node name="Layout" type="VBoxContainer" parent="."]
 unique_name_in_owner = true
@@ -46,7 +47,7 @@ theme_override_constants/separation = 0
 
 [node name="Header" type="PanelContainer" parent="Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"HeaderPanel"
@@ -54,91 +55,125 @@ theme_type_variation = &"HeaderPanel"
 [node name="Row" type="HBoxContainer" parent="Layout/Header"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 8
 
-[node name="StageCell" type="BoxContainer" parent="Layout/Header/Row"]
+[node name="StageCell" type="VBoxContainer" parent="Layout/Header/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
+theme_override_constants/separation = -2
 alignment = 1
 
 [node name="StageLabel" type="Label" parent="Layout/Header/Row/StageCell"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_font_sizes/font_size = 20
 text = "Étage 1"
 vertical_alignment = 1
 
 [node name="ScoreLabel" type="Label" parent="Layout/Header/Row/StageCell"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.75, 0.75, 0.8, 1)
-text = "record 1"
-vertical_alignment = 1
-
-[node name="GoldCell" type="BoxContainer" parent="Layout/Header/Row"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-alignment = 1
-
-[node name="GoldCaption" type="Label" parent="Layout/Header/Row/GoldCell"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
-text = "Or"
-vertical_alignment = 1
-
-[node name="GoldLabel" type="Label" parent="Layout/Header/Row/GoldCell"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
-text = "0"
+theme_override_colors/font_color = Color(0.662745, 0.694118, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+text = "Record 1"
 vertical_alignment = 1
 
 [node name="DpsButton" type="Button" parent="Layout/Header/Row"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 4
 theme_type_variation = &"DpsButton"
 
-[node name="DpsCell" type="BoxContainer" parent="Layout/Header/Row/DpsButton"]
+[node name="DpsCell" type="VBoxContainer" parent="Layout/Header/Row/DpsButton"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 4.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+theme_override_constants/separation = -4
 alignment = 1
 
-[node name="DpsCaption" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell"]
-unique_name_in_owner = true
+[node name="GoldRow" type="HBoxContainer" parent="Layout/Header/Row/DpsButton/DpsCell"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
-text = "DPS"
-vertical_alignment = 1
+theme_override_constants/separation = 6
+alignment = 1
 
-[node name="DpsLabel" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell"]
+[node name="CoinIcon" type="Control" parent="Layout/Header/Row/DpsButton/DpsCell/GoldRow"]
+custom_minimum_size = Vector2(22, 22)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 1
+
+[node name="GoldLabel" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell/GoldRow"]
 unique_name_in_owner = true
 layout_mode = 2
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
+theme_override_colors/font_color = Color(1, 0.760784, 0.278431, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 26
 text = "0"
 vertical_alignment = 1
 
-[node name="SaveButton" type="Button" parent="Layout/Header/Row"]
+[node name="DpsRow" type="HBoxContainer" parent="Layout/Header/Row/DpsButton/DpsCell"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="DpsLabel" type="Label" parent="Layout/Header/Row/DpsButton/DpsCell/DpsRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.815686, 0.831373, 0.894118, 1)
+theme_override_font_sizes/font_size = 14
+text = "0 DPS"
+vertical_alignment = 1
+
+[node name="OpenIcon" type="Control" parent="Layout/Header/Row/DpsButton/DpsCell/DpsRow"]
+custom_minimum_size = Vector2(10, 10)
 layout_mode = 2
 size_flags_vertical = 4
-text = "Réglages"
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 2
+color = Color(0.815686, 0.831373, 0.894118, 1)
+
+[node name="SettingsCell" type="HBoxContainer" parent="Layout/Header/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+alignment = 2
+
+[node name="SaveButton" type="Button" parent="Layout/Header/Row/SettingsCell"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="GearIcon" type="Control" parent="Layout/Header/Row/SettingsCell/SaveButton"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -13.0
+offset_top = -13.0
+offset_right = 13.0
+offset_bottom = 13.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("14_icon")
 
 [node name="Split" type="BoxContainer" parent="Layout"]
 unique_name_in_owner = true
@@ -156,22 +191,9 @@ size_flags_vertical = 3
 size_flags_stretch_ratio = 6.0
 script = ExtResource("11_zone")
 
-[node name="AbandonButton" type="Button" parent="Layout/Split/GameZone"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-text = "Abandonner"
-
 [node name="BossTimer" parent="Layout/Split/GameZone" instance=ExtResource("4_boss")]
 unique_name_in_owner = true
 layout_mode = 2
-
-[node name="ChallengeButton" type="Button" parent="Layout/Split/GameZone"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_type_variation = &"ChallengeButton"
-text = "Défier le boss"
 
 [node name="Enemy" type="Control" parent="Layout/Split/GameZone"]
 unique_name_in_owner = true
@@ -183,7 +205,7 @@ script = ExtResource("2_enemy")
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-color = Color(0.278431, 0.101961, 0.101961, 1)
+color = Color(0.180392, 0.047059, 0.062745, 1)
 
 [node name="HpFill" type="ColorRect" parent="Layout/Split/GameZone/HpBar"]
 unique_name_in_owner = true
@@ -192,7 +214,7 @@ anchors_preset = 9
 anchor_bottom = 1.0
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.85098, 0.2, 0.2, 1)
+color = Color(0.768627, 0.168627, 0.215686, 1)
 
 [node name="HpLabel" type="Label" parent="Layout/Split/GameZone/HpBar"]
 unique_name_in_owner = true
@@ -219,23 +241,37 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
+[node name="ChallengeButton" type="Button" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"CornerChallenge"
+text = "Boss"
+
+[node name="ArrowIcon" type="Control" parent="Layout/Split/GameZone/ChallengeButton"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 8.0
+offset_top = -7.0
+offset_right = 22.0
+offset_bottom = 7.0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 3
+
+[node name="AbandonButton" type="Button" parent="Layout/Split/GameZone"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"CornerButton"
+text = "Abandonner"
+
 [node name="SkillBar" parent="Layout/Split/GameZone" instance=ExtResource("5_skills")]
 unique_name_in_owner = true
 layout_mode = 2
-
-[node name="VersionLabel" type="Label" parent="Layout/Split/GameZone"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.74902, 0.74902, 0.8, 1)
-theme_override_font_sizes/font_size = 16
-vertical_alignment = 1
-
-[node name="AutoChallengeToggle" type="Button" parent="Layout/Split/GameZone"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"ToggleButton"
-toggle_mode = true
-text = "Défi auto : NON"
 
 [node name="ManagementZone" type="PanelContainer" parent="Layout/Split"]
 unique_name_in_owner = true
@@ -439,7 +475,7 @@ alignment = 1
 [node name="OfflineTitle" type="Label" parent="OfflinePanel/OfflineScroll/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.25, 1)
+theme_override_colors/font_color = Color(1, 0.760784, 0.278431, 1)
 theme_override_font_sizes/font_size = 32
 text = "Bon retour !"
 horizontal_alignment = 1
