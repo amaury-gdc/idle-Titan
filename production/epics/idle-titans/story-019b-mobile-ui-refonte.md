@@ -6,7 +6,7 @@
 > **Type**: UI
 > **Estimate**: XL
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-03
+> **Last Updated**: 2026-11-04
 
 ## Context
 
@@ -89,9 +89,9 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 ## Files
 
 - `src/ui/main_theme.tres`, `adaptive_layout.gd`, `game_zone.gd`, `main_screen.gd`, `main_screen.tscn`, `save_screen.gd`, `save_screen.tscn`, `companion_orbs.gd`, `boss_timer.gd`, `boss_timer.tscn`, `skill_bar.gd`, `skill_bar.tscn`, `management_tabs.gd`, `companion_panel.gd`, `companion_panel.tscn`, `buy_quote.gd`, `inventory_screen.gd`, `inventory_screen.tscn`, `talent_screen.gd`, `talent_screen.tscn`
-- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5), `mouse_portrait.gd` (lot 6), `item_icon.gd` (lot 7) ; lecture pure `FloorManager.companion_dps_at` (lot 6)
+- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5), `mouse_portrait.gd` (lot 6), `item_icon.gd` (lot 7), `talent_tile.gd` (lot 8) ; lecture pure `FloorManager.companion_dps_at` (lot 6)
 - `src/core/display_settings.gd` (repli du panneau, mode ×100)
-- Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd`
+- Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd` ; nouveau `talent_shell_test.gd` (lot 8)
 
 ## QA Test Cases
 
@@ -219,6 +219,25 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
     Écart maximal +0,2 point ; aucune image de plus de 33 ms. Limite : une partie neuve a un sac vide, donc la série « Objets » mesure l'en-tête, pas des cartes pleines. Elle appuie la piste du lot 6 : sans les cartes Souris à l'écran, l'occupation baisse d'environ 1 point.
   - **Preuves.** Captures aux 5 tailles (partie préparée `?seed=d` : Épée Rare, Casque Commun et Aura Légendaire portés ; 8 objets dans le sac) : `lot7-*-objets` et `-detail` (corps de carte touché : comparaison), `lot7e-*-equipe` (« Équiper » sur le Plastron : il passe en haut avec 3 points, sac 7/12, DPS 462,8 M → 546,1 M), `lot7s-*-emplacement` (Épée portée : « Équipé » grisé avec la coche). Aucune erreur console, aucun défilement horizontal.
 
+- Lot 8 (2026-11-04) :
+  - **En-tête de 46 u.** « 23 points à dépenser » : le nombre en jaune 32 u, les mots en 16 u (« point » pour 0 ou 1). Les mots passent sur deux lignes (« points / à dépenser ») quand la largeur qu'ils reçoivent ne suffit pas pour une : à 320 de large, pas à 360 ni au-delà. Le libellé ne demande que la largeur de ses deux lignes et coupe le reste, si bien que la version sur une ligne n'élargit jamais le panneau. Les points et la partie libre se partagent la place selon un rapport de 4 à 1 ; la partie libre fait au moins 43 u (audit). « Réinitialiser » est un `HeaderButton` (dessiné sur 44 u, touchable sur 50 u, fond sombre à bord gris), et garde ses deux lignes pendant l'attente (« Réinitialiser / dans 59:05 »). « Meilleur étage… Prochain point… » reste dans la liste. Le texte « Points disponibles : N » de la bande disparaît : l'en-tête dit la même chose dans toutes les mises en page.
+  - **Paliers.** « Palier 2 » à gauche (16 u). À droite, « Ouvert » en jaune, ou un cadenas et « 0 / 2 points » en gris 14 u (« point » si le seuil est 1). `TalentCardText.tier_header` devient « Palier 4 : 4 / 8 points » (au lieu de « 4 points sur 8 »).
+  - **Tuiles** (`TalentTile`, un bouton à bascule) : 64 u minimum au lieu de 76, plus hautes si le texte le demande, alignées à gauche. Une tuile achetée a une coche jaune devant son nom (`UiIcon.CHECK`, dans une marge de 22 u ajoutée à ses styles) **et** garde le mot « Acheté ». **Coût réel** (`TalentCardText.tile_state_text`) : « Palier fermé · 2 pts », « Requiert : Frénésie · 2 pts » ; « Exclu » sans coût, puisqu'on ne peut pas l'acheter.
+  - **Conservé de la 019.** Sous-onglets, fiche (Retour, Acheter, garde de 250 ms), confirmation et refus de la réinitialisation, décompte, les trois mises en page, focus, glissé, noms des fonctions publiques. La fiche remplace toujours l'arbre et son en-tête sur un téléphone.
+  - **Pas fait** : le nom en gras de la maquette (la spec ne le demande pas ; un bouton n'a qu'une police).
+  - **Tests.** Nouveau `talent_shell_test.gd` (13) : en-tête de 46 u qui tient à 320 avec un Réinitialiser sur deux lignes, nombre jaune de 32 u, une ou deux lignes selon la largeur, singulier, Réinitialiser touchable sur 50 u, partie libre d'au moins 30 u qui ne recouvre ni les points ni Réinitialiser, cadenas et « Ouvert », cadenas qui part à l'ouverture du palier, tuiles de 64 u alignées à gauche, coche et marge seulement sur une tuile achetée, marge retirée après une réinitialisation, marge gardée sur une tuile achetée sélectionnée, coûts. Adaptés sans les affaiblir : dans `talent_screen_v2_test`, les en-têtes de palier (nom et progression lus séparément, plus la forme jointe), les mots d'état (avec le coût), le texte des points. Contraste : nombre jaune, progression, Réinitialiser et son bord, cadenas, coche sur la tuile achetée normale, survolée et sélectionnée. Deux sabotages vus en échec, puis code remis : les mots toujours sur une ligne ; la coche jamais retirée. Suite 988/988.
+  - **Défaut trouvé pendant l'écriture** : avec la phrase sur une ligne, la largeur minimale du panneau montait à 326 u. À 320, le panneau ne pouvait donc jamais devenir assez étroit pour passer sur deux lignes : le test a échoué. D'où le libellé qui demande seulement la largeur de ses deux lignes.
+  - **Audit des 18 tailles** (`lot8-audit-18-tailles.txt`, sonde jetable sur la vraie scène, sans affichage) : onglets Souris et Objets, puis Talents (arbre, fiche, confirmation, attente, refus, troisième branche). Contrôles : rien ne sort du panneau ; boutons touchables sur 50 u au moins (zone d'un `HeaderButton` comprise) ; 16 u pour les boutons, 14 u pour les textes ; aucun texte plus grand que sa place, même coupé ; aucun bouton sur un autre. **0 problème aux 18 tailles.** Exclue : la bande de 22 u de la poignée, prolongée par les en-têtes depuis le lot 5. La sonde a d'abord signalé cette bande : c'est la preuve qu'elle détecte une cible trop petite.
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`87c77e6`, lot 7), occupation médiane :
+
+    | Mesure | Portrait (réf. / lot 8) | Paysage (réf. / lot 8) |
+    |---|---|---|
+    | Sans fenêtre, onglet Souris (`lot8-fluidite-headless.txt`) | 8,1 / 8,0 % | 8,4 / 8,4 % |
+    | Sans fenêtre, onglet Talents, parties neuves (`lot8-fluidite-talents.txt`) | 7,4 / 7,4 % | 7,4 / 7,6 % |
+
+    Écart maximal +0,2 point ; aucune image de plus de 33 ms. Pas de série en fenêtre visible pour ce lot.
+  - **Preuves.** Captures `lot8-*` aux 5 tailles. Partie préparée `?seed=d`, un lancement par taille : la première série, faite dans un seul navigateur, avait repris la sauvegarde de la taille précédente. Étapes : état initial, `-talents`, `-compagnons` (Frénésie achetée : coche et « Acheté » ; paliers fermés avec cadenas et coûts), `-fiche` et `-retour`, `-confirmer`, `-reinit`, `-fiche-achat` puis `-attente` (Frénésie rachetée : « Réinitialiser / dans 59:5x »), `-replie` (partie libre de l'en-tête touchée ; pas en paysage). Aucune erreur console, aucun défilement horizontal.
+
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
 - Essai prévu après le lot 5 (2026-11-04). Cette liste sera complétée à chaque lot.
@@ -266,6 +285,16 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - toucher le reste de la carte ouvre la comparaison et n'équipe jamais ; « Retour » revient à la liste au même endroit ;
   - glisser dans la liste en partant d'une carte ou de son « Équiper » : la liste défile, rien ne s'équipe ;
   - lisibilité générale de l'onglet, le point que tu trouvais le moins lisible.
+- Talents (lot 8) :
+  - en haut, « N points à dépenser », le nombre en gros et en jaune ; sur ton téléphone, sur une ligne ou deux, sans rien de coupé ;
+  - « Réinitialiser » se touche au pouce ; après une réinitialisation puis un achat, il dit « Réinitialiser / dans mm:ss » sur deux lignes, et le décompte avance ;
+  - toucher l'espace vide entre les points et « Réinitialiser » replie le panneau ; toucher les points ne fait rien ;
+  - chaque palier : « Palier N » à gauche ; à droite « Ouvert » en jaune, ou un cadenas et « x / y points » ;
+  - une tuile achetée : coche jaune devant le nom, et « Acheté » ; une tuile d'un palier fermé ou qui requiert un autre talent montre son coût (« · 2 pts ») ;
+  - toucher une tuile ouvre sa fiche ; « Acheter » juste après l'ouverture (double toucher) n'achète pas ; « Retour » revient à la même tuile ;
+  - réinitialiser : la question, puis « Oui, réinitialiser » ; pendant un boss ou l'attente, la fiche dit pourquoi c'est impossible ;
+  - les trois sous-onglets (Clic, Compagnons, Économie) et le glissé dans la liste : rien ne s'achète en glissant ;
+  - lisibilité des tuiles : rien ne déborde à droite.
 
 ---
 

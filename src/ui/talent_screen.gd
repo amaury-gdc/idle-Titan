@@ -24,6 +24,12 @@ extends PanelContainer
 ##
 ## Node buttons pass the mouse on: a drag in the tree scrolls it and never opens a card.
 ##
+## In the panel of story 019b: the tab header ([PaneHeader], 46 u) tells "21 points à dépenser", the
+## number in 32 u yellow, the words on two lines when the pane is too narrow for one, and carries
+## "Réinitialiser" as a [HeaderButton]. A tier header is "Palier 2" with its progress on the right
+## ("Ouvert", or "0 / 2 points" and a lock). The nodes are [TalentTile]s: 64 u at least, a check in
+## front of a bought one, and the real cost on a tile whose state does not say it.
+##
 ## Usage:
 ## [codeblock]
 ## screen.buy_requested.connect(func(id: String) -> void: tree.buy(id))
@@ -47,7 +53,7 @@ signal focus_lost(hidden: bool)
 ## What the detail shows.
 enum Detail { NONE, NODE, RESET }
 
-const NODE_MIN_SIZE: Vector2 = Vector2(170, 76)
+const NODE_MIN_SIZE: Vector2 = Vector2(170, TalentTile.MIN_HEIGHT)
 ## Least width of a tile in the grid of two (phone); a long word still fits on one line.
 const COMPACT_TILE_MIN_WIDTH: float = 116.0
 ## Tiles per row in one branch at a time.
@@ -75,6 +81,13 @@ const COLUMN_SIDE_MARGINS: float = 12.0
 const COLUMN_GAP: float = 8.0
 const PANE_SIDE_MARGINS: float = 16.0
 const SCROLL_BAR_ROOM: float = 16.0
+## "x / y points" of a tier header: secondary text, 14 u (spec 019b).
+const TIER_PROGRESS_FONT_SIZE: int = 14
+const TIER_LOCK_SIZE: Vector2 = Vector2(16, 16)
+## "Réinitialiser": its grey edge, corners and side margins; drawn 44 u in the 46 u header.
+const RESET_EDGE: int = 2
+const RESET_CORNER: int = 8
+const RESET_TEXT_MARGIN: float = 10.0
 
 var _tree: TalentTree
 var _text: TalentCardText
@@ -88,7 +101,8 @@ var _in_boss_fight: Callable = func() -> bool: return false
 var _clock_msec: Callable = Time.get_ticks_msec
 ## One entry per node: {"def": TalentTree.TalentDef, "button": Button, "branch": int}.
 var _rows: Array[Dictionary] = []
-## One entry per tier header: {"label": Label, "branch": String, "tier": int}.
+## One entry per tier header: {"label": Label (its name), "progress": Label, "lock": UiIcon,
+## "branch": String, "tier": int}.
 var _headers: Array[Dictionary] = []
 var _grids: Array[GridContainer] = []
 var _columns: Array[Control] = []
@@ -115,6 +129,8 @@ var _countdown_left: int = -1
 
 @onready var _top: Control = %Top
 @onready var _points_label: Label = %PointsLabel
+@onready var _points_word: Label = %PointsWord
+@onready var _points_box: Control = %PointsBox
 @onready var _info_label: Label = %InfoLabel
 @onready var _empty_label: Label = %EmptyLabel
 @onready var _reset_button: Button = %ResetButton
@@ -133,10 +149,14 @@ var _countdown_left: int = -1
 func _ready() -> void:
 	_reset_button.text = tr("Réinitialiser")
 	_back_button.text = tr("Retour")
+	_style_reset_button()
 	_reset_button.pressed.connect(_on_reset_pressed)
 	_back_button.pressed.connect(close_detail)
 	_action_button.pressed.connect(_on_action_pressed)
 	resized.connect(_on_resized)
+	_points_word.resized.connect(func() -> void:
+		if _tree != null:
+			_draw_points_word())
 	# The countdown only runs while the tab shows. A hidden ancestor (another tab) also sends it.
 	visibility_changed.connect(_on_visibility_changed)
 	_on_visibility_changed()
@@ -326,13 +346,15 @@ func _redraw(focus: PaneFocus) -> void:
 	_drawn_points = available
 	_drawn_best_stage = _tree.best_stage()
 	_next_point = _next_point_stage()
-	_points_label.text = tr("Points disponibles : %d") % available if _band else tr("Points : %d") % available
+	_points_label.text = str(available)
+	_draw_points_word()
+	# The number and its words are two labels, in every layout.
 	_info_label.text = _info_text()
 	_draw_reset_button()
 	for row: Dictionary in _rows:
 		_draw_node(row)
 	for header: Dictionary in _headers:
-		(header["label"] as Label).text = _text.tier_header(header["branch"], header["tier"])
+		_draw_tier_header(header)
 	var empty: String = _empty_text()
 	_empty_label.text = empty
 	_empty_label.visible = not empty.is_empty()
@@ -356,6 +378,67 @@ func _draw_reset_button() -> void:
 		_reset_button.text = "%s\n%s" % [tr("Réinitialiser"), tr("dans %s") % TalentCardText.clock_text(left)]
 	else:
 		_reset_button.text = tr("Réinitialiser")
+
+
+# "point à dépenser" or "points à dépenser", on two lines when the width the header gives the words
+# is short of one (at 320 u wide). The label asks only for the width of its two lines, and clips: so
+# the one-line text never widens the pane, and the choice follows the width it really gets. The
+# header shares its width between the points (stretch ratio 4 in the scene) and its free part (1):
+# one line at 390 u wide, two at 320, and a free part of 30 u or more in both.
+func _draw_points_word() -> void:
+	var words: String = tr("point à dépenser") if _tree.available_points() < 2 else tr("points à dépenser")
+	var two_lines: String = words.replace(" à ", "\nà ")
+	var least: float = 0.0
+	for line: String in two_lines.split("\n"):
+		least = maxf(least, _text_width(line))
+	if _points_word.custom_minimum_size.x != ceilf(least):
+		_points_word.custom_minimum_size.x = ceilf(least)
+	var text: String = words if _points_word.size.x >= _text_width(words) else two_lines
+	if _points_word.text != text:
+		_points_word.text = text
+
+
+func _text_width(text: String) -> float:
+	var font: Font = _points_word.get_theme_font(&"font")
+	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _points_word.get_theme_font_size(&"font_size")).x
+
+
+func _draw_tier_header(header: Dictionary) -> void:
+	var open: bool = _tree.tier_open(header["branch"], header["tier"])
+	(header["label"] as Label).text = _text.tier_name(header["tier"])
+	var progress: Label = header["progress"]
+	progress.text = _text.tier_progress(header["branch"], header["tier"])
+	progress.add_theme_color_override(&"font_color", UiPalette.YELLOW if open else UiPalette.TEXT_MUTED)
+	(header["lock"] as Control).visible = not open
+
+
+# A dark fill with a grey edge, drawn 44 u in the 46 u header like "Achat ×N"; touched over 50 u.
+func _style_reset_button() -> void:
+	_reset_button.custom_minimum_size.y = AdaptiveLayout.PANE_HEADER_HEIGHT
+	var fills: Dictionary = {&"normal": UiPalette.BUTTON, &"hover": UiPalette.BUTTON_HOVER,
+			&"pressed": UiPalette.ROW, &"hover_pressed": UiPalette.ROW}
+	for state: StringName in fills:
+		var box: StyleBoxFlat = StyleBoxFlat.new()
+		box.bg_color = fills[state]
+		box.set_border_width_all(RESET_EDGE)
+		box.border_color = UiPalette.TEXT_MUTED
+		box.set_corner_radius_all(RESET_CORNER)
+		_reset_box_margins(box)
+		_reset_button.add_theme_stylebox_override(state, box)
+	var disabled: StyleBox = _reset_button.get_theme_stylebox(&"disabled").duplicate()
+	_reset_box_margins(disabled)
+	_reset_button.add_theme_stylebox_override(&"disabled", disabled)
+
+
+# Two lines of 16 u fit the 44 u frame: no margin above or below the text.
+func _reset_box_margins(box: StyleBox) -> void:
+	box.content_margin_left = RESET_TEXT_MARGIN
+	box.content_margin_right = RESET_TEXT_MARGIN
+	box.content_margin_top = 0.0
+	box.content_margin_bottom = 0.0
+	if box is StyleBoxFlat:
+		(box as StyleBoxFlat).expand_margin_top = -HeaderButton.DRAWN_INSET
+		(box as StyleBoxFlat).expand_margin_bottom = -HeaderButton.DRAWN_INSET
 
 
 func _info_text() -> String:
@@ -456,17 +539,33 @@ func _add_column(branch: Dictionary, index: int) -> void:
 	_columns.append(column)
 
 
-func _new_header(branch_id: String, tier: int) -> Label:
+# "Palier 2" on the left; on the right a lock while the tier is closed, and its progress.
+func _new_header(branch_id: String, tier: int) -> HBoxContainer:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.add_theme_constant_override("separation", 6)
 	var label: Label = Label.new()
-	label.theme_type_variation = &"PaneText"
+	label.theme_type_variation = &"PaneBody"
 	label.add_theme_font_size_override("font_size", TILE_FONT_SIZE)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_headers.append({"label": label, "branch": branch_id, "tier": tier})
-	return label
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
+	var lock: UiIcon = UiIcon.new()
+	lock.kind = UiIcon.Kind.LOCK
+	lock.color = UiPalette.TEXT_MUTED
+	lock.custom_minimum_size = TIER_LOCK_SIZE
+	lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(lock)
+	var progress: Label = Label.new()
+	progress.add_theme_font_size_override("font_size", TIER_PROGRESS_FONT_SIZE)
+	progress.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(progress)
+	_headers.append({"label": label, "progress": progress, "lock": lock, "branch": branch_id, "tier": tier})
+	return row
 
 
 func _new_node(def: TalentTree.TalentDef, branch_index: int) -> Button:
-	var button: Button = Button.new()
+	var button: TalentTile = TalentTile.new()
 	button.custom_minimum_size = NODE_MIN_SIZE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # also keeps a long text from widening it
@@ -491,6 +590,7 @@ func _draw_node(row: Dictionary) -> void:
 			variation = &"TalentUnaffordable"
 	if button.theme_type_variation != variation:
 		button.theme_type_variation = variation
+	(button as TalentTile).set_owned(variation == &"TalentOwned")
 	var chosen: bool = _detail == Detail.NODE and def.id == _selected_id
 	button.set_pressed_no_signal(chosen)
 	var lines: PackedStringArray = PackedStringArray([SELECTED_MARK + tr(def.display_name) if chosen else tr(def.display_name)])
@@ -498,7 +598,7 @@ func _draw_node(row: Dictionary) -> void:
 	var excludes: String = _text.excludes_text(def)
 	if not excludes.is_empty():
 		lines.append(excludes)
-	lines.append(_text.state_text(def))
+	lines.append(_text.tile_state_text(def))
 	button.text = "\n".join(lines)
 
 

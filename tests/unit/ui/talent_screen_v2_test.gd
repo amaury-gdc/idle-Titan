@@ -69,10 +69,12 @@ func _tile(id: String) -> String:
 	return _screen._button_of(id).text
 
 
+# Story 019b: a tier header is two labels, its name on the left and its progress on the right; this
+# joins them as "Palier 3 | Ouvert".
 func _header_texts() -> PackedStringArray:
 	var texts: PackedStringArray = PackedStringArray()
 	for header: Dictionary in _screen._headers:
-		texts.append((header["label"] as Label).text)
+		texts.append("%s | %s" % [(header["label"] as Label).text, (header["progress"] as Label).text])
 	return texts
 
 
@@ -87,9 +89,11 @@ func test_tier_header_says_points_spent_in_the_branch_against_the_threshold() ->
 	var texts: PackedStringArray = _header_texts()
 
 	# Assert
-	assert_bool(texts.has("Palier 3 : ouvert")).is_true()
-	assert_bool(texts.has("Palier 4 : 4 points sur 8")).is_true()
-	assert_bool(texts.has("Palier 2 : 0 point sur 2")).is_true()
+	assert_bool(texts.has("Palier 3 | Ouvert")).is_true()
+	assert_bool(texts.has("Palier 4 | 4 / 8 points")).is_true()
+	assert_bool(texts.has("Palier 2 | 0 / 2 points")).is_true()
+	# The joined form of the same parts, as TalentCardText.tier_header gives it.
+	assert_str(_screen._text.tier_header("click", 4)).is_equal("Palier 4 : 4 / 8 points")
 
 
 # Top nodes and states
@@ -110,8 +114,9 @@ func test_every_state_is_a_word_on_its_tile() -> void:
 	assert_int(_tree.available_points()).is_equal(0)
 	assert_str(_tile("eco_purse")).ends_with("Acheté")
 	assert_str(_tile("eco_top_harvest")).ends_with("Exclu")
-	assert_str(_tile("click_heavy")).ends_with("Palier fermé")
-	assert_str(_tile("bighit_cd")).ends_with("Requiert : Gros coup puissant")
+	# Story 019b: a tile whose state does not tell the cost shows the real one after it.
+	assert_str(_tile("click_heavy")).ends_with("Palier fermé · " + _screen._text.points_text(2))
+	assert_str(_tile("bighit_cd")).ends_with("Requiert : Gros coup puissant · " + _screen._text.points_text(3))
 
 	# Act: one more point
 	_state.max_stage_reached = 80
@@ -255,7 +260,10 @@ func test_phone_shows_one_branch_as_a_grid_of_two_tiles() -> void:
 	_start(PHONE)
 	assert_bool(_screen.is_wide()).is_false()
 	assert_int(_screen._grids[0].columns).is_equal(TalentScreen.COMPACT_GRID_COLUMNS)
-	assert_str(_screen._points_label.text).starts_with("Points : ")
+	# Story 019b: the header tells the number and "points à dépenser" (20 points at stage 100).
+	assert_str(_screen._points_label.text).is_equal("20")
+	assert_str(_screen._points_word.text.replace("\n", " ")).is_equal("points à dépenser")
+	# (story 019 read "Points : ")
 
 
 func test_from_560_the_card_is_a_band_under_the_tree() -> void:

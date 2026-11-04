@@ -277,6 +277,18 @@ func test_notification_dot_edge_stands_out_of_the_tabs() -> void:
 		assert_float(_contrast(dot.border_color, fill)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
+func test_talent_header_and_tiers_read() -> void:
+	# Story 019b, lot 8: the yellow number and the tier progress on the panel, "Réinitialiser" and its
+	# grey edge, the lock of a closed tier, the check of a bought tile on its fill and when selected.
+	for text: Color in [UiPalette.YELLOW, UiPalette.TEXT_MUTED, Color.WHITE]:
+		assert_float(_contrast(text, UiPalette.PANEL)).is_greater_equal(MIN_CONTRAST)
+	for fill: Color in [UiPalette.BUTTON, UiPalette.BUTTON_HOVER, UiPalette.ROW]:
+		assert_float(_contrast(_text("font_color", "Button"), fill)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	for style: String in ["normal", "hover", "pressed"]:
+		assert_float(_contrast(TalentTile.CHECK_COLOR, _background(style, "TalentOwned"))).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
 func test_talent_states_read() -> void:
 	for type: String in ["TalentBuyable", "TalentOwned", "TalentUnaffordable", "TalentLocked"]:
 		for style: String in ["normal", "hover", "pressed"]:

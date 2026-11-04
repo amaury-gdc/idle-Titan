@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/ui/talent_screen.gd" id="1_screen"]
 [ext_resource type="Script" path="res://src/ui/pane_header.gd" id="2_header"]
+[ext_resource type="Script" path="res://src/ui/header_button.gd" id="3_button"]
 
 [node name="TalentScreen" type="PanelContainer"]
 visible = false
@@ -20,21 +21,38 @@ layout_mode = 2
 theme_override_constants/separation = 8
 script = ExtResource("2_header")
 
-[node name="PointsLabel" type="Label" parent="Content/Top"]
+[node name="PointsBox" type="HBoxContainer" parent="Content/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 4.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="PointsLabel" type="Label" parent="Content/Top/PointsBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.760784, 0.278431, 1)
+theme_override_font_sizes/font_size = 32
+text = "0"
+vertical_alignment = 1
+
+[node name="PointsWord" type="Label" parent="Content/Top/PointsBox"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"PaneBody"
-text = "Points disponibles : 0"
+clip_text = true
+theme_override_constants/line_spacing = -2
+text = "point à dépenser"
 vertical_alignment = 1
-autowrap_mode = 3
 
 [node name="ResetButton" type="Button" parent="Content/Top"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 50)
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "Réinitialiser"
+script = ExtResource("3_button")
 
 [node name="BranchSelector" type="HFlowContainer" parent="Content"]
 unique_name_in_owner = true

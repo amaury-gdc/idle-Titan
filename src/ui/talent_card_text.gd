@@ -116,14 +116,40 @@ func requires_text(def: TalentTree.TalentDef) -> String:
 	return tr("Requiert : %s") % _and_list(names)
 
 
-## "Palier 3 : 4 points sur 8" while the tier is closed, "Palier 3 : ouvert" once it is open.
+## "Palier 3 : 4 / 8 points" while the tier is closed, "Palier 3 : Ouvert" once it is open.
 func tier_header(branch_id: String, tier: int) -> String:
 	if _tree.tier_open(branch_id, tier):
-		return tr("Palier %d : ouvert") % tier
+		return tr("Palier %d : Ouvert") % tier
 	var spent: int = _tree.spent_in_branch(branch_id)
 	var threshold: int = _tree.tier_thresholds()[tier - 1]
-	var word: String = tr("point") if spent < 2 else tr("points")
-	return tr("Palier %d : %d %s sur %d") % [tier, spent, word, threshold]
+	var word: String = tr("point") if threshold < 2 else tr("points")
+	return tr("Palier %d : %d / %d %s") % [tier, spent, threshold, word]
+
+
+## "Palier 3", the left part of a tier header.
+func tier_name(tier: int) -> String:
+	return tr("Palier %d") % tier
+
+
+## "Ouvert" once the tier is open, else "4 / 8 points", the points spent in the branch against its
+## threshold: the right part of a tier header (story 019b).
+func tier_progress(branch_id: String, tier: int) -> String:
+	if _tree.tier_open(branch_id, tier):
+		return tr("Ouvert")
+	var threshold: int = _tree.tier_thresholds()[tier - 1]
+	var word: String = tr("point") if threshold < 2 else tr("points")
+	return tr("%d / %d %s") % [_tree.spent_in_branch(branch_id), threshold, word]
+
+
+## The state line of the tile of [param def]: [method state_text], with the real cost after it when
+## the state does not say it (a closed tier, a missing prerequisite). An excluded node is never
+## bought, so it shows none.
+func tile_state_text(def: TalentTree.TalentDef) -> String:
+	var state: String = state_text(def)
+	match _tree.state_of(def.id):
+		TalentTree.NodeState.LOCKED, TalentTree.NodeState.TIER_CLOSED:
+			return "%s · %s" % [state, points_text(def.cost)]
+	return state
 
 
 ## Why [method TalentTree.try_reset] refuses at Unix time [param now_unix], in French; "" when it would not.
