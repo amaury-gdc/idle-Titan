@@ -262,8 +262,9 @@ func test_awaken_button_stays_at_least_50_high_and_its_two_lines_fit_in_it() -> 
 	_at(FIRST_THRESHOLD, 0, _plenty())
 	await await_idle_frame()
 
-	# Act
-	var needed: float = _button().get_combined_minimum_size().y
+	# Act: what the two lines need, without the height the rows share (story 019b: the header of
+	# 46 u leaves the rows a little more than the selector of 50 u did)
+	var needed: float = _button().get_minimum_size().y
 
 	# Assert: the row keeps its height, the target its 50 u
 	assert_float(_button().size.y).is_greater_equal(MIN_TARGET)
@@ -277,8 +278,8 @@ func test_max_of_1000_levels_past_the_last_awakening_fits_the_50_high_button() -
 	_at(LAST_THRESHOLD, ALL_AWAKENINGS, _plenty())
 	await await_idle_frame()
 
-	# Act
-	var needed: float = _button().get_combined_minimum_size().y
+	# Act: what the text needs, without the height the rows share
+	var needed: float = _button().get_minimum_size().y
 
 	# Assert
 	assert_str(_button().text).starts_with("Améliorer x%d" % CompanionManager.MAX_SCAN_LEVELS)

@@ -75,6 +75,7 @@ var _compare_header: Array = []
 @onready var _back_button: Button = %BackButton
 @onready var _equip_button: Button = %EquipButton
 @onready var _slots_box: VBoxContainer = %Slots
+@onready var _header: PaneHeader = %Header
 @onready var _bag_label: Label = %BagLabel
 @onready var _empty_label: Label = %EmptyLabel
 @onready var _bag_list: VBoxContainer = %BagList
@@ -157,6 +158,12 @@ func close_detail() -> bool:
 	_selected_uid = NO_SELECTION
 	_draw_all_settling(focus)
 	return true
+
+
+## The header of the tab ("Sac N / M", story 019b), whose free part is a touch zone of the panel
+## handle.
+func pane_header() -> PaneHeader:
+	return _header
 
 
 ## The first control of this content for the Tab key, null when nothing can take the focus.

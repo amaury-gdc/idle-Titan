@@ -177,6 +177,25 @@ func test_portrait_rows_add_up_to_the_screen() -> void:
 		assert_float(rows).is_equal_approx(height, TOLERANCE)
 
 
+func test_collapsed_rows_add_up_to_the_screen() -> void:
+	# Story 019b, lot 5: header, scene, skills, the collapsed handle and the tabs.
+	for height: float in [645.0, 693.0, 742.0, 866.0]:
+		var rows: float = AdaptiveLayout.HEADER_HEIGHT + AdaptiveLayout.portrait_game_height(AdaptiveLayout.portrait_scene_collapsed(height)) \
+				+ AdaptiveLayout.HANDLE_COLLAPSED_HEIGHT + AdaptiveLayout.TAB_ROW_HEIGHT
+		assert_float(rows).is_equal_approx(height, TOLERANCE)
+
+
+func test_collapsed_scene_takes_what_the_panel_gave_and_never_falls_under_its_minimum() -> void:
+	assert_float(AdaptiveLayout.portrait_scene_collapsed(742.0)).is_equal(516.0)
+	assert_float(AdaptiveLayout.portrait_scene_collapsed(742.0)).is_greater(AdaptiveLayout.portrait_scene(742.0))
+	assert_float(AdaptiveLayout.portrait_scene_collapsed(300.0)).is_equal(AdaptiveLayout.SCENE_MIN)
+
+
+func test_open_panel_holds_its_handle_header_and_two_and_a_half_rows() -> void:
+	assert_float(AdaptiveLayout.PANEL_MIN_HEIGHT).is_equal(
+			AdaptiveLayout.HANDLE_HEIGHT + AdaptiveLayout.PANE_HEADER_HEIGHT + 2.5 * 70.0)
+
+
 func test_modal_rect_wide_view_is_capped_and_centered() -> void:
 	var rect: Rect2 = AdaptiveLayout.modal_rect(Vector2(1280.0, 720.0), 600.0)
 	assert_float(rect.size.x).is_equal(AdaptiveLayout.MODAL_MAX_WIDTH)

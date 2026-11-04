@@ -295,6 +295,12 @@ func close_confirmation() -> void:
 		close_detail()
 
 
+## The header of the tab (the points and "Réinitialiser", story 019b), whose free part is a touch
+## zone of the panel handle.
+func pane_header() -> PaneHeader:
+	return _top as PaneHeader
+
+
 ## The first control of this content for the Tab key, null when nothing can take the focus.
 func first_focus() -> Control:
 	var controls: Array[Control] = _focusables()

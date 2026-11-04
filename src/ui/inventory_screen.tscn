@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/ui/inventory_screen.gd" id="1_screen"]
+[ext_resource type="Script" path="res://src/ui/pane_header.gd" id="2_header"]
 
 [node name="InventoryScreen" type="PanelContainer"]
 visible = false
@@ -8,11 +9,29 @@ layout_mode = 3
 theme_type_variation = &"ListPanel"
 script = ExtResource("1_screen")
 
-[node name="Body" type="HBoxContainer" parent="."]
+[node name="Column" type="VBoxContainer" parent="."]
 layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Header" type="HBoxContainer" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+script = ExtResource("2_header")
+
+[node name="BagLabel" type="Label" parent="Column/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PaneTitle"
+text = "Sac : 0 / 0"
+vertical_alignment = 1
+
+[node name="Body" type="HBoxContainer" parent="Column"]
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 12
 
-[node name="ListColumn" type="ScrollContainer" parent="Body"]
+[node name="ListColumn" type="ScrollContainer" parent="Column/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -20,29 +39,23 @@ size_flags_vertical = 3
 follow_focus = true
 horizontal_scroll_mode = 0
 
-[node name="List" type="VBoxContainer" parent="Body/ListColumn"]
+[node name="List" type="VBoxContainer" parent="Column/Body/ListColumn"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
-[node name="EquippedTitle" type="Label" parent="Body/ListColumn/List"]
+[node name="EquippedTitle" type="Label" parent="Column/Body/ListColumn/List"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"PaneTitle"
 text = "Équipement"
 
-[node name="Slots" type="VBoxContainer" parent="Body/ListColumn/List"]
+[node name="Slots" type="VBoxContainer" parent="Column/Body/ListColumn/List"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="BagLabel" type="Label" parent="Body/ListColumn/List"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"PaneTitle"
-text = "Sac : 0 / 0"
-
-[node name="EmptyLabel" type="Label" parent="Body/ListColumn/List"]
+[node name="EmptyLabel" type="Label" parent="Column/Body/ListColumn/List"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -50,12 +63,12 @@ theme_type_variation = &"PaneText"
 text = "Ton sac est vide. Bats des boss pour trouver des objets."
 autowrap_mode = 3
 
-[node name="BagList" type="VBoxContainer" parent="Body/ListColumn/List"]
+[node name="BagList" type="VBoxContainer" parent="Column/Body/ListColumn/List"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="DetailColumn" type="VBoxContainer" parent="Body"]
+[node name="DetailColumn" type="VBoxContainer" parent="Column/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -63,53 +76,53 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 6
 
-[node name="DetailScroll" type="ScrollContainer" parent="Body/DetailColumn"]
+[node name="DetailScroll" type="ScrollContainer" parent="Column/Body/DetailColumn"]
 layout_mode = 2
 size_flags_vertical = 3
 follow_focus = true
 horizontal_scroll_mode = 0
 
-[node name="DetailMargin" type="MarginContainer" parent="Body/DetailColumn/DetailScroll"]
+[node name="DetailMargin" type="MarginContainer" parent="Column/Body/DetailColumn/DetailScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_right = 12
 
-[node name="DetailBody" type="VBoxContainer" parent="Body/DetailColumn/DetailScroll/DetailMargin"]
+[node name="DetailBody" type="VBoxContainer" parent="Column/Body/DetailColumn/DetailScroll/DetailMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="DetailTitle" type="Label" parent="Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
+[node name="DetailTitle" type="Label" parent="Column/Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"PaneTitle"
 autowrap_mode = 3
 
-[node name="DetailStatus" type="Label" parent="Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
+[node name="DetailStatus" type="Label" parent="Column/Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"PaneText"
 autowrap_mode = 3
 
-[node name="CompareTable" type="GridContainer" parent="Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
+[node name="CompareTable" type="GridContainer" parent="Column/Body/DetailColumn/DetailScroll/DetailMargin/DetailBody"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 4
 columns = 4
 
-[node name="DetailBar" type="HBoxContainer" parent="Body/DetailColumn"]
+[node name="DetailBar" type="HBoxContainer" parent="Column/Body/DetailColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="BackButton" type="Button" parent="Body/DetailColumn/DetailBar"]
+[node name="BackButton" type="Button" parent="Column/Body/DetailColumn/DetailBar"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Retour"
 
-[node name="EquipButton" type="Button" parent="Body/DetailColumn/DetailBar"]
+[node name="EquipButton" type="Button" parent="Column/Body/DetailColumn/DetailBar"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2

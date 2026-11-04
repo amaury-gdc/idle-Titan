@@ -17,8 +17,12 @@
 // 195,197, the one of the new layout at 195,126 (the default); a reference touched at 195,126 was
 // never hit, and seemed cheaper than it is.
 //
+// A build can also get one tap after each load, before the measure: tap:<label>:<shape>=X,Y (story
+// 019b: the handle, to measure the collapsed panel; the same URL may run under two labels).
+//
 // Usage: node tools/web/perf.mjs <label=url> [<label=url> ...] [touch:<label>:<shape>=X,Y ...]
-// Environment: PERF_PASSES (5), PERF_RATES ("1,4"), PERF_MEASURE_MS (10000), PERF_KEYS (none): DOM
+//        [tap:<label>:<shape>=X,Y ...]
+// Environment: PERF_PASSES (5), PERF_RATES ("1,4"), PERF_MEASURE_MS (10000), PERF_FRESH (0), PERF_KEYS (none): DOM
 // codes of digit keys pressed after each load, before the measure ("Digit1": "Gros coup" recharges
 // during the pass, so its ring moves).
 // Output: one JSON line per build, shape and rate, then a table with the median busy share.
@@ -32,20 +36,25 @@ const PASSES = Number(process.env.PERF_PASSES) || 5;
 const RATES = (process.env.PERF_RATES || "1,4").split(",").map(Number);
 const MEASURE_MS = Number(process.env.PERF_MEASURE_MS) || 10000;
 const KEYS = (process.env.PERF_KEYS || "").split(",").filter((k) => /^Digit\d$/.test(k));
+// PERF_FRESH=1: the storage of the build's origin is cleared before each load, so that every pass
+// starts from a new game and the default settings (a tap that collapses a panel would otherwise
+// unfold it on the next pass, the choice being saved).
+const FRESH = process.env.PERF_FRESH === "1";
 const LOAD_MS = 9000;
 const TOUCH_MS = 75;
 const SLOW_FRAME_MS = 33.4;
 
 const touches = new Map();
+const taps = new Map();
 const builds = [];
 for (const arg of process.argv.slice(2)) {
-  const touch = arg.match(/^touch:([^:=]+):(portrait|paysage)=(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)$/);
-  if (touch) {
-    touches.set(`${touch[1]}:${touch[2]}`, { x: +touch[3], y: +touch[4] });
+  const point = arg.match(/^(touch|tap):([^:=]+):(portrait|paysage)=(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)$/);
+  if (point) {
+    (point[1] === "touch" ? touches : taps).set(`${point[2]}:${point[3]}`, { x: +point[4], y: +point[5] });
     continue;
   }
   const i = arg.indexOf("=");
-  if (i < 1 || arg.startsWith("touch:")) throw new Error(`expected label=url or touch:<label>:<shape>=X,Y, got ${arg}`);
+  if (i < 1 || arg.startsWith("touch:") || arg.startsWith("tap:")) throw new Error(`expected label=url, touch:<label>:<shape>=X,Y or tap:<label>:<shape>=X,Y, got ${arg}`);
   builds.push({ label: arg.slice(0, i), url: arg.slice(i + 1) });
 }
 if (builds.length === 0) {
@@ -87,12 +96,19 @@ try {
       for (let p = 0; p < PASSES; p++) for (const build of builds) {
         await page.send("Emulation.setCPUThrottlingRate", { rate: 1 });
         await page.send("Emulation.setDeviceMetricsOverride", { width: shape.w, height: shape.h, deviceScaleFactor: shape.dpr, mobile: shape.mobile });
+        if (FRESH) await page.send("Storage.clearDataForOrigin", { origin: new URL(build.url).origin, storageTypes: "all" });
         await page.send("Page.navigate", { url: build.url });
         await sleep(LOAD_MS);
         if (renderer === null) {
           renderer = (await page.send("Runtime.evaluate", { expression: RENDERER, returnByValue: true })).result.value;
           console.log(`renderer: ${renderer}`);
           if (/swiftshader|software|basic render/i.test(renderer)) console.log("WARNING: software rendering, the measure is not representative");
+        }
+        const tap = taps.get(`${build.label}:${shape.key}`);
+        if (tap) {
+          for (const type of ["mousePressed", "mouseReleased"])
+            await page.send("Input.dispatchMouseEvent", { type, x: tap.x, y: tap.y, button: "left", clickCount: 1 });
+          await sleep(1000);
         }
         for (const code of KEYS)
           for (const type of ["keyDown", "keyUp"])

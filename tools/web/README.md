@@ -35,6 +35,9 @@ node tools/web/capture.mjs <url> <dossier> lot4 "390x742@2m+kDigit1:w1+kDigit2:e
 | `BROWSER_TIMEOUT_MS` | Durée maximale d'un lancement : 600000 (10 min) par défaut. Au-delà, le navigateur est fermé et le script sort en erreur. |
 | `PERF_PASSES`, `PERF_RATES`, `PERF_MEASURE_MS` | Pour `perf.mjs` : passages (5), ralentissements du processeur (`1,4`), durée d'un passage (10000 ms). |
 | `PERF_KEYS` | Pour `perf.mjs` : touches chiffres appuyées après chaque chargement, par exemple `Digit1` pour mettre « Gros coup » en recharge pendant la mesure. |
+| `PERF_FRESH` | Pour `perf.mjs` : `1` vide le stockage de l'origine avant chaque chargement. Chaque passage part d'une partie neuve et des réglages par défaut. Nécessaire avec `tap:` sur un réglage mémorisé (le repli du panneau). |
+
+Avec `perf.mjs`, `tap:<version>:<forme>=X,Y` touche une fois après le chargement, avant la mesure : par exemple la poignée pour mesurer le panneau replié. Une même URL peut passer sous deux noms, servie sur deux ports pour que leurs réglages ne se mélangent pas.
 
 ## Lire une mesure de `perf.mjs`
 

@@ -153,22 +153,47 @@ func test_refresh_builds_no_node() -> void:
 	assert_object(_bar()).is_same(first_bar)
 
 
-func test_selector_offers_four_segments_in_order() -> void:
-	var segments: Array = _panel.get("_segments")
-	assert_int(segments.size()).is_equal(BuyQuote.MODE_COUNT)
-	assert_str((segments[BuyQuote.Mode.TIER] as Button).text).is_equal("Palier")
+func _mode_button() -> Button:
+	return _panel.get("_mode_button")
 
 
-func test_pressing_the_tier_segment_reports_its_mode() -> void:
-	var segments: Array = _panel.get("_segments")
-	(segments[BuyQuote.Mode.TIER] as Button).pressed.emit()
+func test_one_button_walks_the_five_modes_and_comes_back() -> void:
+	# Arrange: the order of story 019b
+	var expected: Array = [BuyQuote.Mode.TEN, BuyQuote.Mode.HUNDRED, BuyQuote.Mode.MAX, BuyQuote.Mode.TIER, BuyQuote.Mode.ONE]
+
+	# Act
+	for i in expected.size():
+		_mode_button().pressed.emit()
+
+	# Assert
+	assert_array(_modes).is_equal(expected)
+	assert_int(_panel.buy_mode()).is_equal(BuyQuote.Mode.ONE)
+
+
+func test_pressing_from_max_reports_palier() -> void:
+	_panel.set_mode(BuyQuote.Mode.MAX)
+	_mode_button().pressed.emit()
 	assert_array(_modes).contains_exactly([BuyQuote.Mode.TIER])
+	assert_str(_mode_button().text).is_equal("Achat Palier")
 
 
-func test_stored_tier_mode_is_shown_as_chosen() -> void:
-	var segments: Array = _panel.get("_segments")
+func test_stored_tier_mode_is_shown_on_the_button() -> void:
 	_panel.set_mode(BuyQuote.Mode.TIER)
-	assert_bool((segments[BuyQuote.Mode.TIER] as Button).button_pressed).is_true()
+	assert_str(_mode_button().text).is_equal("Achat Palier")
+	assert_str(_mode_button().accessibility_name).contains("Achat Palier")
+
+
+func test_button_text_names_each_mode() -> void:
+	var texts: Dictionary = {BuyQuote.Mode.ONE: "Achat ×1", BuyQuote.Mode.TEN: "Achat ×10",
+			BuyQuote.Mode.HUNDRED: "Achat ×100", BuyQuote.Mode.MAX: "Achat Max", BuyQuote.Mode.TIER: "Achat Palier"}
+	for mode: int in texts:
+		_panel.set_mode(mode)
+		assert_str(_mode_button().text).is_equal(texts[mode])
+
+
+func test_set_mode_does_not_report_back() -> void:
+	_panel.set_mode(BuyQuote.Mode.HUNDRED)
+	assert_array(_modes).is_empty()
 
 
 func test_tier_button_shows_the_real_count_and_the_verb_of_a_first_purchase() -> void:

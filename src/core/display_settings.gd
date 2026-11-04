@@ -3,9 +3,10 @@ extends RefCounted
 ## Display preferences of the player, kept in a small file of their own (story 009), apart from
 ## the game saves: it is NOT part of [GameState], [PermanentState] or the text of "Copier ma
 ## sauvegarde", and "Réinitialiser ma sauvegarde" does not touch it. It holds "Effets visuels"
-## (floating numbers, companion spheres and balls, monster squash), on by default, and the x1 /
-## x10 / Max / Palier choice of the companion list (stories 010, 013), x1 by default, and whether
-## the sentence of the first awakening was already shown (story 017), not by default.
+## (floating numbers, companion spheres and balls, monster squash), on by default, the x1 / x10 /
+## x100 / Max / Palier choice of the companion list (stories 010, 013, 019b), x1 by default, whether
+## the sentence of the first awakening was already shown (story 017), not by default, and whether
+## the management panel is folded (story 019b), not by default.
 ## An absent, unreadable or malformed file means the default. The path can be injected for tests.
 ## Single-thread only.
 ##
@@ -28,9 +29,10 @@ const SECTION: String = "display"
 const KEY_VISUAL_EFFECTS: String = "visual_effects"
 const KEY_BUY_MODE: String = "buy_mode"
 const KEY_AWAKENING_INTRO_SEEN: String = "awakening_intro_seen"
+const KEY_PANEL_COLLAPSED: String = "panel_collapsed"
 ## Stored values of the buy mode go from 0 to this, excluded: a [enum BuyQuote.Mode], kept as a
 ## number here so that this file depends on nothing in the interface.
-const BUY_MODE_COUNT: int = 4
+const BUY_MODE_COUNT: int = 5
 
 var _path: String
 var _config: ConfigFile = ConfigFile.new()
@@ -87,6 +89,23 @@ func awakening_intro_seen() -> bool:
 ## false when the file could not be written; the flag still counts until the game closes.
 func mark_awakening_intro_seen() -> bool:
 	_config.set_value(SECTION, KEY_AWAKENING_INTRO_SEEN, true)
+	return _config.save(_path) == OK
+
+
+## True when the player folded the management panel with its handle (story 019b); unfolded by
+## default, and a malformed value counts as unfolded.
+## [codeblock]
+## tabs.set_collapsed(settings.panel_collapsed())
+## [/codeblock]
+func panel_collapsed() -> bool:
+	var value: Variant = _config.get_value(SECTION, KEY_PANEL_COLLAPSED, false)
+	return value is bool and value
+
+
+## Keeps whether the panel is folded and writes the file at once. Returns false when the file could
+## not be written; the new value still counts until the game closes.
+func set_panel_collapsed(collapsed: bool) -> bool:
+	_config.set_value(SECTION, KEY_PANEL_COLLAPSED, collapsed)
 	return _config.save(_path) == OK
 
 

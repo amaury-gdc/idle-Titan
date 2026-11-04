@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://src/ui/companion_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://src/ui/pane_header.gd" id="2_header"]
+[ext_resource type="Script" path="res://src/ui/header_button.gd" id="3_button"]
+[ext_resource type="Script" path="res://src/ui/ui_icon.gd" id="4_icon"]
 
 [node name="CompanionPanel" type="PanelContainer"]
 theme_type_variation = &"CompanionListPanel"
@@ -18,41 +21,66 @@ theme_override_constants/margin_bottom = 0
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Selector" type="HBoxContainer" parent="Frame/Column"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="OneSegment" type="Button" parent="Frame/Column/Selector"]
+[node name="Header" type="HBoxContainer" parent="Frame/Column"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_type_variation = &"SegmentButton"
-toggle_mode = true
+script = ExtResource("2_header")
 
-[node name="TenSegment" type="Button" parent="Frame/Column/Selector"]
+[node name="SquadDpsButton" type="Button" parent="Frame/Column/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_type_variation = &"SegmentButton"
-toggle_mode = true
+script = ExtResource("3_button")
 
-[node name="MaxSegment" type="Button" parent="Frame/Column/Selector"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_type_variation = &"SegmentButton"
-toggle_mode = true
+[node name="SquadDpsCell" type="VBoxContainer" parent="Frame/Column/Header/SquadDpsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = -4
+alignment = 1
 
-[node name="TierSegment" type="Button" parent="Frame/Column/Selector"]
+[node name="SquadDpsTitle" type="Label" parent="Frame/Column/Header/SquadDpsButton/SquadDpsCell"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_type_variation = &"SegmentButton"
-toggle_mode = true
+theme_override_colors/font_color = Color(0.662745, 0.694118, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+text = "DPS des souris"
+
+[node name="SquadDpsValue" type="Label" parent="Frame/Column/Header/SquadDpsButton/SquadDpsCell"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.45, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+
+[node name="BuyModeButton" type="Button" parent="Frame/Column/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 0
+script = ExtResource("3_button")
+
+[node name="RotateIcon" type="Control" parent="Frame/Column/Header/BuyModeButton"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -9.0
+offset_right = -12.0
+offset_bottom = 9.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_icon")
+kind = 7
 
 [node name="Scroll" type="ScrollContainer" parent="Frame/Column"]
 unique_name_in_owner = true

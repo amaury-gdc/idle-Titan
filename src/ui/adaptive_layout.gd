@@ -48,6 +48,13 @@ const SCENE_MIN: float = 160.0
 ## [constant PANEL_MIN_HEIGHT]: its handle (22 u), its header (46 u) and 2,5 rows of 70 u.
 const PANEL_MIN_SHARE: float = 0.45
 const PANEL_MIN_HEIGHT: float = 243.0
+## The handle of the portrait panel: a band of 22 u over the header of the open tab, whose free part
+## also collapses the panel. Collapsed, the header is gone and the band alone must be a touch
+## target: it grows to 50 u (display settings).
+const HANDLE_HEIGHT: float = 22.0
+const HANDLE_COLLAPSED_HEIGHT: float = 50.0
+## The header of each tab of the panel (story 019b).
+const PANE_HEADER_HEIGHT: float = 46.0
 ## Space between two blocks of the portrait game zone.
 const ROW_GAP: float = 4.0
 ## A modal panel is at most this wide, and leaves [constant MODAL_MARGIN] on each side.
@@ -118,6 +125,14 @@ static func portrait_scene(logical_height: float) -> float:
 	var free: float = logical_height - HEADER_HEIGHT - SKILL_ROW_HEIGHT - TAB_ROW_HEIGHT - panel_min
 	# Rounded down: the window has whole units, and the fraction must not come out of the panel.
 	return clampf(floorf(free), SCENE_MIN, SCENE_MAX)
+
+
+## Height of the portrait scene when the panel is collapsed (story 019b): everything but the header,
+## the skills, the tabs and the collapsed handle, with no upper bound; never under
+## [constant SCENE_MIN].
+static func portrait_scene_collapsed(logical_height: float) -> float:
+	var free: float = logical_height - HEADER_HEIGHT - SKILL_ROW_HEIGHT - TAB_ROW_HEIGHT - HANDLE_COLLAPSED_HEIGHT
+	return maxf(floorf(free), SCENE_MIN)
 
 
 ## Height of the portrait panel, its handle and header included, the tabs not: what the scene

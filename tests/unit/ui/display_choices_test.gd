@@ -1,7 +1,9 @@
 extends GdUnitTestSuite
 ## Unit tests for the choices kept in [DisplaySettings] by story 010: "never set" for the effects,
-## so that prefers-reduced-motion can decide the first run, and the x1 / x10 / Max / Palier choice.
-## Stories: production/epics/idle-titans/story-010-adaptive-layout.md, story-013-companion-touch-ups.md.
+## so that prefers-reduced-motion can decide the first run, the x1 / x10 / x100 / Max / Palier choice,
+## and the collapsed panel (story 019b).
+## Stories: production/epics/idle-titans/story-010-adaptive-layout.md, story-013-companion-touch-ups.md,
+## story-019b-mobile-ui-refonte.md.
 
 const SETTINGS_PATH: String = "user://display_choices_test.cfg"
 
@@ -68,8 +70,30 @@ func test_buy_mode_stored_before_the_tier_segment_stays_valid() -> void:
 	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.MAX)
 
 
+func test_buy_mode_hundred_survives_a_reload() -> void:
+	# x100 came after Palier (story 019b): 4, and the modes stored before keep their values.
+	DisplaySettings.new(SETTINGS_PATH).set_buy_mode(BuyQuote.Mode.HUNDRED)
+	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.HUNDRED)
+	assert_int(BuyQuote.Mode.HUNDRED).is_equal(4)
+	assert_int(BuyQuote.Mode.TIER).is_equal(3)
+
+
+func test_panel_is_unfolded_by_default() -> void:
+	assert_bool(DisplaySettings.new(SETTINGS_PATH).panel_collapsed()).is_false()
+
+
+func test_panel_collapsed_survives_a_reload() -> void:
+	DisplaySettings.new(SETTINGS_PATH).set_panel_collapsed(true)
+	assert_bool(DisplaySettings.new(SETTINGS_PATH).panel_collapsed()).is_true()
+
+
+func test_panel_collapsed_of_the_wrong_type_is_unfolded() -> void:
+	_write("\"yes\"", DisplaySettings.KEY_PANEL_COLLAPSED)
+	assert_bool(DisplaySettings.new(SETTINGS_PATH).panel_collapsed()).is_false()
+
+
 func test_buy_mode_out_of_range_is_the_default() -> void:
-	_write("4", DisplaySettings.KEY_BUY_MODE)
+	_write(str(DisplaySettings.BUY_MODE_COUNT), DisplaySettings.KEY_BUY_MODE)
 	assert_int(DisplaySettings.new(SETTINGS_PATH).buy_mode()).is_equal(BuyQuote.Mode.ONE)
 
 

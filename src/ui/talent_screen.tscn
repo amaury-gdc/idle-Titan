@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://src/ui/talent_screen.gd" id="1_screen"]
+[ext_resource type="Script" path="res://src/ui/pane_header.gd" id="2_header"]
 
 [node name="TalentScreen" type="PanelContainer"]
 visible = false
@@ -14,8 +15,10 @@ theme_override_constants/separation = 6
 
 [node name="Top" type="HBoxContainer" parent="Content"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_constants/separation = 8
+script = ExtResource("2_header")
 
 [node name="PointsLabel" type="Label" parent="Content/Top"]
 unique_name_in_owner = true

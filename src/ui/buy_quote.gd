@@ -1,16 +1,17 @@
 class_name BuyQuote
 extends RefCounted
-## What one press of a companion buy button would do under the x1 / x10 / Max / Palier selector
-## (stories 010 and 013, decision D3 of design/ux/main-screen-adaptive.md). Pure reading of a
+## What one press of a companion buy button would do under the x1 / x10 / x100 / Max / Palier mode
+## (stories 010 and 013, decision D3 of design/ux/main-screen-adaptive.md; x100 and the one button
+## that cycles the modes, story 019b). Pure reading of a
 ## [CompanionManager]: it changes nothing, and the row keeps the quote it displays, so a press buys
 ## what was shown.
 ##
-## x1 and x10 are strict: the whole amount or nothing. Max is the real number of levels the gold
+## x1, x10 and x100 are strict: the whole amount or nothing. Max is the real number of levels the gold
 ## covers; at 0 it quotes the next level, so that the player sees its price. Palier is strict too:
 ## exactly the levels up to the next tier; past the last tier, or without any, it quotes nothing.
 ##
-## Awakening (story 017, amends D3): no mode goes past the next awakening threshold, so x10 quotes
-## the real number of levels left (3 levels from the threshold: "x3"), Max stops at the threshold and
+## Awakening (story 017, amends D3): no mode goes past the next awakening threshold, so x10 and x100
+## quote the real number of levels left (3 levels from the threshold: "x3"), Max stops at the threshold and
 ## Palier aims at the nearer of the next tier and the next threshold. At the threshold, whatever the
 ## mode, the quote is the awakening itself: [member awakening] is true, [member count] is 0 and
 ## [member cost] is the price of the awakening.
@@ -24,13 +25,18 @@ extends RefCounted
 ##     companions.buy_levels("scout", quote.count)
 ## [/codeblock]
 
-## The segments of the selector, in display order. The value is stored in [DisplaySettings].
-enum Mode { ONE, TEN, MAX, TIER }
+## The buy modes. The value is stored in [DisplaySettings]: a new mode goes at the end, so that a
+## stored value keeps its meaning (HUNDRED came after TIER, story 019b). The order of the button is
+## [constant CYCLE].
+enum Mode { ONE, TEN, MAX, TIER, HUNDRED }
 
 ## Number of [enum Mode] values.
-const MODE_COUNT: int = 4
-## Levels of the x10 segment.
+const MODE_COUNT: int = 5
+## The order one press of the buy mode button walks, back to the first after the last.
+const CYCLE: Array[Mode] = [Mode.ONE, Mode.TEN, Mode.HUNDRED, Mode.MAX, Mode.TIER]
+## Levels of the x10 and x100 modes.
 const TEN_COUNT: int = 10
+const HUNDRED_COUNT: int = 100
 
 ## Levels a press buys. 0 for Max when the gold does not cover one level, and for Palier with no
 ## tier left.
@@ -59,9 +65,9 @@ static func of(companions: CompanionManager, id: String, mode: Mode, gold: BigNu
 			quote.affordable = gold.compare(quote.cost) >= 0
 			return quote
 	match mode:
-		Mode.TEN:
+		Mode.TEN, Mode.HUNDRED:
 			# Never past the threshold: the row shows the real number, "x3" three levels before it.
-			quote.count = mini(TEN_COUNT, room)
+			quote.count = mini(TEN_COUNT if mode == Mode.TEN else HUNDRED_COUNT, room)
 			quote.cost = companions.cost_of_levels(id, quote.count)
 		Mode.MAX:
 			# One walk gives the count and its cost; a second one would cost as much again.
@@ -83,3 +89,9 @@ static func of(companions: CompanionManager, id: String, mode: Mode, gold: BigNu
 			quote.cost = companions.next_cost(id)
 	quote.affordable = quote.count > 0 and gold.compare(quote.cost) >= 0
 	return quote
+
+
+## The mode after [param mode] in [constant CYCLE]; a value out of the cycle gives the first.
+static func next_mode(mode: int) -> Mode:
+	var at: int = CYCLE.find(mode as Mode)
+	return CYCLE[(at + 1) % CYCLE.size()] if at >= 0 else CYCLE[0]

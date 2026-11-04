@@ -157,6 +157,26 @@ func test_x10_three_levels_before_the_threshold_quotes_three() -> void:
 	assert_bool(quote.affordable).is_true()
 
 
+func test_x100_with_fewer_than_100_levels_before_the_threshold_quotes_the_real_number() -> void:
+	# Arrange: 50 levels left before the first awakening (story 019b, QA "x100 avec moins de 100")
+	_at(150)
+
+	# Act
+	var quote: BuyQuote = _quote(BuyQuote.Mode.HUNDRED)
+
+	# Assert
+	assert_int(quote.count).is_equal(FIRST_THRESHOLD - 150)
+	assert_int(quote.cost.compare(_companions.cost_of_levels(ID, FIRST_THRESHOLD - 150))).is_equal(0)
+	assert_bool(quote.affordable).is_true()
+
+
+func test_x100_buys_what_it_shows_and_lands_on_the_threshold() -> void:
+	_at(150)
+	var quote: BuyQuote = _quote(BuyQuote.Mode.HUNDRED)
+	assert_bool(_companions.buy_levels(ID, quote.count)).is_true()
+	assert_int(_companions.level(ID)).is_equal(FIRST_THRESHOLD)
+
+
 func test_max_with_plenty_of_gold_stops_at_the_threshold() -> void:
 	_at(150)
 	assert_int(_quote(BuyQuote.Mode.MAX).count).is_equal(FIRST_THRESHOLD - 150)

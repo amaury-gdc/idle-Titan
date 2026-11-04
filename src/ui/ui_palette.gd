@@ -67,3 +67,7 @@ const HP_BACK: Color = Color("#2E0C10")
 const COMMON: Color = Color("#C3C8DC")
 ## A talent that is owned: white on it 14.36:1, yellow edge 8.93:1.
 const OWNED_BG: Color = Color("#2E2A1A")
+## The colour of each bottom tab (story 019b): its icon, and the stripe of the open tab. Souris
+## coral, Objets [constant YELLOW], Talents [constant VIOLET_EDGE]; each at least 3:1 on the tab bar
+## and on the open tab.
+const TAB_MICE: Color = Color("#FF7A6B")

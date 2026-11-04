@@ -140,6 +140,18 @@ func orb_slot_radius() -> float:
 	return orb_radius(_enemy.box_size())
 
 
+## The monster box of the portrait scene: as tall as its room, at most [constant BOX_ZONE_RATIO] of
+## the width, and never so wide that two columns of mice stop fitting on each side. With the panel
+## open the height decides; a collapsed panel makes the scene tall, and the mice decide (story 019b).
+static func portrait_box(zone: Vector2, scene: float) -> float:
+	var enemy: Rect2 = (_portrait_blocks(zone, scene)["enemy"] as Rect2)
+	var half: Vector2 = MouseFace.half_extent(portrait_mouse_size(zone, scene))
+	# Each flank holds two mice side by side, their gap, and a gap to the monster.
+	var flank: float = half.x * 4.0 + MOUSE_GAP * 2.0
+	var by_mice: float = enemy.size.x - flank * 2.0
+	return minf(minf(enemy.size.y, zone.x * BOX_ZONE_RATIO), by_mice)
+
+
 ## The width of the portrait mice: the largest, up to [constant MOUSE_MAX_SIZE], whose two rows fit
 ## the band under the corner, and never under [constant MOUSE_MIN_SIZE].
 static func portrait_mouse_size(zone: Vector2, scene: float) -> float:
@@ -289,7 +301,10 @@ static func _append_grid(slots: PackedVector2Array, center: Vector2, pitch: Vect
 
 func _place_blocks() -> void:
 	var rects: Dictionary = blocks(_shape, size, _scene)
-	_enemy.set_box_limit(size.x * BOX_ZONE_RATIO)
+	var box_limit: float = size.x * BOX_ZONE_RATIO
+	if _shape == AdaptiveLayout.Shape.PORTRAIT:
+		box_limit = portrait_box(size, _scene)
+	_enemy.set_box_limit(box_limit)
 	fit_child_in_rect(_enemy, rects["enemy"])
 	fit_child_in_rect(_hp_bar, rects["hp"])
 	fit_child_in_rect(_hint, rects["hint"])

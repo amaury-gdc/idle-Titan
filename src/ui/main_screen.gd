@@ -254,6 +254,10 @@ func _ready() -> void:
 	_companions.awakened.connect(_on_companion_awakened)
 	_companion_panel.mode_changed.connect(_on_buy_mode_changed)
 	_companion_panel.set_mode(_display.buy_mode())
+	_companion_panel.squad_dps_pressed.connect(_on_squad_dps_pressed)
+	_tabs.set_collapsed(_display.panel_collapsed())
+	_tabs.collapsed_changed.connect(_on_panel_collapsed)
+	_sync_window()
 	_companion_panel.setup(_companions, func() -> BigNumber: return _game.gold)
 	_gold_drawn = _game.gold
 	_skill_bar.activate_requested.connect(_on_skill_requested)
@@ -394,7 +398,10 @@ func _sync_window() -> void:
 		_apply_shape()
 	_bubble.set_css_per_unit(AdaptiveLayout.css_per_unit(css_size, shape))
 	var logical_height: float = AdaptiveLayout.logical_size(css_size, shape).y
-	_game_zone.set_layout(shape, AdaptiveLayout.portrait_scene(logical_height))
+	# A collapsed panel gives its height to the scene (story 019b); only portrait has the handle.
+	var scene: float = AdaptiveLayout.portrait_scene_collapsed(logical_height) if _tabs.is_collapsed() \
+			else AdaptiveLayout.portrait_scene(logical_height)
+	_game_zone.set_layout(shape, scene)
 	var content: Vector2i = AdaptiveLayout.content_size(css_size, shape)
 	if get_window().content_scale_size != content:
 		get_window().content_scale_size = content
@@ -422,6 +429,7 @@ func _apply_shape() -> void:
 	_boss_timer.set_compact(portrait)
 	_reserve_header_widths()
 	_skill_bar.set_compact(portrait)
+	_tabs.set_handle_enabled(portrait)
 	if _floors != null:
 		_refresh()
 
@@ -726,6 +734,23 @@ func _on_dps_pressed() -> void:
 func _on_dps_unfocused() -> void:
 	if _bubble.is_showing_for(_dps_button):
 		_bubble.dismiss()
+
+
+# "DPS des souris" in the header of the Souris tab opens the same detail as the screen header
+# (Amaury, 2026-11-04), next to itself; a second touch closes it.
+func _on_squad_dps_pressed() -> void:
+	var target: Control = _companion_panel.squad_dps_button()
+	if _bubble.is_showing_for(target):
+		_bubble.dismiss()
+		return
+	_bubble.show_for(target, _dps_button.tooltip_text)
+
+
+# The handle, a header or a tab changed the panel: the scene takes or gives back the height.
+func _on_panel_collapsed(collapsed: bool) -> void:
+	_bubble.cancel()
+	_display.set_panel_collapsed(collapsed)
+	_sync_window()
 
 
 func _on_save_copy_requested() -> void:
@@ -1084,5 +1109,6 @@ func _refresh_dps() -> void:
 	var from_companions: BigNumber = _floors.buffed_damage(_companions.total_power())
 	var from_clicks: BigNumber = _floors.buffed_damage(clicks_without_buff)
 	_dps_label.text = _dps_text(from_companions.add(from_clicks).format())
+	_companion_panel.set_squad_dps(from_companions.format())
 	var click_damage: BigNumber = _floors.buffed_damage(_floors.click_damage())
 	_dps_button.tooltip_text = tr("Compagnons : %s\nDPS des clics : %s\nDégâts de clic : %s") % [from_companions.format(), from_clicks.format(), click_damage.format()]

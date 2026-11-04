@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://src/ui/main_screen.gd" id="1_main"]
 [ext_resource type="Script" path="res://src/ui/enemy_view.gd" id="2_enemy"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://src/ui/management_tabs.gd" id="12_tabs"]
 [ext_resource type="Script" path="res://src/ui/hint_bubble.gd" id="13_bubble"]
 [ext_resource type="Script" path="res://src/ui/ui_icon.gd" id="14_icon"]
+[ext_resource type="Script" path="res://src/ui/panel_handle.gd" id="15_handle"]
 
 [node name="MainScreen" type="Control"]
 layout_mode = 3
@@ -289,6 +290,11 @@ mouse_filter = 2
 theme_override_constants/separation = 0
 script = ExtResource("12_tabs")
 
+[node name="PanelHandle" type="Button" parent="Layout/Split/ManagementZone/ManagementTabs"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("15_handle")
+
 [node name="CompanionPanel" parent="Layout/Split/ManagementZone/ManagementTabs" instance=ExtResource("3_panel")]
 unique_name_in_owner = true
 layout_mode = 2
@@ -316,6 +322,31 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TabButton"
 
+[node name="Content" type="HBoxContainer" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/CompanionsTabButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="CompanionsIcon" type="Control" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/CompanionsTabButton/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 8
+
+[node name="CompanionsLabel" type="Label" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/CompanionsTabButton/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Souris"
+
 [node name="CompanionsDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/CompanionsTabButton"]
 unique_name_in_owner = true
 visible = false
@@ -336,6 +367,31 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TabButton"
+
+[node name="Content" type="HBoxContainer" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/InventoryButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="InventoryIcon" type="Control" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/InventoryButton/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 9
+
+[node name="InventoryLabel" type="Label" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/InventoryButton/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Objets"
 
 [node name="InventoryDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/InventoryButton"]
 unique_name_in_owner = true
@@ -358,20 +414,53 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TabButton"
 
-[node name="TalentsDot" type="Panel" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton"]
+[node name="Content" type="HBoxContainer" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="TalentsIcon" type="Control" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("14_icon")
+kind = 4
+
+[node name="TalentsLabel" type="Label" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Talents"
+
+[node name="TalentsDot" type="PanelContainer" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -20.0
-offset_top = 8.0
-offset_right = -6.0
-offset_bottom = 22.0
+offset_left = -26.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 24.0
 grow_horizontal = 0
 mouse_filter = 2
 theme_type_variation = &"DotPanel"
+
+[node name="TalentsCount" type="Label" parent="Layout/Split/ManagementZone/ManagementTabs/TabBar/TalentsButton/TalentsDot"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="CompanionOrbs" type="Control" parent="."]
 unique_name_in_owner = true

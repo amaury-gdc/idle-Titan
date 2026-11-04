@@ -1,13 +1,17 @@
 class_name CompanionPanel
 extends PanelContainer
 ## Readable list of the companions (story 003): name, level, damage per second, the next tier with
-## a thin bar, and a button showing what a press buys under the x1 / x10 / Max / Palier selector
-## (stories 010 and 013, D3), showing the cost alone and disabled when gold is short. Companions not
+## a thin bar, and a button showing what a press buys under the buy mode (stories 010 and 013, D3),
+## showing the cost alone and disabled when gold is short. Companions not
 ## bought yet are listed at level 0. The bar takes no input and tells nothing the text does not.
 ## One list only: it adapts to its own width, not to the shape of the screen.
 ## Pure presentation: reads a [CompanionManager], never changes it; a press is reported through
 ## [signal buy_requested] with the amount the row displays, and the composition root forwards it.
-## The selector's choice is kept by the composition root ([DisplaySettings]), never in the save.
+## The mode's choice is kept by the composition root ([DisplaySettings]), never in the save.
+##
+## Header (story 019b, a [PaneHeader]): "DPS des souris" and its value, a button that reports
+## [signal squad_dps_pressed] (the composition root opens the same detail as the screen header),
+## and one "Achat ×N" button, whose press walks [constant BuyQuote.CYCLE].
 ##
 ## The buy buttons pass the mouse on: the [ScrollContainer] sees a drag and cancels the press, so a
 ## drag in the list never buys.
@@ -17,13 +21,16 @@ extends PanelContainer
 ## panel.buy_requested.connect(func(id: String, count: int) -> void: companions.buy_levels(id, count))
 ## panel.setup(companions, func() -> BigNumber: return game.gold)   # builds one row per companion
 ## panel.set_mode(BuyQuote.Mode.TEN)
+## panel.set_squad_dps("19,4 Qa")
 ## panel.refresh()           # after a change of gold or level
 ## [/codeblock]
 
 ## The player pressed the buy button of companion [param id]: buy [param count] levels.
 signal buy_requested(id: String, count: int)
-## The player chose [param mode] (a [enum BuyQuote.Mode]) in the selector.
+## The player chose [param mode] (a [enum BuyQuote.Mode]) with the "Achat ×N" button.
 signal mode_changed(mode: int)
+## The player touched "DPS des souris" in the header: show the detail of the damage.
+signal squad_dps_pressed
 ## The player pressed the "Éveiller" button of companion [param id], shown only at an awakening
 ## threshold (story 017): awaken it.
 signal awaken_requested(id: String)
@@ -70,6 +77,17 @@ const RANK_MARGIN_X: float = 4.0
 const RANK_MARGIN_Y: float = 0.0
 const RANK_CORNER: int = 4
 const COLOR_RANK: Color = Color(1, 0.84, 0.25)
+## The "Achat ×N" button: 16 u text, room on the right for its rotation icon, a blue edge (display
+## settings).
+const MODE_FONT_SIZE: int = 16
+const MODE_TEXT_MARGIN: float = 12.0
+const MODE_ICON_ROOM: float = 38.0
+const MODE_EDGE: int = 2
+const MODE_CORNER: int = 8
+## The "DPS des souris" button: room for the longest value of the spec, and its side margins (the
+## offsets of SquadDpsCell in the scene).
+const LONGEST_SQUAD_DPS: String = "999,9 Qa"
+const SQUAD_MARGIN: float = 8.0
 
 var _companions: CompanionManager
 var _gold: Callable
@@ -83,20 +101,21 @@ var _wide: bool = false
 @onready var _rows_box: VBoxContainer = %Rows
 @onready var _frame: MarginContainer = %Frame
 @onready var _scroll: ScrollContainer = %Scroll
-@onready var _segments: Array[Button] = [%OneSegment, %TenSegment, %MaxSegment, %TierSegment]
+@onready var _header: PaneHeader = %Header
+@onready var _squad_button: Button = %SquadDpsButton
+@onready var _squad_value: Label = %SquadDpsValue
+@onready var _mode_button: Button = %BuyModeButton
 
 
 func _ready() -> void:
-	var group: ButtonGroup = ButtonGroup.new()
-	for i in _segments.size():
-		var segment: Button = _segments[i]
-		segment.button_group = group
-		segment.pressed.connect(_on_segment_pressed.bind(i))
-	_segments[0].text = tr("x1")
-	_segments[1].text = tr("x10")
-	_segments[2].text = tr("Max")
-	_segments[3].text = tr("Palier")
-	_segments[_mode].button_pressed = true
+	_style_header_buttons()
+	_mode_button.add_theme_font_size_override("font_size", MODE_FONT_SIZE)
+	_mode_button.pressed.connect(_on_mode_pressed)
+	_squad_button.pressed.connect(squad_dps_pressed.emit)
+	_squad_button.custom_minimum_size.x = _squad_width()
+	_mode_button.custom_minimum_size.x = _mode_width()
+	set_squad_dps("0")
+	_draw_mode()
 	resized.connect(_on_resized)
 	_scroll.resized.connect(_fit_rows)
 	_on_resized()
@@ -115,20 +134,55 @@ func setup(companions: CompanionManager, gold: Callable) -> void:
 
 ## The first control of the panel for the Tab key.
 func first_focus() -> Control:
-	return _segments[0]
+	return _squad_button
 
 
 ## The last control of the panel for the Tab key. Call after [method setup].
 func last_focus() -> Control:
-	return _rows[-1]["button"] if not _rows.is_empty() else _segments[-1]
+	return _rows[-1]["button"] if not _rows.is_empty() else _mode_button
+
+
+## The header of the tab, whose free part is a touch zone of the panel handle.
+func pane_header() -> PaneHeader:
+	return _header
 
 
 ## Shows [param mode] (a [enum BuyQuote.Mode]) as chosen, without reporting it back.
 func set_mode(mode: int) -> void:
 	_mode = mode as BuyQuote.Mode
-	_segments[_mode].button_pressed = true
+	_draw_mode()
 	if _companions != null:
 		refresh()
+
+
+## The "DPS des souris" button of the header, where the detail bubble goes.
+func squad_dps_button() -> Button:
+	return _squad_button
+
+
+## The mode shown now, a [enum BuyQuote.Mode].
+func buy_mode() -> BuyQuote.Mode:
+	return _mode
+
+
+## Shows [param value] (already formatted) as the damage per second of the companions.
+func set_squad_dps(value: String) -> void:
+	_squad_value.text = value
+	_squad_button.accessibility_name = tr("DPS des souris : %s. Détail du DPS") % value
+
+
+## The words of the "Achat ×N" button for [param mode] (a [enum BuyQuote.Mode]).
+func mode_text(mode: int) -> String:
+	match mode:
+		BuyQuote.Mode.TEN:
+			return tr("Achat ×10")
+		BuyQuote.Mode.HUNDRED:
+			return tr("Achat ×100")
+		BuyQuote.Mode.MAX:
+			return tr("Achat Max")
+		BuyQuote.Mode.TIER:
+			return tr("Achat Palier")
+	return tr("Achat ×1")
 
 
 ## Redraws every row from the current levels and gold.
@@ -308,10 +362,58 @@ func _on_buy_pressed(row: Dictionary) -> void:
 		buy_requested.emit(row["id"], count)
 
 
-func _on_segment_pressed(mode: int) -> void:
-	_mode = mode as BuyQuote.Mode
-	mode_changed.emit(mode)
-	refresh()
+func _on_mode_pressed() -> void:
+	_mode = BuyQuote.next_mode(_mode)
+	mode_changed.emit(_mode)
+	_draw_mode()
+	if _companions != null:
+		refresh()
+
+
+func _draw_mode() -> void:
+	_mode_button.text = mode_text(_mode)
+	_mode_button.accessibility_name = tr("Mode d'achat : %s. Toucher pour changer") % mode_text(_mode)
+
+
+# The "Achat ×N" button: a dark fill with a blue edge, drawn 44 u in the 46 u header. The DPS button
+# has no fill: it reads as a value, and lights only under the pointer.
+func _style_header_buttons() -> void:
+	var states: Dictionary = {&"normal": UiPalette.BUTTON, &"hover": UiPalette.BUTTON_HOVER,
+			&"pressed": UiPalette.ROW, &"hover_pressed": UiPalette.ROW}
+	for state: StringName in states:
+		var box: StyleBoxFlat = StyleBoxFlat.new()
+		box.bg_color = states[state]
+		box.set_border_width_all(MODE_EDGE)
+		box.border_color = UiPalette.BLUE
+		box.set_corner_radius_all(MODE_CORNER)
+		box.content_margin_left = MODE_TEXT_MARGIN
+		box.content_margin_right = MODE_ICON_ROOM
+		box.expand_margin_top = -HeaderButton.DRAWN_INSET
+		box.expand_margin_bottom = -HeaderButton.DRAWN_INSET
+		_mode_button.add_theme_stylebox_override(state, box)
+		var flat: StyleBoxFlat = StyleBoxFlat.new()
+		flat.bg_color = UiPalette.ROW_HOVER if state != &"normal" else Color(UiPalette.ROW_HOVER, 0.0)
+		flat.set_corner_radius_all(MODE_CORNER)
+		_squad_button.add_theme_stylebox_override(state, flat)
+
+
+# Wide enough for the longest of the five texts, measured: the button never changes width.
+func _mode_width() -> float:
+	var font: Font = _mode_button.get_theme_font("font")
+	var widest: float = 0.0
+	for each: int in BuyQuote.CYCLE:
+		widest = maxf(widest, font.get_string_size(mode_text(each), HORIZONTAL_ALIGNMENT_LEFT, -1, MODE_FONT_SIZE).x)
+	return ceilf(widest + MODE_TEXT_MARGIN + MODE_ICON_ROOM) + BUTTON_TEXT_ROOM
+
+
+# Wide enough for its title and the longest value of the header (spec: "999,9 Qa").
+func _squad_width() -> float:
+	var title: Label = %SquadDpsTitle
+	var title_width: float = title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			title.get_theme_font_size("font_size")).x
+	var value_width: float = _squad_value.get_theme_font("font").get_string_size(LONGEST_SQUAD_DPS, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			_squad_value.get_theme_font_size("font_size")).x
+	return ceilf(maxf(title_width, value_width)) + SQUAD_MARGIN * 2.0
 
 
 func _on_resized() -> void:
@@ -323,8 +425,6 @@ func _on_resized() -> void:
 	if wide == _wide:
 		return
 	_wide = wide
-	for segment: Button in _segments:
-		segment.add_theme_font_size_override("font_size", FONT_SIZE_WIDE if wide else FONT_SIZE_COMPACT)
 	for row: Dictionary in _rows:
 		_size_row(row)
 

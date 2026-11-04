@@ -1,8 +1,9 @@
 extends GdUnitTestSuite
-## Unit tests for the amounts of the x1 / x10 / Max selector: strict x10, real Max, and that a quote
-## spends exactly what it says. The Palier segment: buy_quote_tier_test.gd.
-## Story: production/epics/idle-titans/story-010-adaptive-layout.md, D3 of
-## design/ux/main-screen-adaptive.md.
+## Unit tests for the amounts of the x1 / x10 / x100 / Max modes: strict x10 and x100, real Max, that
+## a quote spends exactly what it says, and the order of the one buy mode button. The Palier mode:
+## buy_quote_tier_test.gd.
+## Stories: production/epics/idle-titans/story-010-adaptive-layout.md, D3 of
+## design/ux/main-screen-adaptive.md; story-019b-mobile-ui-refonte.md (x100, cycle).
 
 const ID: String = "scout"
 const SEVEN_LEVELS: int = 7
@@ -86,6 +87,38 @@ func test_x10_one_gold_short_is_strict_and_keeps_the_total() -> void:
 	assert_int(quote.count).is_equal(BuyQuote.TEN_COUNT)
 	assert_bool(quote.affordable).is_false()
 	_assert_same(quote.cost, total)
+
+
+func test_x100_with_exact_gold_is_affordable() -> void:
+	_state.gold = _companions.cost_of_levels(ID, BuyQuote.HUNDRED_COUNT)
+	var quote: BuyQuote = _quote(BuyQuote.Mode.HUNDRED)
+	assert_int(quote.count).is_equal(BuyQuote.HUNDRED_COUNT)
+	_assert_same(quote.cost, _state.gold)
+	assert_bool(quote.affordable).is_true()
+
+
+func test_x100_one_gold_short_is_strict_and_keeps_the_total() -> void:
+	var total: BigNumber = _companions.cost_of_levels(ID, BuyQuote.HUNDRED_COUNT)
+	_state.gold = total.subtract(_one())
+	var quote: BuyQuote = _quote(BuyQuote.Mode.HUNDRED)
+	assert_int(quote.count).is_equal(BuyQuote.HUNDRED_COUNT)
+	assert_bool(quote.affordable).is_false()
+	_assert_same(quote.cost, total)
+
+
+func test_cycle_goes_x1_x10_x100_max_palier_and_back() -> void:
+	var walked: Array = []
+	var mode: int = BuyQuote.Mode.ONE
+	for i in BuyQuote.MODE_COUNT:
+		mode = BuyQuote.next_mode(mode)
+		walked.append(mode)
+	assert_array(walked).is_equal([BuyQuote.Mode.TEN, BuyQuote.Mode.HUNDRED, BuyQuote.Mode.MAX, BuyQuote.Mode.TIER, BuyQuote.Mode.ONE])
+
+
+func test_cycle_holds_every_mode_once() -> void:
+	assert_int(BuyQuote.CYCLE.size()).is_equal(BuyQuote.MODE_COUNT)
+	for mode: int in BuyQuote.Mode.values():
+		assert_int(BuyQuote.CYCLE.count(mode)).is_equal(1)
 
 
 func test_max_counts_the_real_levels_and_their_cost() -> void:

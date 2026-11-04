@@ -187,6 +187,39 @@ func test_skill_orb_seconds_read() -> void:
 	assert_float(_contrast(Color.WHITE, UiPalette.BACKGROUND)).is_greater_equal(MIN_CONTRAST)
 
 
+func test_tab_colours_stand_out_of_the_bar_and_of_the_open_tab() -> void:
+	# Icons and stripes of the bottom tabs (story 019b, lot 5).
+	for tab: int in ManagementTabs.Tab.values():
+		var color: Color = ManagementTabs.tab_color(tab)
+		# A closed tab is drawn with the style of Button: the theme resource does not follow base types.
+		for fill: Color in [_background("normal", "Button"), _background("pressed", "TabButton"), UiPalette.PANEL]:
+			assert_float(_contrast(color, fill)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_tab_labels_read_open_and_closed() -> void:
+	assert_float(_contrast(UiPalette.TEXT_SOFT, _background("pressed", "TabButton"))).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_MUTED, _background("normal", "Button"))).is_greater_equal(MIN_CONTRAST)
+
+
+func test_talent_count_reads_on_the_dot() -> void:
+	# The number is white (main_screen.tscn, TalentsCount; checked in panel_shell_test.gd).
+	assert_float(_contrast(Color.WHITE, _background("panel", "DotPanel"))).is_greater_equal(MIN_CONTRAST)
+
+
+func test_pane_header_reads() -> void:
+	# "DPS des souris" and its value on the panel, "Achat ×N" on its fill, its blue edge on the panel.
+	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.PANEL)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(CompanionPanel.COLOR_DAMAGE, UiPalette.PANEL)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(CompanionPanel.COLOR_DAMAGE, UiPalette.ROW_HOVER)).is_greater_equal(MIN_CONTRAST)
+	for fill: Color in [UiPalette.BUTTON, UiPalette.BUTTON_HOVER, UiPalette.ROW]:
+		assert_float(_contrast(_text("font_color", "Button"), fill)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.BLUE, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_panel_handle_bar_stands_out() -> void:
+	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
 func test_selected_segment_is_inverted_and_reads() -> void:
 	var fill: Color = _background("pressed", "SegmentButton")
 	assert_float(_contrast(_text("font_pressed_color", "SegmentButton"), fill)).is_greater_equal(MIN_CONTRAST)

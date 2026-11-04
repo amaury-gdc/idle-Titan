@@ -89,6 +89,7 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 ## Files
 
 - `src/ui/main_theme.tres`, `adaptive_layout.gd`, `game_zone.gd`, `main_screen.gd`, `main_screen.tscn`, `save_screen.gd`, `save_screen.tscn`, `companion_orbs.gd`, `boss_timer.gd`, `boss_timer.tscn`, `skill_bar.gd`, `skill_bar.tscn`, `management_tabs.gd`, `companion_panel.gd`, `companion_panel.tscn`, `buy_quote.gd`, `inventory_screen.gd`, `inventory_screen.tscn`, `talent_screen.gd`, `talent_screen.tscn`
+- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5)
 - `src/core/display_settings.gd` (repli du panneau, mode ×100)
 - Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd`
 
@@ -163,10 +164,31 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 
     Aucune image de plus de 33 ms pour le lot 4. Écart maximal +0,8 point, sous le critère de 1,5 point. Le niveau absolu (≈ 8 % contre ≈ 20 % au lot 3) a changé d'une série à l'autre, pour les deux versions : on ne compare qu'à l'intérieur d'une série. Les touchers tombent bien sur le monstre (PV 22 → 20 après deux touchers, capture de contrôle).
   - **Preuves.** Captures `lot4-*` (partie préparée, Frénésie et Bonus d'or débloqués) : état initial, puis touches 1 et 2 (`-etats` : recharge, en cours, prête), appui long sur Bonus d'or (`-bulle`), après relâchement (`-relache` : toujours prête). Captures `lot4c-*` (Instinct de meute) : prête, passif, cadenas. Aux 5 tailles ; pas d'appui long en paysage. Aucune erreur console, aucun défilement horizontal.
+- Lot 5 (2026-11-04) :
+  - **Poignée.** `PanelHandle` en haut du panneau, en portrait seulement. Elle replie ou déploie au toucher, et avec Entrée ou Espace quand elle a le focus ; son nom accessible est « Replier le panneau » ou « Déployer le panneau ». Bande de 22 u ; replié, l'en-tête disparaît et la bande passe à 50 u pour rester une cible. Le repli est mémorisé dans `DisplaySettings.panel_collapsed` (non par défaut). Toucher un onglet d'un panneau replié le déploie sur cet onglet. En paysage, pas de poignée et panneau ouvert, mais le choix reste pour le portrait.
+  - **Zone étendue de la poignée.** C'est la partie libre de l'en-tête de chaque onglet (`PaneHeader`, bouton plat sans focus), placée entre ce que montre l'en-tête et son action. Elle ne recouvre jamais « DPS des souris » ni « Achat ×N » (testé, demande d'Amaury). **Écart avec le plan** : au lieu d'agrandir la zone de la poignée vers le bas (`_has_point`), l'en-tête porte lui-même cette partie libre. La sélection de Godot s'arrête au premier contrôle qui ne laisse pas passer la souris, si bien qu'un agrandissement aurait été masqué par les conteneurs de l'onglet.
+  - **Replié.** Les contenus sont masqués, jamais libérés. L'ordre du clavier devient compétences → poignée → onglet ouvert → suite, sans aucun contrôle caché. La scène prend la hauteur rendue (`AdaptiveLayout.portrait_scene_collapsed`, sans plafond) : 516 u à 390x742.
+  - **Monstre d'une scène haute (trouvé par les tests).** En portrait, la largeur du monstre est maintenant limitée pour laisser deux colonnes de souris de chaque côté (`GameZone.portrait_box`). Panneau ouvert, rien ne change : c'est la hauteur qui limite (testé à 178 et 208 u). Sans cette limite, à 419, 516 et 640 u, quatre souris touchaient le monstre (vu en échec).
+  - **En-tête Souris** (46 u) : « DPS des souris » (titre 14 u gris, valeur 20 u orange). Il se touche (`HeaderButton`, dessiné à 44 u, touché sur 50 u en montant de 4 u dans la bande de la poignée) et ouvre le même détail que le centre de l'en-tête du haut. Bouton « Achat ×N » avec bord bleu et icône de rotation (`UiIcon.ROTATE`) ; sa largeur est mesurée sur le plus long des 5 textes.
+  - **Modes d'achat.** `BuyQuote.Mode.HUNDRED` = 4, ajouté à la fin, donc les modes déjà enregistrés gardent leur valeur ; ×100 suit la règle de ×10 (tout ou rien, jamais au-delà du seuil d'éveil). `BuyQuote.CYCLE` : ×1 → ×10 → ×100 → Max → Palier → ×1. Le sélecteur à 4 segments est retiré.
+  - **En-têtes Objets et Talents.** Objets : « Sac N / M », sorti de la liste. Talents : la ligne existante (points et « Réinitialiser »), dont la hauteur reste 50 u à cause du bouton, jusqu'au lot 8. Leur contenu complet est prévu aux lots 7 et 8.
+  - **Onglets du bas.** Souris / Objets / Talents, avec icône (`UiIcon.MOUSE`, `SHIELD`, `STAR`) et libellé. Liseré de couleur sur l'onglet ouvert : corail `UiPalette.TAB_MICE`, jaune, violet `VIOLET_EDGE`. Libellé clair sur l'onglet ouvert, gris sur les autres. La pastille de Talents porte le nombre de points (blanc sur rouge), reste visible tant qu'il reste des points (elle remplace « Talents (N) »), et le nom accessible dit « Talents, N points ».
+  - **Tests.** Nouveau `panel_shell_test.gd` (21) : repli et déploiement par la poignée, Entrée, l'en-tête et un onglet ; ordre du clavier une fois replié ; paysage ; zones de l'en-tête ; défilement gardé après un repli et après le retour de la barre du navigateur ; onglets, pastille, liserés. Ajouts dans `buy_quote_test` (×100, cycle), `buy_quote_awakening_test` (×100 à moins de 100 niveaux du seuil), `display_choices_test` (×100 relu, mode 4 valide, repli), `adaptive_layout_test` (hauteurs repliées), `game_zone_layout_test` (scènes repliées, monstre), `main_theme_contrast_test` (onglets, pastille, en-tête, poignée). Tests adaptés : les 3 tests des segments deviennent 5 tests du bouton unique ; deux tests de `companion_panel_awakening_test` mesurent maintenant le texte (`get_minimum_size`) et non la hauteur que se partagent les lignes, qui a gagné 2 u. Vus en échec contre un sabotage, puis code remis : l'ordre du clavier une fois replié, la partie libre qui ne recouvre pas les boutons ; les souris d'une scène haute ont échoué contre l'ancien code. Suite 925/925.
+  - **Outils.** `perf.mjs` : `tap:<version>:<forme>=X,Y` (un toucher après chargement) et `PERF_FRESH=1` (stockage vidé avant chaque chargement).
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`9c647d2`, lot 4), occupation médiane du fil principal (`lot5-fluidite-*.txt`) :
+
+    | Mesure | Portrait (réf. / lot 5) | Paysage (réf. / lot 5) |
+    |---|---|---|
+    | Sans fenêtre | 6,7 / 6,7 % | 6,6 / 6,7 % |
+    | Sans fenêtre, parties neuves, panneau replié en plus (`PERF_FRESH=1`) | 6,7 / 6,6 / replié 6,2 % | 6,7 / 6,9 / 6,8 % |
+    | Fenêtre visible | 6,6 / 6,7 % | 6,7 / 6,7 % |
+
+    Écart maximal +0,2 point ; aucune image de plus de 33 ms. Panneau replié, les touchers visent le monstre déplacé (195, 280) ; contrôle : PV 22 → 20 après deux touchers.
+  - **Preuves.** Captures `lot5-*` aux 5 tailles (partie préparée) : état initial, `-x10`, `-x100`, `-detail` (« DPS des souris » touché), `-ferme`, `-replie`, `-objets` (toucher un onglet déploie), `-talents` ; en paysage `-x10`, `-x100`, `-detail`. `lot5k-*` (390x742, clavier) : `-focus-poignee`, `-entree-replie`, `-tab-suivant` (l'onglet ouvert reçoit le focus). Aucune erreur console, aucun défilement horizontal.
 
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
-- Après le lot 5 : cette liste sera complétée à chaque lot.
+- Essai prévu après le lot 5 (2026-11-04). Cette liste sera complétée à chaque lot.
 - **Plein écran, à vérifier à la main** : Réglages → « Plein écran : NON » → toucher : la barre du navigateur disparaît et le libellé passe à OUI ; quitter par le geste retour : le libellé revient à NON sans toucher le bouton ; aucun décalage de la mise en page après la sortie.
 - « Abandonner » pendant un boss : un toucher affiche « Confirmer ? », un second dans les 3 s abandonne, sans second toucher il revient à « Abandonner ».
 - En-tête : toucher l'or ouvre le détail du DPS, un second toucher le ferme ; la roue ouvre Réglages ; les deux se touchent au pouce sans viser.
@@ -186,6 +208,16 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - appui long (une demi-seconde) : la bulle montre le nom puis l'effet, et lever le doigt n'active rien ; le toucher suivant ferme la bulle sans rien activer ;
   - les secondes de la pastille se lisent ; on distingue « en cours » (jaune) de « en recharge » (sombre) ;
   - un rond à cadenas ouvre l'onglet Talents sur le talent qui le débloque.
+- Coquille du panneau (lot 5) :
+  - toucher la poignée (le trait sous les compétences) replie le panneau : la scène grandit, le monstre aussi, les souris restent à côté sans le toucher ; un second toucher le déploie ;
+  - toucher l'espace vide de l'en-tête, entre « DPS des souris » et « Achat ×N », fait la même chose ; toucher « DPS des souris » ouvre le détail du DPS (comme le centre de l'en-tête du haut) et ne replie jamais le panneau ; un second toucher ferme le détail ;
+  - panneau replié, la poignée seule se touche au pouce sans viser ; toucher un onglet le déploie sur cet onglet ;
+  - recharger la page : le panneau revient replié ou déployé comme on l'a laissé ;
+  - tourner le téléphone en paysage : pas de poignée, panneau ouvert ; revenir en portrait : l'état d'avant revient ;
+  - « Achat ×1 » : chaque toucher passe à ×10, ×100, Max, Palier, puis ×1 ; les boutons des lignes suivent ; après rechargement, le mode reste ;
+  - faire défiler la liste Souris, replier puis déployer : la liste est au même endroit ; même chose quand la barre d'adresse du navigateur apparaît ou disparaît en faisant défiler ;
+  - glisser dans la liste en partant d'un bouton d'achat : la liste défile, rien ne s'achète ;
+  - onglets du bas : icône et nom (Souris, Objets, Talents), liseré de couleur sur l'onglet ouvert, pastille rouge avec le nombre de points sur Talents, lisible.
 
 ---
 
