@@ -234,6 +234,20 @@ func test_awakening_edge_stands_out_of_the_card_and_the_list() -> void:
 	assert_float(_contrast(UiPalette.VIOLET_EDGE, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
+func test_item_cards_and_slots_read() -> void:
+	# Story 019b, lot 7: the rarity words on the card, the grey line, the bag count, "Équiper".
+	for rarity: Color in InventoryScreen.RARITY_COLORS.values():
+		assert_float(_contrast(rarity, UiPalette.ROW)).is_greater_equal(MIN_CONTRAST)
+		# The band, the edge of a slot and its dots stand out of the card and the header.
+		assert_float(_contrast(rarity, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+		assert_float(_contrast(rarity, UiPalette.BACKGROUND)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.ROW)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.YELLOW, UiPalette.PANEL)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(_text("font_color", "Button"), _background("normal", "EquipButton"))).is_greater_equal(MIN_CONTRAST)
+	# An empty slot: its grey icon on the slot.
+	assert_float(_contrast(UiPalette.TEXT_DISABLED, UiPalette.ROW)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
 func test_panel_handle_bar_stands_out() -> void:
 	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 

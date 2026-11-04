@@ -89,7 +89,7 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 ## Files
 
 - `src/ui/main_theme.tres`, `adaptive_layout.gd`, `game_zone.gd`, `main_screen.gd`, `main_screen.tscn`, `save_screen.gd`, `save_screen.tscn`, `companion_orbs.gd`, `boss_timer.gd`, `boss_timer.tscn`, `skill_bar.gd`, `skill_bar.tscn`, `management_tabs.gd`, `companion_panel.gd`, `companion_panel.tscn`, `buy_quote.gd`, `inventory_screen.gd`, `inventory_screen.tscn`, `talent_screen.gd`, `talent_screen.tscn`
-- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5), `mouse_portrait.gd` (lot 6) ; lecture pure `FloorManager.companion_dps_at` (lot 6)
+- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5), `mouse_portrait.gd` (lot 6), `item_icon.gd` (lot 7) ; lecture pure `FloorManager.companion_dps_at` (lot 6)
 - `src/core/display_settings.gd` (repli du panneau, mode ×100)
 - Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd`
 
@@ -201,6 +201,23 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 
     De +0,7 à +1,0 point, sous le critère de 1,5 ; aucune image de plus de 33 ms. Le surcoût suit le nombre de cartes visibles (environ 3 en portrait, 8 en paysage) et n'a pas bougé après le cache des textes : c'est probablement le dessin des cartes et des portraits (11 cercles par souris) à chaque image. Ce n'est pas prouvé. Piste pour le lot 9 : un atlas des portraits, comme pour les souris du lot 3.
   - **Preuves.** Captures `lot6-*` aux 5 tailles (partie préparée `?seed=d` : Éclaireur 300 avec un éveil, Lancier 150, Archer 200 bloqué, Gardien 25, Mage 10, Chevalier 1, Alchimiste et Dragon à 0) : état initial (×1), `-x10`, `-x100`, `-max`, `-palier`. Aucune erreur console, aucun défilement horizontal.
+- Lot 7 (2026-11-04) :
+  - **En-tête de 56 u.** 5 emplacements, un par type des données (Épée, Casque, Plastron, Aura, Entaille ; la fiche disait 4, les données en ont 5). Chacun est dessiné à 48 u dans une zone de 50 u, avec l'icône du type (`UiIcon` : épée, casque, plastron, aura, entaille) et un bord de la couleur de rareté. **Marque de forme** (demande d'Amaury) : 1, 2 ou 3 points dans le coin pour Commun, Rare, Légendaire (`ItemIcon`, rang de la rareté + 1, 3 au plus). Un emplacement vide est gris, sans point, désactivé. À droite : « Sac » (« Sac plein ») en 14 u, puis « N / M » en jaune gras 20 u (26 u ne tient pas à 320). Le titre « Équipement » disparaît.
+  - **Carte du sac** (70 u, davantage si un long bonus passe à la ligne). Bande de 4 u de la couleur de rareté ; tuile de 52 u avec l'icône teintée ; type en gras et rareté en toutes lettres et en couleur (`HFlowContainer`) ; bonus principal en gras ; ligne grise de 14 u. **Ligne grise** (demande d'Amaury) : « Équipé : +5 % » si l'objet porté a le même bonus principal, « Équipé : +5 % Dégâts globaux » s'il en a un autre, « Emplacement vide » sinon (`InventoryScreen.worn_line`).
+  - **Deux zones par carte.** « Équiper » (vert, 112×56) émet `equip_requested` tout de suite. Le reste de la carte (`_bag_buttons`, un bouton plat à bascule) ouvre la comparaison et n'équipe jamais : `test_a_touch_never_equips_by_itself` est conservé, inchangé. Les deux laissent passer le glissé. Ordre du clavier : emplacements, puis chaque carte et son « Équiper », puis la barre du détail. Après « Équiper », le focus reste sur la même carte, où l'ancien objet revient.
+  - **Détail.** Inchangé, sauf « Équipé » grisé avec une coche dessinée (`UiIcon.CHECK` : la police par défaut n'est pas sûre d'avoir ✓).
+  - **Couleurs de rareté** : celles de la palette (`COMMON`, `BLUE`, `YELLOW`). Les variantes `ItemRow*` du thème ne servent plus ; elles restent jusqu'au nettoyage du lot 9.
+  - **Tests.** Nouveau `inventory_rows_test.gd` (18) : carte, bande et tuile, les trois formes de la ligne grise, « Équiper » qui équipe sans détail, le corps qui n'équipe pas, « Équiper » désactivé pour un type inconnu, passage du glissé, ordre du clavier, focus après « Équiper », points et bord des emplacements, emplacement vide, coche centrée, « Sac plein », tailles, sac plein de longs bonus à 320. `inventory_pane_test.gd` : 35 tests, dont `test_a_touch_never_equips_by_itself` inchangé ; le test du titre « Équipement » devient « les emplacements restent dans l'en-tête dans les deux largeurs » ; le test de l'emplacement vérifie aussi l'icône sans texte et le nom accessible exact. Vus en échec contre un sabotage, puis code remis : la ligne grise qui compare toujours par un nombre seul ; le corps de carte qui équipe. Contraste : mots de rareté sur la carte, bande, bord et points sur le panneau et la tuile, ligne grise, « Sac », « Équiper ». Suite 974/974.
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`abd2330`, lot 6), occupation médiane (`lot7-fluidite-*.txt`) :
+
+    | Mesure | Portrait (réf. / lot 7) | Paysage (réf. / lot 7) |
+    |---|---|---|
+    | Sans fenêtre | 7,5 / 7,5 % | 7,8 / 7,9 % |
+    | Onglet Objets ouvert, parties neuves (`PERF_FRESH=1`) | 6,6 / 6,7 % | 6,4 / 6,6 % |
+    | Fenêtre visible | 7,4 / 7,5 % | 7,9 / 7,9 % |
+
+    Écart maximal +0,2 point ; aucune image de plus de 33 ms. Limite : une partie neuve a un sac vide, donc la série « Objets » mesure l'en-tête, pas des cartes pleines. Elle appuie la piste du lot 6 : sans les cartes Souris à l'écran, l'occupation baisse d'environ 1 point.
+  - **Preuves.** Captures aux 5 tailles (partie préparée `?seed=d` : Épée Rare, Casque Commun et Aura Légendaire portés ; 8 objets dans le sac) : `lot7-*-objets` et `-detail` (corps de carte touché : comparaison), `lot7e-*-equipe` (« Équiper » sur le Plastron : il passe en haut avec 3 points, sac 7/12, DPS 462,8 M → 546,1 M), `lot7s-*-emplacement` (Épée portée : « Équipé » grisé avec la coche). Aucune erreur console, aucun défilement horizontal.
 
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
@@ -241,6 +258,14 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - en Max ou Palier, « ×N · » devant le gain ; « Max » seulement en Palier après le dernier palier ;
   - glisser dans la liste en partant d'un bouton : rien ne s'achète ;
   - rien ne déborde à droite sur le téléphone, même avec un nom long.
+- Objets (lot 7) :
+  - en haut, les 5 emplacements : icône du type, bord et 1, 2 ou 3 points de la rareté ; un emplacement vide est gris et ne réagit pas ; à droite « Sac N / 12 » (« Sac plein » quand il l'est) ;
+  - toucher un emplacement porté ouvre son détail ; le bouton dit « Équipé », grisé, avec une coche ;
+  - chaque carte du sac : type et rareté en toutes lettres et en couleur, le bonus en gras, la ligne grise « Équipé : +X % » (même bonus) ou « Équipé : +X % <bonus> » (bonus différent) ou « Emplacement vide » ;
+  - « Équiper » sur une carte équipe tout de suite : l'objet passe en haut, l'ancien revient à sa place dans le sac ;
+  - toucher le reste de la carte ouvre la comparaison et n'équipe jamais ; « Retour » revient à la liste au même endroit ;
+  - glisser dans la liste en partant d'une carte ou de son « Équiper » : la liste défile, rien ne s'équipe ;
+  - lisibilité générale de l'onglet, le point que tu trouvais le moins lisible.
 
 ---
 

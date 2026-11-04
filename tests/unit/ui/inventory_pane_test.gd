@@ -121,13 +121,22 @@ func test_slot_takes_one_line_and_keeps_the_full_item_for_the_touch() -> void:
 	assert_float(slot.size.y).is_equal(MIN_TARGET)
 	assert_str(slot.text).not_contains("\n")
 	assert_int(slot.tooltip_text.count("\n")).is_equal(3)
+	# Story 019b: an icon, not words, on the slot; its name says the item and its main bonus.
+	assert_str(slot.text).is_empty()
+	assert_str(slot.accessibility_name).is_equal("Légendaire : Plastron, +10 % Dégâts des compagnons, équipé")
 
 
-func test_equipment_title_goes_when_the_pane_is_narrow() -> void:
-	_start([], COMPACT)
-	assert_bool(_screen._equipped_title.visible).is_false()
+func test_slots_stay_in_the_header_in_both_widths() -> void:
+	# Story 019b: the "Équipement" title is gone; the worn items sit in the header, narrow or wide,
+	# with the detail open too.
+	_start([_item(1)], COMPACT)
+	var header: Control = _screen.pane_header()
+	for slot: Button in _screen._slot_buttons:
+		assert_bool(header.is_ancestor_of(slot)).is_true()
+	_rows()[0].pressed.emit()
+	assert_bool(_screen._slot_buttons[0].is_visible_in_tree()).is_true()
 	_screen.size = WIDE
-	assert_bool(_screen._equipped_title.visible).is_true()
+	assert_bool(_screen._slot_buttons[0].is_visible_in_tree()).is_true()
 
 
 func test_worn_item_lists_its_bonuses_with_a_disabled_equipe() -> void:

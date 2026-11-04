@@ -14,7 +14,7 @@ extends Control
 
 ## What the icon shows. COIN ignores [member color]: a coin is always gold. New kinds go at the end:
 ## the scenes store the number.
-enum Kind { GEAR, COIN, CHEVRON, ARROW, STAR, BOLT, LOCK, ROTATE, MOUSE, SHIELD }
+enum Kind { GEAR, COIN, CHEVRON, ARROW, STAR, BOLT, LOCK, ROTATE, MOUSE, SHIELD, SWORD, HELMET, CHEST, AURA, SLASH, CHECK }
 
 ## Teeth of the gear (display setting).
 const GEAR_TEETH: int = 8
@@ -67,6 +67,18 @@ static func draw_kind(canvas: CanvasItem, icon: Kind, center: Vector2, radius: f
 			_draw_mouse(canvas, center, radius, tint)
 		Kind.SHIELD:
 			_draw_shield(canvas, center, radius, tint)
+		Kind.SWORD:
+			_draw_sword(canvas, center, radius, tint)
+		Kind.HELMET:
+			_draw_helmet(canvas, center, radius, tint)
+		Kind.CHEST:
+			_draw_chest(canvas, center, radius, tint)
+		Kind.AURA:
+			_draw_aura(canvas, center, radius, tint)
+		Kind.SLASH:
+			_draw_slash(canvas, center, radius, tint)
+		Kind.CHECK:
+			_draw_check(canvas, center, radius, tint)
 
 
 # A ring and its teeth: the hole is the inside of the ring, so the icon works on any background.
@@ -162,6 +174,63 @@ static func _draw_shield(canvas: CanvasItem, center: Vector2, radius: float, tin
 		center + Vector2(-0.75, -0.8) * radius,
 	])
 	canvas.draw_polyline(points, tint, radius * 0.2, true)
+
+
+# A blade, its guard and its grip, pointing up and right: "Épée".
+static func _draw_sword(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	var tip: Vector2 = center + Vector2(0.75, -0.75) * radius
+	var hilt: Vector2 = center + Vector2(-0.35, 0.35) * radius
+	canvas.draw_line(hilt, tip, tint, radius * 0.22, true)
+	canvas.draw_line(hilt + Vector2(-0.3, -0.3) * radius, hilt + Vector2(0.3, 0.3) * radius, tint, radius * 0.18, true)
+	canvas.draw_line(hilt, center + Vector2(-0.8, 0.8) * radius, tint, radius * 0.16, true)
+
+
+# A dome and its rim, hollow: "Casque".
+static func _draw_helmet(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	var base: Vector2 = center + Vector2(0.0, radius * 0.25)
+	canvas.draw_arc(base, radius * 0.7, PI, TAU, CIRCLE_POINTS / 2, tint, radius * 0.2, true)
+	canvas.draw_line(base + Vector2(-radius * 0.9, 0.0), base + Vector2(radius * 0.9, 0.0), tint, radius * 0.2, true)
+
+
+# A shirt in outline, its sleeves out: "Plastron".
+static func _draw_chest(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	canvas.draw_polyline(PackedVector2Array([
+		center + Vector2(-0.3, -0.8) * radius,
+		center + Vector2(-0.9, -0.45) * radius,
+		center + Vector2(-0.65, -0.05) * radius,
+		center + Vector2(-0.5, -0.15) * radius,
+		center + Vector2(-0.5, 0.85) * radius,
+		center + Vector2(0.5, 0.85) * radius,
+		center + Vector2(0.5, -0.15) * radius,
+		center + Vector2(0.65, -0.05) * radius,
+		center + Vector2(0.9, -0.45) * radius,
+		center + Vector2(0.3, -0.8) * radius,
+		center + Vector2(-0.3, -0.8) * radius,
+	]), tint, radius * 0.16, true)
+
+
+# A dashed ring around a dot: "Aura".
+static func _draw_aura(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	for i in 8:
+		var start: float = TAU * float(i) / 8.0
+		canvas.draw_arc(center, radius * 0.8, start, start + TAU / 16.0, 4, tint, radius * 0.16, true)
+	canvas.draw_arc(center, radius * 0.38, 0.0, TAU, CIRCLE_POINTS, tint, radius * 0.16, true)
+
+
+# Two parallel cuts: "Entaille".
+static func _draw_slash(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	for offset: float in [-0.3, 0.3]:
+		var shift: Vector2 = Vector2(offset, offset) * radius
+		canvas.draw_line(center + Vector2(-0.6, 0.6) * radius + shift, center + Vector2(0.6, -0.6) * radius + shift, tint, radius * 0.18, true)
+
+
+# A tick: "done", "worn".
+static func _draw_check(canvas: CanvasItem, center: Vector2, radius: float, tint: Color) -> void:
+	canvas.draw_polyline(PackedVector2Array([
+		center + Vector2(-0.8, 0.0) * radius,
+		center + Vector2(-0.25, 0.55) * radius,
+		center + Vector2(0.8, -0.55) * radius,
+	]), tint, radius * 0.28, true)
 
 
 # A body and its shackle: "locked".
