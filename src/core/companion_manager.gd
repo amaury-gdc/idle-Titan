@@ -101,6 +101,16 @@ func damage_per_second(id: String) -> BigNumber:
 	return _floors.companion_dps(id)
 
 
+## What [method damage_per_second] of [param id] would be at [param level], all else as now (see
+## [method FloorManager.companion_dps_at]): a reading for the "+X DPS" of a purchase, which changes
+## nothing. [param id] must be in the roster.
+## [codeblock]
+## var gain: BigNumber = companions.damage_per_second_at("scout", 20).subtract(companions.damage_per_second("scout"))
+## [/codeblock]
+func damage_per_second_at(id: String, level: int) -> BigNumber:
+	return _floors.companion_dps_at(id, level)
+
+
 ## Number of awakenings of [param id] (0 for none, an unknown id, or a roster without the
 ## "awakening" block), never above the number of thresholds of the data.
 ## [codeblock]

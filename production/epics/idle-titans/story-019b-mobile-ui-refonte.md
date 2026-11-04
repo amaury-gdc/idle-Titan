@@ -89,7 +89,7 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 ## Files
 
 - `src/ui/main_theme.tres`, `adaptive_layout.gd`, `game_zone.gd`, `main_screen.gd`, `main_screen.tscn`, `save_screen.gd`, `save_screen.tscn`, `companion_orbs.gd`, `boss_timer.gd`, `boss_timer.tscn`, `skill_bar.gd`, `skill_bar.tscn`, `management_tabs.gd`, `companion_panel.gd`, `companion_panel.tscn`, `buy_quote.gd`, `inventory_screen.gd`, `inventory_screen.tscn`, `talent_screen.gd`, `talent_screen.tscn`
-- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5)
+- Nouveaux : `src/ui/skill_orb.gd` (lot 4), `panel_handle.gd`, `pane_header.gd`, `header_button.gd` (lot 5), `mouse_portrait.gd` (lot 6) ; lecture pure `FloorManager.companion_dps_at` (lot 6)
 - `src/core/display_settings.gd` (repli du panneau, mode ×100)
 - Tests à adapter : `tests/unit/ui/main_theme_contrast_test.gd`, `adaptive_layout_test.gd`, `companion_panel_*_test.gd`, `buy_quote*_test.gd`, `inventory_pane_test.gd`, `management_tabs_test.gd`, `talent_screen_v2_test.gd`, `talent_pane_test.gd`
 
@@ -185,6 +185,22 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 
     Écart maximal +0,2 point ; aucune image de plus de 33 ms. Panneau replié, les touchers visent le monstre déplacé (195, 280) ; contrôle : PV 22 → 20 après deux touchers.
   - **Preuves.** Captures `lot5-*` aux 5 tailles (partie préparée) : état initial, `-x10`, `-x100`, `-detail` (« DPS des souris » touché), `-ferme`, `-replie`, `-objets` (toucher un onglet déploie), `-talents` ; en paysage `-x10`, `-x100`, `-detail`. `lot5k-*` (390x742, clavier) : `-focus-poignee`, `-entree-replie`, `-tab-suivant` (l'onglet ouvert reçoit le focus). Aucune erreur console, aucun défilement horizontal.
+- Lot 6 (2026-11-04) :
+  - **Carte de 70 u.** Portrait de 52 u (`MousePortrait` : tuile sombre et souris vectorielle dans la couleur du roster, transmise par `CompanionPanel.set_colors`). Nom en gras 16 u et « Niv. N » en bleu ; ils sont dans un `HFlowContainer`, donc « Niv. 1000 » passe sous un nom long au lieu de le couper. « 339,9 M DPS · 2 % » en gris 14 u (part du DPS de toutes les souris, arrondie). Ligne de progression en 14 u : barre et texte court (« Palier 200 », « Éveil 1000 », comme la fiche « barre + Éveil N ») ; la phrase complète (« Palier niv. 200 : ×3 ») reste dans la bulle d'aide du libellé. Sans objectif devant (dernier palier, tous les éveils), la barre disparaît et le texte prend la place.
+  - **Bouton 112×56 u** à deux libellés : le coût (gras 16 u) puis « +X DPS » (14 u). Niveau 0 : « Acheter » puis le coût. Éveil : bouton violet « Éveil II » puis le coût, carte bordée de violet, ligne « Niveau bloqué : éveil requis » en violet clair ; le badge du rang actuel s'efface, puisque le bouton dit le rang visé. « Max » seulement en mode Palier après le dernier palier : bouton foncé à bord, désactivé. Pas assez d'or : gris. « ×N · » précède le gain seulement si le nombre réel diffère du mode (Max, Palier, ×10 ou ×100 limités par un seuil) ; seul l'espace après « · » est sécable. Nom accessible : la phrase entière (« Améliorer Lancier ×50 : 17,7 B, +2,7 M DPS » ; pour l'éveil, le gain « Escouade ×2,10 » ou « Ce compagnon ×3,4 », qui ne tient plus sur le bouton).
+  - **« +X DPS ».** Nouvelle lecture pure `FloorManager.companion_dps_at(id, niveau)`, exposée par `CompanionManager.damage_per_second_at`, avec les éveils, les talents de souris et Cadence. Le gain vaut `dps_at(niveau visé) − dps actuel` : c'est la formule de la fiche, mais elle vaut aussi au niveau 0. Ne sont pas anticipés : « Champion » (la souris la plus forte peut changer) et le seuil de « Synergie ».
+  - **Coût.** Les textes du bouton ne sont recalculés que si le niveau, le nombre, le rang, la puissance des souris ou le mode changent. L'or seul ne change que l'état payable. Styles et couleurs ne sont reposés qu'au changement d'état.
+  - **Défaut trouvé et corrigé.** En réécrivant `companion_panel.gd`, `NO_BREAK_SPACE` est devenu un espace ordinaire, ce qui désactivait `keep_together` en silence : les tests comparaient avec la même fonction. `test_keep_together_leaves_no_plain_space` vérifie maintenant le code U+00A0.
+  - **Tests.** Nouveaux `companion_gain_test.gd` (12) : gain affiché égal au gain réel après `buy_levels` en ×1, ×10 à travers un palier, ×100, Max, Palier, niveau 0, ×10 limité par un seuil, après un éveil, avec talents et Cadence, talent acheté après un rafraîchissement, autre souris présente ; vu en échec contre deux sabotages (gain d'un seul niveau ; clé de cache sans la puissance des souris). `companion_rows_test.gd` (13) : textes, parts qui font 100 %, « Acheter », règles du « ×N · », couleurs, tailles, passage du glissé, l'or seul. Adaptés sans affaiblissement : `companion_panel_press_test`, `_tier_test`, `_awakening_test`, `companion_cost_text_test`. Contraste : textes de la carte et du bouton dans chaque état, bord violet. Suite 955/955.
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`7a880aa`, lot 5), occupation médiane (`lot6-fluidite-*.txt`) :
+
+    | Mesure | Portrait (réf. / lot 6) | Paysage (réf. / lot 6) |
+    |---|---|---|
+    | Sans fenêtre | 6,7 / 7,4 % | 6,9 / 7,9 % |
+    | Fenêtre visible | 6,7 / 7,4 % | 6,7 / 7,7 % |
+
+    De +0,7 à +1,0 point, sous le critère de 1,5 ; aucune image de plus de 33 ms. Le surcoût suit le nombre de cartes visibles (environ 3 en portrait, 8 en paysage) et n'a pas bougé après le cache des textes : c'est probablement le dessin des cartes et des portraits (11 cercles par souris) à chaque image. Ce n'est pas prouvé. Piste pour le lot 9 : un atlas des portraits, comme pour les souris du lot 3.
+  - **Preuves.** Captures `lot6-*` aux 5 tailles (partie préparée `?seed=d` : Éclaireur 300 avec un éveil, Lancier 150, Archer 200 bloqué, Gardien 25, Mage 10, Chevalier 1, Alchimiste et Dragon à 0) : état initial (×1), `-x10`, `-x100`, `-max`, `-palier`. Aucune erreur console, aucun défilement horizontal.
 
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
@@ -218,6 +234,13 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - faire défiler la liste Souris, replier puis déployer : la liste est au même endroit ; même chose quand la barre d'adresse du navigateur apparaît ou disparaît en faisant défiler ;
   - glisser dans la liste en partant d'un bouton d'achat : la liste défile, rien ne s'achète ;
   - onglets du bas : icône et nom (Souris, Objets, Talents), liseré de couleur sur l'onglet ouvert, pastille rouge avec le nombre de points sur Talents, lisible.
+- Lignes Souris (lot 6) :
+  - chaque souris a son portrait de couleur ; nom et « Niv. N » lisibles d'un coup d'œil ; « DPS · % » se lit ;
+  - le bouton dit le coût puis « +X DPS » ; après un achat, le DPS de la souris a bien augmenté d'environ ce montant (comparer « DPS des souris » avant et après) ;
+  - niveau 0 : « Acheter » ; seuil d'éveil : bouton violet « Éveil N » et la ligne « Niveau bloqué : éveil requis », la carte bordée de violet ;
+  - en Max ou Palier, « ×N · » devant le gain ; « Max » seulement en Palier après le dernier palier ;
+  - glisser dans la liste en partant d'un bouton : rien ne s'achète ;
+  - rien ne déborde à droite sur le téléphone, même avec un nom long.
 
 ---
 

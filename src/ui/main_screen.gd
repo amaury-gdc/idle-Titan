@@ -258,6 +258,7 @@ func _ready() -> void:
 	_tabs.set_collapsed(_display.panel_collapsed())
 	_tabs.collapsed_changed.connect(_on_panel_collapsed)
 	_sync_window()
+	_companion_panel.set_colors(roster)
 	_companion_panel.setup(_companions, func() -> BigNumber: return _game.gold)
 	_gold_drawn = _game.gold
 	_skill_bar.activate_requested.connect(_on_skill_requested)

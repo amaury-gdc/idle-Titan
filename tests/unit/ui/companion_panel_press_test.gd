@@ -1,8 +1,10 @@
 extends GdUnitTestSuite
 ## Unit tests for what a press of a companion row buys: what the row displays, even when the gold
-## changed since the last redraw, and for the texts of the buy button.
+## changed since the last redraw, and for the texts of the buy button (two lines since story 019b:
+## the cost, then the gain; "Acheter" over the cost at level 0; the whole sentence in its accessible
+## name).
 ## Story: production/epics/idle-titans/story-010-adaptive-layout.md, D3 of
-## design/ux/main-screen-adaptive.md.
+## design/ux/main-screen-adaptive.md; story-019b-mobile-ui-refonte.md (lot 6).
 
 const PANEL_SCENE: String = "res://src/ui/companion_panel.tscn"
 const ID: String = "scout"
@@ -55,6 +57,14 @@ func _button() -> Button:
 	return (_panel.get("_rows") as Array)[0]["button"]
 
 
+func _lines() -> PackedStringArray:
+	return _panel.row_lines(0)
+
+
+func _cost(cost: BigNumber) -> String:
+	return CompanionPanel.keep_together(cost.format())
+
+
 func _show_max_of(levels: int) -> void:
 	_state.gold = _companions.cost_of_levels(ID, levels)
 	_panel.set_mode(BuyQuote.Mode.MAX)
@@ -83,26 +93,34 @@ func test_press_at_max_zero_asks_for_nothing() -> void:
 
 
 func test_button_text_says_the_verb_for_a_first_purchase() -> void:
+	# Level 0 reads "Acheter" over the cost; 10 is the count of the x10 mode, so no "×10 · ".
 	_state.gold = BigNumber.from_int(FAR_MORE_GOLD)
 	_panel.set_mode(BuyQuote.Mode.TEN)
-	assert_str(_button().text).is_equal("Acheter x10 : %s" % CompanionPanel.keep_together(_companions.cost_of_levels(ID, 10).format()))
+	assert_array(_lines()).is_equal(PackedStringArray(["Acheter", _cost(_companions.cost_of_levels(ID, 10))]))
+	assert_str(_button().accessibility_name).starts_with("Acheter Scout ×10 : %s" % _companions.cost_of_levels(ID, 10).format())
 
 
-func test_button_text_says_the_verb_for_an_upgrade() -> void:
+func test_button_text_says_the_cost_and_the_gain_of_an_upgrade() -> void:
 	_state.companion_levels = {ID: 1}
 	_state.gold = BigNumber.from_int(FAR_MORE_GOLD)
 	_panel.set_mode(BuyQuote.Mode.TEN)
-	assert_str(_button().text).is_equal("Améliorer x10 : %s" % CompanionPanel.keep_together(_companions.cost_of_levels(ID, 10).format()))
+	var gain: BigNumber = _companions.damage_per_second_at(ID, 11).subtract(_companions.damage_per_second(ID))
+	assert_array(_lines()).is_equal(PackedStringArray([_cost(_companions.cost_of_levels(ID, 10)), CompanionPanel.gain_text(gain)]))
+	assert_str(_button().accessibility_name).is_equal("Améliorer Scout ×10 : %s, %s" % [_companions.cost_of_levels(ID, 10).format(), CompanionPanel.gain_text(gain)])
 
 
-func test_button_text_short_of_gold_is_one_line_without_what_is_missing() -> void:
+func test_button_text_short_of_gold_is_one_line_each_without_what_is_missing() -> void:
 	_state.gold = BigNumber.new()
 	_panel.set_mode(BuyQuote.Mode.TEN)
-	assert_str(_button().text).not_contains("\n")
-	assert_str(_button().text).not_contains("manque")
+	for line: String in _lines():
+		assert_str(line).not_contains("\n")
+		assert_str(line).not_contains("manque")
+	assert_str(_button().accessibility_name).not_contains("manque")
 
 
 func test_button_text_at_max_zero_names_max_and_the_next_cost() -> void:
+	# Nothing to count: no "×0 · "; the accessible name says Max and the price of the next level.
 	_state.gold = BigNumber.new()
 	_panel.set_mode(BuyQuote.Mode.MAX)
-	assert_str(_button().text).starts_with("Acheter Max : %s" % CompanionPanel.keep_together(_companions.next_cost(ID).format()))
+	assert_array(_lines()).is_equal(PackedStringArray(["Acheter", _cost(_companions.next_cost(ID))]))
+	assert_str(_button().accessibility_name).starts_with("Acheter Scout Max : %s" % _companions.next_cost(ID).format())

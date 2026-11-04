@@ -80,6 +80,11 @@ func _tier_text(index: int = 0) -> String:
 	return (_row(index)["tier"] as Label).text
 
 
+# The whole sentence, multiplier included, kept in the tooltip of the line (story 019b).
+func _tier_sentence(index: int = 0) -> String:
+	return (_row(index)["tier"] as Label).tooltip_text
+
+
 func _bar(index: int = 0) -> ProgressBar:
 	return _row(index)["bar"]
 
@@ -90,33 +95,54 @@ func _at_level(level: int, gold: BigNumber = BigNumber.new()) -> void:
 	_panel.refresh()
 
 
-func _text_with_cost(prefix: String, cost: BigNumber) -> String:
-	var colon: String = CompanionPanel.NO_BREAK_SPACE + ":"
-	return "%s%s %s" % [prefix, colon, CompanionPanel.keep_together(cost.format())]
+func _lines() -> PackedStringArray:
+	return _panel.row_lines(0)
+
+
+func _cost(cost: BigNumber) -> String:
+	return CompanionPanel.keep_together(cost.format())
+
+
+# "×N · " before the rest of the line (story 019b: the count shows when the mode does not say it).
+func _counted(count: int, rest: String) -> String:
+	return CompanionPanel.keep_together("×%d ·" % count) + " " + rest
+
+
+func _gain(from_level: int, to_level: int) -> String:
+	_state.companion_levels = {ID: from_level}
+	var gain: BigNumber = _companions.damage_per_second_at(ID, to_level).subtract(_companions.damage_per_second(ID))
+	return CompanionPanel.gain_text(gain)
 
 
 func test_row_at_level_0_names_the_first_tier_on_an_empty_bar() -> void:
 	_at_level(0)
-	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier niv. 10 : ×2"))
+	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier 10"))
+	assert_str(_tier_sentence()).is_equal(CompanionPanel.keep_together("Palier niv. 10 : ×2"))
 	assert_float(_bar().value).is_equal(0.0)
+	assert_bool(_bar().visible).is_true()
 
 
 func test_row_between_two_tiers_fills_from_the_previous_tier() -> void:
 	_at_level(19)
-	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier niv. 25 : ×1,5"))
+	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier 25"))
+	assert_str(_tier_sentence()).is_equal(CompanionPanel.keep_together("Palier niv. 25 : ×1,5"))
 	assert_float(_bar().value).is_equal_approx(9.0 / 15.0, 0.0001)
 
 
 func test_row_on_a_tier_starts_the_next_bar_empty() -> void:
 	_at_level(10)
-	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier niv. 25 : ×1,5"))
+	assert_str(_tier_text()).is_equal(CompanionPanel.keep_together("Palier 25"))
+	assert_str(_tier_sentence()).is_equal(CompanionPanel.keep_together("Palier niv. 25 : ×1,5"))
 	assert_float(_bar().value).is_equal(0.0)
 
 
 func test_row_after_the_last_tier_says_so_on_a_full_bar() -> void:
 	_at_level(250)
 	assert_str(_tier_text()).is_equal("Tous les paliers atteints")
+	assert_str(_tier_sentence()).is_equal("Tous les paliers atteints")
 	assert_float(_bar().value).is_equal(1.0)
+	# No goal ahead: the words say it all, the bar goes (story 019b).
+	assert_bool(_bar().visible).is_false()
 
 
 func test_row_on_the_last_tier_says_so_on_a_full_bar() -> void:
@@ -129,6 +155,7 @@ func test_row_without_any_tier_says_so_on_an_empty_bar() -> void:
 	_at_level(5)
 	assert_str(_tier_text(1)).is_equal("Tous les paliers atteints")
 	assert_float(_bar(1).value).is_equal(0.0)
+	assert_bool(_bar(1).visible).is_false()
 
 
 func test_bar_takes_no_input_and_no_focus() -> void:
@@ -199,13 +226,16 @@ func test_set_mode_does_not_report_back() -> void:
 func test_tier_button_shows_the_real_count_and_the_verb_of_a_first_purchase() -> void:
 	_at_level(0)
 	_panel.set_mode(BuyQuote.Mode.TIER)
-	assert_str(_button().text).is_equal(_text_with_cost("Acheter x10", _companions.cost_of_levels(ID, 10)))
+	assert_array(_lines()).is_equal(PackedStringArray(["Acheter", _counted(10, _cost(_companions.cost_of_levels(ID, 10)))]))
+	assert_str(_button().accessibility_name).starts_with("Acheter %s ×10 : %s" % [ID, _companions.cost_of_levels(ID, 10).format()])
 
 
 func test_tier_button_shows_the_real_count_of_an_upgrade() -> void:
 	_at_level(10)
 	_panel.set_mode(BuyQuote.Mode.TIER)
-	assert_str(_button().text).is_equal(_text_with_cost("Améliorer x15", _companions.cost_of_levels(ID, 15)))
+	var expected: PackedStringArray = PackedStringArray([_cost(_companions.cost_of_levels(ID, 15)), _counted(15, _gain(10, 25))])
+	assert_array(_lines()).is_equal(expected)
+	assert_str(_button().accessibility_name).starts_with("Améliorer %s ×15 : %s" % [ID, _companions.cost_of_levels(ID, 15).format()])
 
 
 func test_tier_press_buys_the_count_the_row_shows() -> void:
@@ -227,14 +257,26 @@ func test_tier_button_one_gold_short_is_disabled_with_the_cost_alone() -> void:
 	_panel.set_mode(BuyQuote.Mode.TIER)
 	_at_level(0, total.subtract(BigNumber.from_int(1)))
 	assert_bool(_button().disabled).is_true()
-	assert_str(_button().text).is_equal(_text_with_cost("Acheter x10", total))
+	assert_array(_lines()).is_equal(PackedStringArray(["Acheter", _counted(10, _cost(total))]))
 
 
-func test_tier_button_after_the_last_tier_is_disabled_without_a_price() -> void:
+func test_tier_button_after_the_last_tier_reads_max_outlined_and_disabled() -> void:
+	# Story 019b: "Max" only in the Palier mode once the last tier is passed, and never a price.
 	_panel.set_mode(BuyQuote.Mode.TIER)
 	_at_level(250, BigNumber.from_string("1" + "0".repeat(60)))
 	assert_bool(_button().disabled).is_true()
-	assert_str(_button().text).is_equal("Dernier palier")
+	assert_array(_lines()).is_equal(PackedStringArray(["Max", ""]))
+	assert_int((_button().get_theme_stylebox("disabled") as StyleBoxFlat).border_width_top).is_greater(0)
+	assert_str(_button().accessibility_name).is_equal("%s : Max, dernier palier atteint" % ID)
+
+
+func test_max_never_shows_outside_the_tier_mode() -> void:
+	# Past the last tier the other modes still buy levels: no "Max" on the button.
+	for mode: int in [BuyQuote.Mode.ONE, BuyQuote.Mode.TEN, BuyQuote.Mode.HUNDRED, BuyQuote.Mode.MAX]:
+		_panel.set_mode(mode)
+		_at_level(250, BigNumber.from_string("1" + "0".repeat(60)))
+		assert_str(_lines()[0]).override_failure_message("mode %d" % mode).is_not_equal("Max")
+		assert_bool(_button().disabled).is_false()
 
 
 func test_tier_press_after_the_last_tier_asks_for_nothing() -> void:
@@ -249,8 +291,10 @@ func test_button_short_of_gold_never_says_what_is_missing_in_any_mode() -> void:
 		_panel.set_mode(mode)
 		_at_level(0)
 		assert_bool(_button().disabled).is_true()
-		assert_str(_button().text).not_contains("manque")
-		assert_str(_button().text).not_contains("\n")
+		for line: String in _lines():
+			assert_str(line).not_contains("manque")
+			assert_str(line).not_contains("\n")
+		assert_str(_button().accessibility_name).not_contains("manque")
 
 
 func test_only_the_affordable_button_has_a_border() -> void:
@@ -270,27 +314,33 @@ func test_only_the_affordable_button_has_a_border() -> void:
 		assert_int(disabled.get_border_width(side)).is_equal(0)
 
 
-func test_longest_button_text_holds_on_one_line_at_320_wide() -> void:
-	# Arrange
+func test_longest_cost_holds_on_one_line_and_the_longest_gain_on_two_at_320_wide() -> void:
+	# Arrange: the button of 112 u; its cost line is bold 16 u, its gain line 14 u and may wrap once
 	_panel.size = PANE_AT_320
 	await await_idle_frame()
 	var button: Button = _button()
-	var font: Font = button.get_theme_font("font")
+	var cost: Label = _row()["cost"]
+	var gain: Label = _row()["gain"]
 	var box: StyleBox = button.get_theme_stylebox("disabled")
-	var text: String = "Améliorer x199 : %s" % CompanionPanel.keep_together(CompanionPanel.LONGEST_COST)
+	var longest_gain: String = _counted(CompanionPanel.LONGEST_COUNT, CompanionPanel.gain_text(BigNumber.from_string("9999" + "0".repeat(98))))
 
 	# Act
-	var needed: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 	var room: float = button.size.x - box.get_margin(SIDE_LEFT) - box.get_margin(SIDE_RIGHT)
+	var cost_width: float = cost.get_theme_font("font").get_string_size(CompanionPanel.keep_together(CompanionPanel.LONGEST_COST),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, CompanionPanel.FONT_SIZE_MAIN).x
+	var lines: int = gain.get_theme_font("font").get_multiline_string_size(longest_gain, HORIZONTAL_ALIGNMENT_CENTER, room, CompanionPanel.FONT_SIZE_SECONDARY,
+			-1, TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND).y / gain.get_line_height()
 
 	# Assert
-	assert_float(room).is_greater_equal(needed)
+	assert_float(button.size.x).is_equal(CompanionPanel.BUTTON_SIZE.x)
+	assert_float(room).is_greater_equal(cost_width)
+	assert_int(lines).is_less_equal(2)
 
 
 func test_longest_tier_line_holds_beside_its_bar_at_320_wide() -> void:
-	# Arrange
+	# Arrange: the longest tier of this roster beside its bar ("Palier 200")
 	_panel.size = PANE_AT_320
-	_at_level(250)
+	_at_level(150)
 	await await_idle_frame()
 
 	# Act
@@ -321,3 +371,4 @@ func test_buy_target_stays_50_high_in_the_shortest_row() -> void:
 	_panel.size = PANE_AT_320
 	await await_idle_frame()
 	assert_float(_button().size.y).is_greater_equal(50.0)
+	assert_float(_button().size.y).is_equal(CompanionPanel.BUTTON_SIZE.y)

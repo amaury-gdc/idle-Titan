@@ -216,6 +216,24 @@ func test_pane_header_reads() -> void:
 	assert_float(_contrast(UiPalette.BLUE, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
+func test_companion_card_texts_read() -> void:
+	# Story 019b, lot 6: on the card (ROW) the level in blue, the grey lines, the violet line of a
+	# threshold and the rank; in the button its two lines in each state.
+	for text: Color in [Color.WHITE, UiPalette.BLUE, UiPalette.TEXT_MUTED, UiPalette.VIOLET_EDGE, CompanionPanel.COLOR_RANK]:
+		assert_float(_contrast(text, UiPalette.ROW)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.ON_YELLOW, _background("normal", "BuyButton"))).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_DISABLED, _background("disabled", "Button"))).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(Color.WHITE, _background("normal", "AwakenButton"))).is_greater_equal(MIN_CONTRAST)
+	# "Max": the grey text on the dark outlined button, its edge on the card.
+	assert_float(_contrast(UiPalette.TEXT_DISABLED, UiPalette.PANEL)).is_greater_equal(MIN_CONTRAST)
+	assert_float(_contrast(UiPalette.TEXT_DISABLED, UiPalette.ROW)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
+func test_awakening_edge_stands_out_of_the_card_and_the_list() -> void:
+	assert_float(_contrast(UiPalette.VIOLET_EDGE, UiPalette.ROW)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	assert_float(_contrast(UiPalette.VIOLET_EDGE, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+
+
 func test_panel_handle_bar_stands_out() -> void:
 	assert_float(_contrast(UiPalette.TEXT_MUTED, UiPalette.PANEL)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 

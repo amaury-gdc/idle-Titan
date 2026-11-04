@@ -407,7 +407,18 @@ func companion_attack_damage(id: String) -> BigNumber:
 ## Damage per second of the companion [param id] now (0 when not bought): the attack damage with every
 ## companion talent, then the attack speed of "Cadence".
 func companion_dps(id: String) -> BigNumber:
-	var bare: BigNumber = _combat.companion(id).damage_per_second_at_level(_level_of(id), _combat.awakening_count(_state.companion_awakenings, id), _combat.squad_awakenings(_state.companion_awakenings))
+	return companion_dps_at(id, _level_of(id))
+
+
+## What [method companion_dps] of [param id] would be at [param level], everything else as it is now:
+## its awakenings and the squad's, the companion talents and "Cadence". A reading for the interface
+## ("+X DPS" of a purchase, story 019b): it changes nothing. "Synergie" and "Champion" are read as they
+## are now, so a purchase that moves them is not foreseen. 0 for a level of 0 or less.
+## [codeblock]
+## var gain: BigNumber = floors.companion_dps_at("scout", 11).subtract(floors.companion_dps("scout"))
+## [/codeblock]
+func companion_dps_at(id: String, level: int) -> BigNumber:
+	var bare: BigNumber = _combat.companion(id).damage_per_second_at_level(level, _combat.awakening_count(_state.companion_awakenings, id), _combat.squad_awakenings(_state.companion_awakenings))
 	return _with_talent(companion_damage(bare, id), TalentTree.factor_from_percent(_attack_speed_percent))
 
 
