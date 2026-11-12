@@ -13,7 +13,8 @@ extends Control
 ## shape from the window size in CSS pixels; this script applies it synchronously, in [method _ready]
 ## and on each [signal Viewport.size_changed]. There is one tree: a shape change only moves the
 ## same nodes, so the focus and the scroll survive it. Portrait and landscape differ by the
-## direction of Split, the blocks of the [GameZone] and the font sizes.
+## direction of Split (landscape: the scene on the left, about 3/7 of the width, the panel on the
+## right, story 019b lot 9), the height of the scene and the handle of the panel.
 ##
 ## Visual feedback (story 009, display only): a [FloatingTextLayer] shows the damage of the
 ## player's hits (a critical hit is a bigger number ending with "!", which replaces the former
@@ -99,7 +100,6 @@ const HEADER_OPEN_WIDTH: float = 10.0
 const HEADER_OPEN_GAP: float = 4.0
 ## The font sizes of the spec, in logical units.
 const FONT_16: int = 16
-const FONT_20: int = 20
 const SECONDS_PER_MINUTE: int = 60
 const SECONDS_PER_HOUR: int = 3600
 
@@ -425,11 +425,12 @@ func _apply_shape() -> void:
 	_split.vertical = portrait
 	_game_zone.size_flags_vertical = Control.SIZE_FILL if portrait else Control.SIZE_EXPAND_FILL
 	# The header is the same line in both shapes (story 019b): its sizes are in main_screen.tscn.
-	var body_size: int = FONT_16 if portrait else FONT_20
-	_set_font_size([_hp_label, _abandon_button, _challenge_button], body_size)
-	_boss_timer.set_compact(portrait)
+	# The scene is the same in both shapes too (lot 9): the left column of the landscape screen holds
+	# the portrait scene, its corner, its thin timer band and its row of skills.
+	_set_font_size([_hp_label, _abandon_button, _challenge_button], FONT_16)
+	_boss_timer.set_compact(true)
 	_reserve_header_widths()
-	_skill_bar.set_compact(portrait)
+	_skill_bar.set_compact(true)
 	_tabs.set_handle_enabled(portrait)
 	if _floors != null:
 		_refresh()

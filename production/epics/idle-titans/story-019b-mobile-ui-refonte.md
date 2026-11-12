@@ -6,7 +6,7 @@
 > **Type**: UI
 > **Estimate**: XL
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-04
+> **Last Updated**: 2026-11-12
 
 ## Context
 
@@ -45,21 +45,38 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 
 ## Acceptance Criteria
 
-- [ ] Portrait : en-tête, scène, compétences, panneau et onglets aux hauteurs de la spec à 390x742 ; règle de repli testée à 360x640 et 320x568.
-- [ ] Aucun débordement horizontal de 320 à 2560 de large, avec « Étage 999 » et « 999,9 Qa ».
-- [ ] Le DPS total est visible dans l'en-tête sur les 3 onglets.
-- [ ] Boss visible seulement si `farming` ; pendant le combat, « Abandonner » et un chrono en bande fine avec les secondes ; rien ne se décale quand il apparaît.
-- [ ] Compétences en ronds aux états prêt, recharge, cadenas et passif, nom dans la bulle ; touches 1/2/3 inchangées.
-- [ ] Poignée qui replie et déploie au toucher et au clavier, état mémorisé ; panneau replié sans contrôle focalisable caché.
-- [ ] Un seul bouton d'achat qui cycle ×1, ×10, ×100, Max, Palier ; ancien mode enregistré relu sans décalage.
-- [ ] « +X DPS » égal au gain réel après achat (test, Champion excepté).
-- [ ] Lignes Souris, Objets et Talents conformes à la spec ; « Équiper » sur la ligne, comparaison toujours accessible.
-- [ ] Talents : fonctions, noms uniques et tests de la story 019 conservés (adaptés, jamais désactivés).
-- [ ] « Défi auto », version et « Plein écran » dans Réglages, plus sur l'écran principal.
-- [ ] Contraste ≥ 4,5:1 pour tout texte et ≥ 3:1 pour les signaux non textuels, couverts par `main_theme_contrast_test.gd`.
-- [ ] Cibles ≥ 44 px CSS, textes ≥ 14 u, contrôlés par la sonde dans l'export.
-- [ ] Captures dans l'export à 390x742, 360x640, 412x915, 1280x720, plus 320x568, et audit des 18 tailles de la story 019.
-- [ ] Essai sur le téléphone d'Amaury après le lot 5, avant les lots 6 à 9.
+Cochés au lot 9 (2026-11-12), un par un ; la preuve suit chaque critère.
+
+- [x] Portrait : en-tête, scène, compétences, panneau et onglets aux hauteurs de la spec à 390x742 ; règle de repli testée à 360x640 et 320x568.
+  - Preuve : `adaptive_layout_test.gd` (742 → scène 208 / panneau 358 ; 693 → 205 / 312 ; 645 → 178 / 291, lot 2) ; captures `lot9-w390x742`, `-w360x640`, `-w320x568`.
+- [x] Aucun débordement horizontal de 320 à 2560 de large, avec « Étage 999 » et « 999,9 Qa ».
+  - Preuve : export avec la partie `?seed=max`, largeur de page égale à la largeur de fenêtre à 320, 360, 390, 412, 768, 1024, 1280, 1920 et 2560 de large, plus 844x390 et 915x412 (lot 9) ; audit des 18 tailles, 0 élément hors de l'écran.
+- [x] Le DPS total est visible dans l'en-tête sur les 3 onglets.
+  - Preuve : captures `lot9-*`, `-objets` et `-talents` aux 8 tailles (« 458,3 M DPS » sous l'or).
+- [x] Boss visible seulement si `farming` ; pendant le combat, « Abandonner » et un chrono en bande fine avec les secondes ; rien ne se décale quand il apparaît.
+  - Preuve : `game_zone_layout_test.gd` (les rectangles ne dépendent pas de ce qui est visible), `confirm_press_test.gd` ; captures `lot3-*` (combat, « Confirmer ? »).
+- [x] Compétences en ronds aux états prêt, recharge, cadenas et passif, nom dans la bulle ; touches 1/2/3 inchangées.
+  - Preuve : `skill_bar_rounds_test.gd` (12) ; captures `lot4-*` et `lot4c-*`.
+- [x] Poignée qui replie et déploie au toucher et au clavier, état mémorisé ; panneau replié sans contrôle focalisable caché.
+  - Preuve : `panel_shell_test.gd` (21), `display_choices_test.gd` ; captures `lot5-*-replie` et `lot5k-*`.
+- [x] Un seul bouton d'achat qui cycle ×1, ×10, ×100, Max, Palier ; ancien mode enregistré relu sans décalage.
+  - Preuve : `buy_quote_test.gd` (cycle, ×100), `display_choices_test.gd` (mode 4 ajouté à la fin, anciens modes relus) ; captures `lot6-*-x10` à `-palier`.
+- [x] « +X DPS » égal au gain réel après achat (test, Champion excepté).
+  - Preuve : `companion_gain_test.gd` (12), vu en échec contre deux sabotages (lot 6).
+- [x] Lignes Souris, Objets et Talents conformes à la spec ; « Équiper » sur la ligne, comparaison toujours accessible.
+  - Preuve : `companion_rows_test.gd`, `inventory_rows_test.gd`, `talent_shell_test.gd` ; captures `lot6-*`, `lot7-*`, `lot8-*`, `lot9-*`. Écart connu : 5 emplacements d'objets (un par type des données), la spec en disait 4.
+- [x] Talents : fonctions, noms uniques et tests de la story 019 conservés (adaptés, jamais désactivés).
+  - Preuve : `talent_screen_v2_test.gd` et `talent_pane_test.gd` toujours dans la suite, 994/994 ; aucun test désactivé (lot 8).
+- [x] « Défi auto », version et « Plein écran » dans Réglages, plus sur l'écran principal.
+  - Preuve : `settings_toggles_test.gd` ; captures `lot2-*-reglages`. « Plein écran » sur un vrai téléphone : à la charge d'Amaury (liste ci-dessous).
+- [x] Contraste ≥ 4,5:1 pour tout texte et ≥ 3:1 pour les signaux non textuels, couverts par `main_theme_contrast_test.gd`.
+  - Preuve : ce test, dans la suite 994/994 ; les styles `ItemRow*` retirés du thème n'y sont plus contrôlés (lot 9), ceux des cartes d'objets le restent.
+- [x] Cibles ≥ 44 px CSS, textes ≥ 14 u, contrôlés par la sonde dans l'export.
+  - Preuve : `lot9-audit-18-tailles.txt`, 0 problème sur 18 tailles et 3 onglets : cibles de 50 u au moins, soit 44 px CSS au plancher de 0,88 px par u ; boutons en 16 u, textes en 14 u au moins. **Écart** : la sonde tourne sur la vraie scène sans affichage, pas dans l'export ; dans l'export, le plancher de 0,88 est tenu par `adaptive_layout_test.gd` et les tailles se voient sur les captures.
+- [x] Captures dans l'export à 390x742, 360x640, 412x915, 1280x720, plus 320x568, et audit des 18 tailles de la story 019.
+  - Preuve : captures `lot9-*` à ces 5 tailles, plus 844x390, 915x412 et 853x480 à 1,5 (zoom 150 %) ; `lot9-audit-18-tailles.txt`.
+- [x] Essai sur le téléphone d'Amaury après le lot 5, avant les lots 6 à 9.
+  - Preuve : retour d'Amaury du 2026-11-04, « lots 6 et 7 : bon ». **Reste à faire sur téléphone** : les talents (lot 8) et le paysage (lot 9), voir la liste ci-dessous.
 
 ---
 
@@ -104,7 +121,7 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
 **Story Type**: UI
 **Required evidence**: captures dans `production/qa/evidence/story-019b-mobile-ui-refonte/`, tests dans `tests/unit/ui/`.
 
-**Status**: [ ] En cours. Lot 1 fait : captures `lot1-*` à 390x742, 360x640, 412x915, 1280x720 et 320x568 (export web, Edge headless, aucune erreur console, scrollWidth = innerWidth), `stamp.txt` ; suite 832/832.
+**Status**: [x] Lots 0 à 9 faits ; preuves finales au journal « Lot 9 » ; suite 994/994. Reste l'essai sur téléphone des lots 8 et 9 (Amaury). Lot 1 : captures `lot1-*` à 390x742, 360x640, 412x915, 1280x720 et 320x568 (export web, Edge headless, aucune erreur console, scrollWidth = innerWidth), `stamp.txt` ; suite 832/832.
 
 **Journal des lots**
 
@@ -238,6 +255,30 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
     Écart maximal +0,2 point ; aucune image de plus de 33 ms. Pas de série en fenêtre visible pour ce lot.
   - **Preuves.** Captures `lot8-*` aux 5 tailles. Partie préparée `?seed=d`, un lancement par taille : la première série, faite dans un seul navigateur, avait repris la sauvegarde de la taille précédente. Étapes : état initial, `-talents`, `-compagnons` (Frénésie achetée : coche et « Acheté » ; paliers fermés avec cadenas et coûts), `-fiche` et `-retour`, `-confirmer`, `-reinit`, `-fiche-achat` puis `-attente` (Frénésie rachetée : « Réinitialiser / dans 59:5x »), `-replie` (partie libre de l'en-tête touchée ; pas en paysage). Aucune erreur console, aucun défilement horizontal.
 
+- Lot 9 (2026-11-12) :
+  - **Paysage.** La colonne de gauche reprend la scène du portrait : monstre au centre, deux grilles de 2 × 2 souris de chaque côté, coin « Boss » en haut à droite, chrono en bande puis PV en bas, et sous la scène la rangée de compétences de 68 u (les ronds ne sont plus empilés). La scène prend toute la hauteur de la colonne moins cette rangée (`GameZone.scene_height`). Scène et panneau se partagent la largeur au rapport 3 : 4, soit 548 et 732 u à 1280 de large (la spec disait environ 540 et 720). En-tête sur une ligne, pas de poignée, onglets en bas du panneau. Mise en page validée par Amaury sur captures le 2026-11-12, avant le commit : elle n'était pas dessinée dans la maquette.
+  - **Souris et billes.** Les emplacements et la taille des souris du paysage sont ceux de la règle du portrait (`portrait_mouse_centers`, 38 u à 1280x720). Les billes partent de ces mêmes points : dessin et tirs sont alignés par construction. Les anciennes règles du paysage (`orb_radius`, `orb_pitch`, blocs de colonne) sont retirées.
+  - **Talents.** À 1280x720, le panneau de 732 u montre l'arbre complet sur 3 colonnes (il en faut 594). Sur un téléphone en paysage (844x390 : panneau de 548 u), les sous-onglets restent.
+  - **Défaut trouvé par un nouveau test, corrigé.** À 844x390, la scène est basse et large (411 × 323 u) et le monstre passait sous le coin « Boss ». `portrait_box` limite maintenant le monstre pour qu'il reste à gauche du coin ou en dessous, selon ce qui le laisse le plus grand. Test vu en échec avant la correction ; rien ne change en portrait.
+  - **Thème.** Les 4 types `ItemRow`, `ItemRowCommon`, `ItemRowRare`, `ItemRowLegendary` et leurs 13 styles sont supprimés. Nouveau `theme_unused_styles_test.gd` (2) : le thème n'a plus ces types, et aucun fichier `.gd`, `.tscn` ou `.tres` de `src/` ne contient « ItemRow ». Les deux ont été vus en échec contre `f391648`.
+  - **Tests.** Nouveau `landscape_layout_test.gd` (5, vraie scène à 1280x720) : partage 3/7 et 4/7, compétences en rangée sous les PV, billes aux points des souris dessinées, souris qui ne touchent rien, arbre complet des talents. `game_zone_layout_test.gd` : scène du paysage, coin à côté du monstre et hors des PV et du chrono, souris qui ne touchent rien, à 548 × 668 et 411 × 391 u. `adaptive_layout_test.gd` : messages de butin du paysage. Retirés avec le code qu'ils testaient : 2 tests des anciennes orbes du paysage, 2 tests de contraste des `ItemRow*`. Suite 994/994.
+  - **Non fait, noté pour plus tard.** Amaury a demandé de centrer verticalement le groupe monstre, souris et sol à 1280x720, seulement si la retouche était petite. Elle ne l'est pas : le groupe est déjà centré dans la place que la scène lui réserve (111 u au-dessus, 106 u en dessous). Le vide visible sous le sol vient de la bande du chrono et de l'indice de boss, réservés pour que rien ne bouge pendant un combat. Centrer par rapport aux PV déplacerait le tout de 12 u seulement, et demande de toucher à la règle commune au portrait. Le vrai levier serait un monstre plus grand en paysage (il est limité à 55 % de la largeur de la colonne, 301 u).
+  - **Audit des 18 tailles** (`lot9-audit-18-tailles.txt`, sonde jetable refaite, vraie scène sans affichage, partie préparée) : onglets Souris, Objets et Talents à chaque taille, soit 54 contrôles. Rien ne sort de l'écran ; boutons touchables sur 50 u au moins ; 16 u pour les boutons, 14 u pour les textes ; aucun texte plus large que sa place ; aucun bouton sur un autre. **0 problème.** Exclues, comme au lot 8 : la bande de la poignée et les parties libres des en-têtes qui la prolongent (comptées à part dans le fichier). La sonde signale bien une cible trop petite quand on monte son seuil à 60 u. Limite : les états internes des talents (fiche, confirmation, attente) n'ont pas été reparcourus ; le lot 9 ne les change pas.
+  - **Débordement.** Export avec `?seed=max` (« Étage 999 », « 999,9 Qa ») à 320, 360, 390, 412, 768, 1024, 1280, 1920 et 2560 de large, plus 844x390 et 915x412 : largeur de page égale à la largeur de fenêtre partout, aucune erreur console.
+  - **Fluidité**, processeur ×4, 5 passages alternés avec la référence (`f391648`, lot 8), partie préparée `?seed=d` rechargée à chaque passage, occupation médiane du fil principal :
+
+    | Mesure | Portrait (réf. / lot 9) | Paysage (réf. / lot 9) |
+    |---|---|---|
+    | Sans fenêtre, onglet Souris (`lot9-fluidite-headless.txt`) | 20,6 / 20,7 % | 21,7 / 21,7 % |
+    | Sans fenêtre, onglet Objets, sac de 8 objets (`lot9-fluidite-objets.txt`) | 20,7 / 20,7 % | 21,5 / 21,3 % |
+    | Sans fenêtre, onglet Talents (`lot9-fluidite-talents.txt`) | 19,3 / 19,6 % | 19,8 / 20,6 % |
+    | Fenêtre visible, onglet Souris (`lot9-fluidite-fenetre.txt`) | 11,5 / 11,5 % | 17,3 / 17,9 % |
+    | Fenêtre visible, onglet Objets (`lot9-fluidite-fenetre-objets.txt`) | 19,7 / 19,6 % | 21,2 / 20,6 % |
+    | Fenêtre visible, onglet Talents (`lot9-fluidite-fenetre-talents.txt`) | 18,8 / 19,4 % | 19,5 / 20,0 % |
+
+    Écart maximal +0,8 point (Talents en paysage, sans fenêtre : l'arbre complet montre plus de tuiles que les sous-onglets de la référence), sous le seuil de 1,5 point. **L'atlas des portraits n'est donc pas fait.** Lecture prudente : le niveau absolu (environ 20 %) est plus haut qu'au lot 8 (environ 8 %) parce que la partie préparée a 6 souris qui tirent, et parce que la machine a changé de régime pendant la première série en fenêtre (de 11 à 18 % pour les deux versions en même temps). Les deux versions ont de 0 à 9 images de plus de 33 ms par passage, sans différence nette ; un seul passage du lot 9 en a 14 (Talents en portrait, fenêtre visible), les quatre autres de 0 à 2. En paysage, les touchers visent le monstre de chaque version (384, 380 pour la référence ; 274, 322 pour le lot 9).
+  - **Preuves.** Captures `lot9-*` dans l'export, partie préparée `?seed=d`, un lancement par taille : état initial (onglet Souris), `-objets`, `-talents`, à 390x742, 360x640, 412x915, 320x568, 1280x720, 844x390 (×3), 915x412 (×2,6) et 853x480 à 1,5 (zoom 150 % d'une fenêtre de 1280x720). Aucune erreur console, aucun défilement horizontal.
+
 ## Vérifications sur téléphone (à la charge d'Amaury)
 
 - Essai prévu après le lot 5 (2026-11-04). Cette liste sera complétée à chaque lot.
@@ -295,6 +336,16 @@ Aucun changement d'économie, de monstres ni de moteur. Analyse : `ux-designer` 
   - réinitialiser : la question, puis « Oui, réinitialiser » ; pendant un boss ou l'attente, la fiche dit pourquoi c'est impossible ;
   - les trois sous-onglets (Clic, Compagnons, Économie) et le glissé dans la liste : rien ne s'achète en glissant ;
   - lisibilité des tuiles : rien ne déborde à droite.
+- Paysage (lot 9), téléphone tourné sur le côté :
+  - l'en-tête tient sur une ligne : étage et record à gauche, or et DPS au centre, roue à droite ;
+  - à gauche la scène : le monstre au centre, les souris des deux côtés, le coin « Boss » en haut à droite, les PV puis les 3 compétences en rangée tout en bas ;
+  - à droite le panneau, avec les 3 onglets en bas ; pas de poignée, et le panneau ne se replie pas ;
+  - le coin « Boss » ne touche pas le monstre, et se touche au pouce ; aucune souris ne touche le monstre, le coin, les PV ou le chrono pendant un boss ;
+  - les billes partent bien des souris dessinées ;
+  - les compétences se touchent au pouce de la main gauche ; tapoter le monstre reste fluide ;
+  - onglet Objets : la liste défile, « Équiper » se touche ; onglet Talents : les sous-onglets Clic, Compagnons, Économie (l'arbre complet sur 3 colonnes n'apparaît que sur un écran large, tablette ou ordinateur) ;
+  - tourner le téléphone dans les deux sens plusieurs fois : rien ne clignote, rien ne reste décalé, et en revenant en portrait le panneau est replié ou déployé comme avant ;
+  - si la barre d'adresse du navigateur mange la hauteur : dire ce qui devient trop serré.
 
 ---
 

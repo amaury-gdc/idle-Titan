@@ -15,7 +15,9 @@ const SCENES: Array[float] = [160.0, 178.0, 208.0, 419.0, 516.0, 640.0]
 const COLLAPSED: Dictionary = {645.0: 419.0, 742.0: 516.0, 866.0: 640.0}
 ## Touch target of the spec: 44 CSS px at the floor of 0.88 CSS px per unit.
 const TOUCH_TARGET: float = 50.0
-const LANDSCAPE_ZONE: Vector2 = Vector2(768.0, 664.0)
+## Left columns of the landscape screen (lot 9): 1280x720 and an 844x390 phone (959x443 u).
+const LANDSCAPE_ZONE: Vector2 = Vector2(548.0, 668.0)
+const LANDSCAPE_ZONES: Array[Vector2] = [Vector2(548.0, 668.0), Vector2(411.0, 391.0)]
 
 
 func _zone(width: float, scene: float) -> Vector2:
@@ -152,7 +154,47 @@ func test_version_and_auto_challenge_left_the_game_zone() -> void:
 		assert_bool(rects.has("auto")).is_false()
 
 
-func test_landscape_skills_take_the_whole_left_column() -> void:
-	var skills: Rect2 = GameZone.blocks(LANDSCAPE, LANDSCAPE_ZONE, 0.0)["skills"]
-	assert_float(skills.position.y).is_equal(GameZone.PADDING)
-	assert_float(skills.end.y).is_equal(LANDSCAPE_ZONE.y - GameZone.PADDING)
+func test_landscape_skills_lie_in_a_row_at_the_bottom_of_the_column() -> void:
+	for zone: Vector2 in LANDSCAPE_ZONES:
+		var skills: Rect2 = GameZone.blocks(LANDSCAPE, zone, 0.0)["skills"]
+		assert_float(skills.size.y).is_equal(AdaptiveLayout.SKILL_ROW_HEIGHT)
+		assert_float(skills.end.y).is_equal(zone.y)
+		assert_float(skills.size.x).is_equal(zone.x - GameZone.PADDING * 2.0)
+
+
+func test_landscape_scene_ignores_the_portrait_height() -> void:
+	# The landscape scene is the column but the skill row, whatever the portrait scene was.
+	for scene: float in [0.0, 178.0, 516.0]:
+		assert_float(GameZone.scene_height(LANDSCAPE, LANDSCAPE_ZONE, scene)).is_equal(LANDSCAPE_ZONE.y - AdaptiveLayout.SKILL_ROW_HEIGHT)
+
+
+func test_landscape_corner_stays_beside_the_monster_and_off_the_hp_and_timer() -> void:
+	for zone: Vector2 in LANDSCAPE_ZONES:
+		var rects: Dictionary = GameZone.blocks(LANDSCAPE, zone, 0.0)
+		var enemy: Rect2 = rects["enemy"]
+		var box: float = GameZone.portrait_box(zone, GameZone.scene_height(LANDSCAPE, zone, 0.0))
+		var monster: Rect2 = Rect2(enemy.get_center() - Vector2.ONE * box / 2.0, Vector2.ONE * box)
+		var corner: Rect2 = rects["challenge"]
+		for key: String in ["hp", "timer"]:
+			assert_bool(corner.intersects(rects[key])).override_failure_message("%s, %s" % [zone, key]).is_false()
+		assert_bool(corner.intersects(monster)).override_failure_message("%s, monster" % zone).is_false()
+
+
+func test_landscape_mice_touch_nothing() -> void:
+	for zone: Vector2 in LANDSCAPE_ZONES:
+		var scene: float = GameZone.scene_height(LANDSCAPE, zone, 0.0)
+		var rects: Dictionary = GameZone.blocks(LANDSCAPE, zone, 0.0)
+		var enemy: Rect2 = rects["enemy"]
+		var box: float = GameZone.portrait_box(zone, scene)
+		var monster: Rect2 = Rect2(enemy.get_center() - Vector2.ONE * box / 2.0, Vector2.ONE * box)
+		var room: Rect2 = Rect2(0.0, 0.0, zone.x, scene)
+		var mice: Array[Rect2] = _mouse_rects(zone, scene)
+		assert_int(mice.size()).is_equal(8)
+		for i in mice.size():
+			var where: String = "mouse %d in %s" % [i, zone]
+			assert_bool(room.encloses(mice[i])).override_failure_message(where).is_true()
+			for key: String in ["challenge", "timer", "hp", "skills"]:
+				assert_bool(mice[i].intersects(rects[key])).override_failure_message("%s, %s" % [where, key]).is_false()
+			assert_bool(mice[i].intersects(monster)).override_failure_message(where + ", monster").is_false()
+			for j in range(i + 1, mice.size()):
+				assert_bool(mice[i].intersects(mice[j])).override_failure_message("%s, mouse %d" % [where, j]).is_false()

@@ -18,7 +18,7 @@ const FOCUS_BACKGROUNDS: Array[Array] = [
 	["normal", "BuyButton"], ["hover", "BuyButton"], ["pressed", "BuyButton"],
 	["normal", "AwakenButton"], ["normal", "EquipButton"], ["normal", "ChallengeButton"],
 	["normal", "DangerButton"], ["pressed", "TabButton"], ["pressed", "SegmentButton"],
-	["normal", "ItemRow"], ["hover", "ItemRow"], ["normal", "TalentOwned"],
+	["normal", "TalentOwned"],
 	["normal", "TalentBuyable"], ["normal", "TalentLocked"], ["panel", "HeaderPanel"],
 	["panel", "ManagementPanel"],
 ]
@@ -98,12 +98,6 @@ func test_enabled_button_keeps_a_light_text() -> void:
 		assert_float(_contrast(text, _background("normal", "Button"))).is_greater_equal(MIN_CONTRAST)
 
 
-func test_rarity_edges_stand_out_of_the_row() -> void:
-	for type: String in ["ItemRowCommon", "ItemRowRare", "ItemRowLegendary"]:
-		var row: StyleBoxFlat = _theme.get_stylebox("normal", type)
-		assert_float(_contrast(row.border_color, row.bg_color)).is_greater_equal(MIN_NON_TEXT_CONTRAST)
-
-
 func test_focus_ring_shows_on_every_background() -> void:
 	# The ring is white with a dark shadow: on a light fill (yellow) the shadow is what shows.
 	var ring: StyleBoxFlat = _theme.get_stylebox("focus", "Button")
@@ -114,6 +108,10 @@ func test_focus_ring_shows_on_every_background() -> void:
 		var fill: Color = _background(pair[0], pair[1])
 		var best: float = maxf(_contrast(ring.border_color, fill), _contrast(ring.shadow_color, fill))
 		assert_float(best).override_failure_message("ring on %s/%s" % [pair[1], pair[0]]).is_greater_equal(MIN_NON_TEXT_CONTRAST)
+	# The cards of the lists (story 019b) are drawn on the row colours, not on a theme style.
+	for fill: Color in [UiPalette.ROW, UiPalette.ROW_HOVER]:
+		var best: float = maxf(_contrast(ring.border_color, fill), _contrast(ring.shadow_color, fill))
+		assert_float(best).override_failure_message("ring on %s" % fill).is_greater_equal(MIN_NON_TEXT_CONTRAST)
 
 
 func test_hp_text_reads_on_the_gauge() -> void:
@@ -125,7 +123,6 @@ func test_theme_matches_the_palette() -> void:
 	var pairs: Array[Array] = [
 		[_background("panel", "HeaderPanel"), UiPalette.BACKGROUND],
 		[_background("panel", "ManagementPanel"), UiPalette.PANEL],
-		[_background("normal", "ItemRow"), UiPalette.ROW],
 		[_background("normal", "Button"), UiPalette.BUTTON],
 		[_background("normal", "BuyButton"), UiPalette.YELLOW],
 		[_text("font_color", "BuyButton"), UiPalette.ON_YELLOW],
@@ -134,8 +131,6 @@ func test_theme_matches_the_palette() -> void:
 		[_background("normal", "ChallengeButton"), UiPalette.RED],
 		[_background("panel", "DotPanel"), UiPalette.RED],
 		[_background("normal", "TalentOwned"), UiPalette.OWNED_BG],
-		[_text("font_color", "ItemRowCommon"), UiPalette.COMMON],
-		[_text("font_color", "ItemRowRare"), UiPalette.BLUE],
 		[_text("font_color", "PaneText"), UiPalette.TEXT_MUTED],
 	]
 	for pair: Array in pairs:
@@ -294,9 +289,3 @@ func test_talent_states_read() -> void:
 		for style: String in ["normal", "hover", "pressed"]:
 			assert_float(_contrast(_text("font_color", type), _background(style, type))).is_greater_equal(MIN_CONTRAST)
 
-
-func test_item_rows_read_in_every_state() -> void:
-	for type: String in ["ItemRow", "ItemRowCommon", "ItemRowRare", "ItemRowLegendary"]:
-		for style: String in ["normal", "hover", "pressed"]:
-			assert_float(_contrast(_text("font_color", type), _background(style, type))).is_greater_equal(MIN_CONTRAST)
-	assert_float(_contrast(_text("font_disabled_color", "ItemRow"), _background("disabled", "ItemRow"))).is_greater_equal(MIN_CONTRAST)

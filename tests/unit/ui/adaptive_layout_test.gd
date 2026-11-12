@@ -209,18 +209,6 @@ func test_modal_rect_small_view_keeps_the_margins() -> void:
 	assert_float(rect.size.y).is_equal(446.0 - AdaptiveLayout.MODAL_MARGIN * 2.0)
 
 
-func test_orb_radius_and_pitch_stay_within_their_bounds() -> void:
-	assert_float(GameZone.orb_radius(100.0)).is_equal(GameZone.ORB_RADIUS_MIN)
-	assert_float(GameZone.orb_pitch(100.0)).is_equal(GameZone.ORB_PITCH_MIN)
-	assert_float(GameZone.orb_radius(640.0)).is_equal(GameZone.ORB_RADIUS_MAX)
-	assert_float(GameZone.orb_pitch(640.0)).is_equal(GameZone.ORB_PITCH_MAX)
-
-
-func test_orb_radius_follows_the_box_between_its_bounds() -> void:
-	assert_float(GameZone.orb_radius(450.0)).is_equal_approx(GameZone.ORB_RADIUS_MIN * 1.5, TOLERANCE)
-	assert_float(GameZone.orb_pitch(450.0)).is_equal_approx(GameZone.ORB_PITCH_MIN * 1.5, TOLERANCE)
-
-
 # The monster box of a portrait zone: the height of its room, at most BOX_ZONE_RATIO of the width.
 func _portrait_box(zone: Vector2, scene: float) -> float:
 	var enemy: Rect2 = GameZone.blocks(PORTRAIT, zone, scene)["enemy"]
@@ -260,17 +248,25 @@ func test_loot_slot_portrait_occupied_band_stays_under_the_corner() -> void:
 	assert_bool((rects["enemy"] as Rect2).encloses(slot)).is_true()
 
 
-func test_loot_slot_landscape_stays_out_of_the_side_columns() -> void:
-	var zone: Vector2 = Vector2(768.0, 664.0)
-	var rects: Dictionary = GameZone.blocks(LANDSCAPE, zone, 170.0)
-	for free: bool in [true, false]:
-		var slot: Rect2 = GameZone.loot_slot_for(LANDSCAPE, zone, 170.0, 360.0, free)
-		assert_bool(slot.intersects(rects["orbs"])).is_false()
-		assert_bool(slot.intersects(rects["skills"])).is_false()
+## Left columns of the landscape screen (story 019b, lot 9): 1280x720 and an 844x390 phone (959x443 u),
+## each 3/7 of the width and the height under the 52 u header.
+const LANDSCAPE_ZONES: Array[Vector2] = [Vector2(548.0, 668.0), Vector2(411.0, 391.0)]
 
 
-func test_loot_slot_landscape_occupied_band_stays_under_the_timer() -> void:
-	var zone: Vector2 = Vector2(768.0, 664.0)
-	var timer: Rect2 = GameZone.blocks(LANDSCAPE, zone, 170.0)["timer"]
-	var slot: Rect2 = GameZone.loot_slot_for(LANDSCAPE, zone, 170.0, 360.0, false)
-	assert_float(slot.position.y).is_greater_equal(timer.end.y)
+func test_loot_slot_landscape_never_reaches_a_mouse_or_the_skills() -> void:
+	for zone: Vector2 in LANDSCAPE_ZONES:
+		var scene: float = GameZone.scene_height(LANDSCAPE, zone, 0.0)
+		var box: float = GameZone.portrait_box(zone, scene)
+		var skills: Rect2 = GameZone.blocks(LANDSCAPE, zone, 0.0)["skills"]
+		for free: bool in [true, false]:
+			var slot: Rect2 = GameZone.loot_slot_for(LANDSCAPE, zone, 0.0, box, free)
+			_assert_clear_of_mice(slot, zone, scene, box)
+			assert_bool(slot.intersects(skills)).override_failure_message("zone %s" % zone).is_false()
+
+
+func test_loot_slot_landscape_occupied_band_stays_under_the_corner() -> void:
+	for zone: Vector2 in LANDSCAPE_ZONES:
+		var scene: float = GameZone.scene_height(LANDSCAPE, zone, 0.0)
+		var corner: Rect2 = GameZone.blocks(LANDSCAPE, zone, 0.0)["challenge"]
+		var slot: Rect2 = GameZone.loot_slot_for(LANDSCAPE, zone, 0.0, GameZone.portrait_box(zone, scene), false)
+		assert_float(slot.position.y).is_greater_equal(corner.end.y)
