@@ -1,12 +1,12 @@
 # Story 020: Calibrage unique de l'économie
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Feature
 > **Type**: Config/Data
 > **Estimate**: M
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: 2026-11-12
+> **Last Updated**: 2026-11-14
 
 ## Context
 
@@ -113,3 +113,10 @@ Message affiché une fois au chargement, pour les sauvegardes dont le record dé
 - Unlocks: None
 
 ---
+
+## Completion Notes
+**Completed**: 2026-11-14
+**Criteria**: 9/10 passing. Part du clic (critère 5) non tenue : 24 % au milieu sans talents (cible environ 40 %), 22 % à l'étage 200 (cible 10 à 20 %), 32 % pour le build Clic (cible 40 à 60 %). Écart accepté par Amaury, reporté à la story 023.
+**Deviations**: ADVISORY, courbes retenues différentes de celles proposées dans `design/economy-rework.md` (base 24, paliers du milieu montés, mur en deux marches), sur décision d'Amaury, document mis à jour. ADVISORY, ajout de périmètre demandé par Amaury : message « Équilibrage mis à jour » au chargement (`BalanceNotice`, sauvegarde permanente en version 7). ADVISORY, non mesurés sur décision d'Amaury : 1 h par jour, sans objets ; sensibilité mesurée sur la graine 1 seulement.
+**Test Evidence**: waived at qa.level minimal ; rapport de fumée `production/qa/smoke-2026-11-14.md`, mesures dans `assets/data/balance_notes.md`, captures dans `production/qa/evidence/story-020-economy-calibration/`. Suite 1012/1012, CI verte sur `40d40e4`.
+**Reviewed by**: self, no independent review
