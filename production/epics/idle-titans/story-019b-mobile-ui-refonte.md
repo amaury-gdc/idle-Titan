@@ -1,7 +1,7 @@
 # Story 019b: Refonte UI/UX mobile
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: In Progress
+> **Status**: Complete
 > **Layer**: Presentation
 > **Type**: UI
 > **Estimate**: XL
@@ -76,7 +76,7 @@ Cochés au lot 9 (2026-11-12), un par un ; la preuve suit chaque critère.
 - [x] Captures dans l'export à 390x742, 360x640, 412x915, 1280x720, plus 320x568, et audit des 18 tailles de la story 019.
   - Preuve : captures `lot9-*` à ces 5 tailles, plus 844x390, 915x412 et 853x480 à 1,5 (zoom 150 %) ; `lot9-audit-18-tailles.txt`.
 - [x] Essai sur le téléphone d'Amaury après le lot 5, avant les lots 6 à 9.
-  - Preuve : retour d'Amaury du 2026-11-04, « lots 6 et 7 : bon ». **Reste à faire sur téléphone** : les talents (lot 8) et le paysage (lot 9), voir la liste ci-dessous.
+  - Preuve : retour d'Amaury du 2026-11-04, « lots 6 et 7 : bon » ; lots 8 (talents) et 9 (paysage) essayés par Amaury le 2026-11-12 avec la liste ci-dessous : « tout est bon ».
 
 ---
 
@@ -121,7 +121,7 @@ Cochés au lot 9 (2026-11-12), un par un ; la preuve suit chaque critère.
 **Story Type**: UI
 **Required evidence**: captures dans `production/qa/evidence/story-019b-mobile-ui-refonte/`, tests dans `tests/unit/ui/`.
 
-**Status**: [x] Lots 0 à 9 faits ; preuves finales au journal « Lot 9 » ; suite 994/994. Reste l'essai sur téléphone des lots 8 et 9 (Amaury). Lot 1 : captures `lot1-*` à 390x742, 360x640, 412x915, 1280x720 et 320x568 (export web, Edge headless, aucune erreur console, scrollWidth = innerWidth), `stamp.txt` ; suite 832/832.
+**Status**: [x] Lots 0 à 9 faits ; preuves finales au journal « Lot 9 » ; suite 994/994 ; essai téléphone des lots 8 et 9 fait (Amaury, 2026-11-12). Lot 1 : captures `lot1-*` à 390x742, 360x640, 412x915, 1280x720 et 320x568 (export web, Edge headless, aucune erreur console, scrollWidth = innerWidth), `stamp.txt` ; suite 832/832.
 
 **Journal des lots**
 
@@ -353,3 +353,12 @@ Cochés au lot 9 (2026-11-12), un par un ; la preuve suit chaque critère.
 
 - Depends on: `production/epics/idle-titans/story-019-talent-tree-content.md`
 - Unlocks: None
+
+---
+
+## Completion Notes
+**Completed**: 2026-11-12
+**Criteria**: 15/15 passing (none deferred)
+**Deviations**: advisory only: la sonde des cibles et des tailles tourne sur la vraie scène sans affichage, pas dans l'export web ; 5 emplacements d'objets au lieu de 4 (un par type des données). `stamp.txt` des preuves date du lot 3 (information).
+**Test Evidence**: `production/qa/evidence/story-019b-mobile-ui-refonte/` (captures `lot1-*` à `lot9-*`, audit `lot9-audit-18-tailles.txt`, fluidité `lot*-fluidite-*.txt`) ; tests dans `tests/unit/ui/`, suite 994/994, CI verte sur `a3eb6a1`
+**Reviewed by**: self, no independent review
