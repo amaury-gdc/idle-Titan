@@ -15,7 +15,7 @@ extends RefCounted
 ## [/codeblock]
 
 ## Save-format version written by this build.
-const CURRENT_VERSION: int = 6
+const CURRENT_VERSION: int = 7
 
 ## Unused since version 4, kept so that older saves keep their value: spent points are
 ## derived from [member talents] and their costs, earned points from
@@ -53,6 +53,9 @@ var talent_tree_seen: int = 0
 ## [method TalentTree.try_reset]). Added in version 6; 0 means none, and so does a negative,
 ## non-numeric or absurd value.
 var talent_reset_unix: int = 0
+## The core_curves.json [code]balance_version[/code] whose message the player saw, or that did not
+## concern them (story 020, see [BalanceNotice]). Added in version 7; older saves have 0.
+var balance_seen: int = 0
 
 
 ## JSON-safe payload including the format version.
@@ -75,6 +78,7 @@ func to_dict() -> Dictionary:
 		"equipped": worn,
 		"talent_tree_seen": talent_tree_seen,
 		"talent_reset_unix": talent_reset_unix,
+		"balance_seen": balance_seen,
 	}
 
 
@@ -110,6 +114,10 @@ static func from_dict(data: Dictionary) -> PermanentState:
 	var reset_at: Variant = data.get("talent_reset_unix", 0)
 	if (reset_at is float or reset_at is int) and float(reset_at) > 0.0 and float(reset_at) <= GameState.MAX_SAVED_UNIX:
 		state.talent_reset_unix = int(reset_at)
+	# Balance version seen (version 7).
+	var balance: Variant = data.get("balance_seen", 0)
+	if (balance is float or balance is int) and float(balance) > 0.0 and float(balance) <= GameState.MAX_SAVED_UNIX:
+		state.balance_seen = int(balance)
 	# Items (version 5). A malformed item, a repeated uid or an equipped item filed under
 	# another type than its own is dropped, so a uid always names one item.
 	var seen: Dictionary = {}

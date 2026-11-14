@@ -1,6 +1,6 @@
 # Refonte de l'économie et éveil des compagnons
 
-> **Status**: Approuvée par Amaury le 2026-11-02, valeurs à recaler à la story 020
+> **Status**: Approuvée par Amaury le 2026-11-02 ; PV recalés à la story 020 (2026-11-14), part du clic reportée à la story 023
 > **Stories**: 015, 016, 017, 020
 > **Référence**: `assets/data/balance_notes.md`, section « Reference before the economy rework »
 
@@ -20,15 +20,18 @@ Les cibles « premier boss en 2 à 3 min » et « étage 50 vers 1 h » du brief
 
 ## PV par paliers
 
-`enemy_hp_base` passe de 22 à 30. Le taux de croissance dépend de l'étage :
+Valeurs recalées à la story 020 (mesures et raisons : `assets/data/balance_notes.md`, « Economy calibration »). `enemy_hp_base` passe de 22 à 24. Le taux de croissance dépend de l'étage :
 
-| À partir de l'étage | Taux |
-|---|---|
-| 1 | 1,32 |
-| 100 | 1,33 |
-| 150 | 1,345 |
-| 190 | 1,40 |
-| 205 | 1,6 |
+| À partir de l'étage | Taux retenu (story 020) | Taux proposé avant mesure |
+|---|---|---|
+| 1 | 1,32 | 1,32 |
+| 100 | 1,345 | 1,33 |
+| 150 | 1,38 | 1,345 |
+| 190 | 1,40 | 1,40 |
+| 205 | 1,27 | 1,6 |
+| 211 | 1,6 | — |
+
+La base proposée avant mesure était 30 : elle mettait le premier boss à 11,8 min, d'où 24 (9,0 min). Le mur est en deux marches parce que l'or ne monte qu'avec l'étage : avec 1,6 dès 205, le joueur reste bloqué devant le boss de 210 pendant les 40 h.
 
 Formule : `HP(s) = max(1, floor(A_k * g_k^(s - f_k)))`, avec `A_1 = base` et `A_(k+1) = floor(A_k * g_k^(f_(k+1) - f_k))`. Les ancres `A_k` sont calculées une fois au chargement, ce qui rend le calcul moins cher qu'aujourd'hui à haut étage. Or, coûts et boss sont inchangés.
 

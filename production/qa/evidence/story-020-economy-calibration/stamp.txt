@@ -1,0 +1,4 @@
+Reviewed-Content-Hash: assets/data/core_curves.json 1903ab5b8d1fab99d6165c3db3407f9ef3cfa623
+Reviewed-Content-Hash: src/core/balance_notice.gd 61bbf9de500557944ea60a10000b08dbe11c6b8d
+Reviewed-Content-Hash: src/core/permanent_state.gd ae550f4bb9e282880aaf261b679d6844de6cd531
+Reviewed-Content-Hash: src/ui/main_screen.gd 29a1206e3a2ec3d7f92ba42f3ad5db2b4ec0565c

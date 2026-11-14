@@ -11,7 +11,7 @@
 ## Player goal & fail state — what "working" looks like
 - But : monter le plus haut possible ; l'étage atteint est le score.
 - Fin de la V1 : le mur, quand on ne peut plus avancer. Le mur est normal.
-- Objectifs de calibrage (hypothèses) : premier boss en 2 à 3 min, étage 50 en environ 1 h, mur net entre les étages 100 et 150.
+- Objectifs de calibrage (story 020, mesurés) : au profil de référence (2 h de jeu par jour, 3 clics/s), étage 200 atteint en 4 à 6 jours, mur vers les étages 210 à 220, étage 230 non atteint après 40 h actives. Mesuré : premier boss tué vers 9 min, étage 50 vers 45 min, étage 200 au jour 5. Les anciennes hypothèses (premier boss en 2 à 3 min, étage 50 en 1 h, mur entre 100 et 150) sont abandonnées. Détail : `assets/data/balance_notes.md`.
 
 ## MVP — what must exist to be the game
 - Boucle clic, compagnons automatiques, étages et or (dégâts de clic = base + % compagnons).

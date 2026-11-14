@@ -146,6 +146,8 @@ var _effects_when_never_set: bool = true
 var _keyboard_used: bool = false
 # Whether the window of the return message shows the new talent tree message now.
 var _version_notice_open: bool = false
+var _balance_notice: BalanceNotice
+var _balance_notice_open: bool = false
 # Height the window of the return message asks for: its content, at least OFFLINE_PANEL_HEIGHT; the
 # view caps it (AdaptiveLayout.modal_rect).
 var _message_window_height: float = OFFLINE_PANEL_HEIGHT
@@ -218,6 +220,10 @@ func _ready() -> void:
 	if not _talents.is_valid():
 		_show_error(_talents.get_error())
 		return
+	_balance_notice = BalanceNotice.from_data(curves, _permanent)
+	if not _balance_notice.is_valid():
+		_show_error(_balance_notice.get_error())
+		return
 	_loot_rng.randomize()
 	_crit_rng.randomize()
 	_inventory = Inventory.from_data(DataLoader.load_json(ITEMS_PATH), _permanent, _game, combat, _loot_rng.randf)
@@ -236,6 +242,8 @@ func _ready() -> void:
 	var offline_gain: Dictionary = _grant_offline_gold()
 	# After the absence is paid with the bonuses the player had (design/talent-tree-v2.md, Données).
 	_talents.apply_tree_version()
+	# Story 020: a record at or under the stage of the data is recorded as seen, without a message.
+	_balance_notice.apply(_talents.best_stage())
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
 	_floors.farming_changed.connect(_on_farming_changed)
@@ -303,6 +311,8 @@ func _ready() -> void:
 		_show_offline_gain(offline_gain)
 	elif _talents.version_notice_due():
 		_show_version_notice()
+	elif _balance_notice.is_due():
+		_show_balance_notice()
 	_watch_tab_visibility()
 
 
@@ -550,6 +560,7 @@ func _show_offline_gain(gain: Dictionary) -> void:
 	_bubble.cancel()
 	_save_screen.close()
 	_version_notice_open = false
+	_balance_notice_open = false
 	_offline_title.text = tr("Bon retour !")
 	var duration: String = _format_duration(gain["seconds"])
 	var gold: String = (gain["gold"] as BigNumber).format()
@@ -609,9 +620,37 @@ func _show_version_notice() -> void:
 	_open_message_window()
 
 
+## What closing the message window means for the balance message (story 020): the one it showed is
+## acknowledged and saved, or, after another message, it is still due and must come next. Returns
+## true when it must be shown now.
+func _close_balance_notice() -> bool:
+	if _balance_notice_open:
+		_balance_notice_open = false
+		_balance_notice.acknowledge()
+		_save()
+		return false
+	return _balance_notice != null and _balance_notice.is_due()
+
+
+## The one-time message of a rebalance (story 020), for a player whose record is above the stage of
+## the data: the high stages changed, nothing was taken. It uses the window of the return message
+## and comes after the return message and the talent tree message.
+func _show_balance_notice() -> void:
+	_bubble.cancel()
+	_save_screen.close()
+	_balance_notice_open = true
+	_offline_title.text = tr("Équilibrage mis à jour")
+	# A non-breaking space ( ) before the colon: it never starts a line.
+	_offline_message.text = tr("L'équilibrage a changé : les monstres des étages élevés sont plus résistants. Tu ne perds rien.")
+	_open_message_window()
+
+
 func _on_offline_closed() -> void:
 	if _close_talent_notice():
 		_show_version_notice()
+		return
+	if _close_balance_notice():
+		_show_balance_notice()
 		return
 	_offline_blocker.visible = false
 	_offline_panel.visible = false

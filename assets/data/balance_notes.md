@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004, 004b, 005, 006, 007)
+# Balance notes (stories 003, 004, 004b, 005, 006, 007, 014, 020)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -9,6 +9,142 @@ The numbers that apply to the game today are in "Bosses".
 Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
+
+## Economy calibration (story 020)
+
+Measured on 2026-11-13 and 2026-11-14. These are the numbers that apply to the game today.
+
+### Rule: re-measure after any story that adds power
+
+Every story that adds power to the player (items, skills, talents, awakening) must re-run the
+reference measure below, for both buyers, over 40 active hours, and check:
+
+- stage 200 is reached on day 4, 5 or 6;
+- stage 230 is NOT reached at 40 active hours.
+
+If one of the two fails, the story retunes or says so before it closes.
+
+Reference profile: 3 clicks/s, 2 h of active play per day then 22 h away (12 h counted offline),
+auto challenge, every skill as soon as it is ready, items on, seed 1, talents in the fixed
+Compagnons order below. Day = floor(wall minutes / 1440) + 1. Run it once with `--buyer=cheapest`
+and once with `--buyer=ratio`:
+
+    <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=40 --auto=1 --skills=1 --talents=1 --loot=1 --seed=1 --buyer=cheapest --away=2:22,4:22,6:22,8:22,10:22,12:22,14:22,16:22,18:22,20:22,22:22,24:22,26:22,28:22,30:22,32:22,34:22,36:22,38:22 --order=comp_camaraderie,frenzy_unlock,comp_cadence,frenzy_long,comp_synergy,comp_formation,frenzy_power,comp_legion,comp_top_champion,eco_purse,gold_unlock,economy_offline,click_grip --milestones=10,50,100,150,190,200,205,210,211,220,225,230 --report=1
+
+One run takes about 20 minutes of real time; at most 5 in parallel (10 in parallel ran 2.5 times
+slower). The sensitivity cases use `--roster=<copy of companions_roster.json with one value changed>`.
+
+### What was tuned (data only)
+
+`core_curves.json`: `enemy_hp_base` 22 to 24; the scalar `enemy_hp_growth` 1.325 is replaced by
+`enemy_hp_segments`: 1.32 from stage 1, 1.345 from 100, 1.38 from 150, 1.40 from 190, 1.27 from
+205, 1.6 from 211. A segment's growth applies to the steps that leave its `from_stage`. The
+awakening block is unchanged (squad x2.10).
+
+Monster HP against the former curve: x1.05 at stage 10, x0.91 at 50, x0.75 at 100, x1.59 at 150,
+x5.4 at 180, x14 at 200. A save beyond about stage 180 stays blocked for a while; nothing is lost.
+
+Why two steps after 205: gold only grows with the stage, so the economy freezes in front of the
+boss of stage 210. A single rate after 205 gave either "stuck at 210 at 40 h" (1.33 and above) or
+a runaway (1.25: stage 230 at 34 h). 1.27 up to 210 lets the boss of 210 fall within 40 h, and 1.6
+from 211 keeps 230 closed. The setting is sensitive: at 1.29 the boss of 210 is not beaten at 40 h.
+
+### Reference measure: 2 buyers, 3 seeds, 40 h
+
+Active hours, then day. The times snap to the returns: offline gold pays the late stages.
+
+| Seed, buyer | Stage 100 | Stage 150 | Stage 200 | Stage 210 | Stage 220 | Stage 230 at 40 h |
+|---|---|---|---|---|---|---|
+| 1, cheapest | 2.5 h, day 2 | 3.9 h, day 2 | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 | no |
+| 1, ratio | 2.1 h, day 2 | 3.2 h, day 2 | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 | no |
+| 2, cheapest | 2.4 h, day 2 | 3.8 h, day 2 | 10.0 h, day 6 | 16.0 h, day 9 | 34.0 h, day 18 | no |
+| 2, ratio | 2.0 h, day 2 | 3.2 h, day 2 | 8.0 h, day 5 | 16.0 h, day 9 | 32.0 h, day 17 | no |
+| 3, cheapest | 2.5 h, day 2 | 3.9 h, day 2 | 8.0 h, day 5 | 12.0 h, day 7 | 28.0 h, day 15 | no |
+| 3, ratio | 2.1 h, day 2 | 3.3 h, day 2 | 8.0 h, day 5 | 12.0 h, day 7 | 28.0 h, day 15 | no |
+
+Before the change (seed 1, cheapest): stage 200 at 5.5 h on day 3, 230 at 8.0 h on day 5, first
+boss killed at 8.1 min. After: first boss killed at 9.0 min; stage 225 is reached in no run. The
+player waits at the boss of 210 for 8 to 12 days, then clears 211 to 220 in about a minute.
+
+### Sensitivity (seed 1, cheapest, 40 h)
+
+| Case | Stage 200 | Stage 210 | Stage 220 | Stage 230 at 40 h |
+|---|---|---|---|---|
+| Reference | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 | no |
+| Squad +3% (`squad_multiplier` 2.163) | 8.0 h, day 5 | 10.0 h, day 6 | 16.0 h, day 9 | no |
+| Squad -3% (`squad_multiplier` 2.037) | 12.0 h, day 7 | 20.0 h, day 11 | no | no |
+| Awakening cost x0.8 (`cost_level_multiplier` 8) | 8.0 h, day 5 | 12.0 h, day 7 | 22.0 h, day 12 | no |
+| Awakening cost x1.2 (`cost_level_multiplier` 12) | 10.0 h, day 6 | 14.0 h, day 8 | no | no |
+| 1 click/s | 10.0 h, day 6 | 14.0 h, day 8 | 38.0 h, day 20 | no |
+
+Two other player profiles, same build and seed (the 4 h per day run ends on day 10):
+
+| Profile | Stage 200 | Stage 210 | Stage 220 | Stage 230 at 40 h |
+|---|---|---|---|---|
+| 4 h active per day, 20 h away, 3 clicks/s (`--away=4:20,8:20,...,36:20`) | 12.3 h, day 4 | 16.0 h, day 5 | no | no |
+| 13 clicks/s, 2 h per day | 6.0 h, day 4 | 10.0 h, day 6 | 22.0 h, day 12 | no |
+
+At 13 clicks/s the first boss falls at 3.3 min and the click share is 46% at stage 200. Not
+measured: 1 h per day, without items.
+
+Stage 225 is reached in no case. Squad -3% is the only case outside the day 4 to 6 target (day 7).
+In the two hard cases (squad -3%, cost x1.2) the player is still at 210 when the 40 h end.
+
+### Builds (seed 1, cheapest, 3 clicks/s, 40 h)
+
+Each build takes the 8 nodes of its branch, one summit, then 4 cheap nodes of the other branches.
+
+| Build, summit | Stage 200 | Stage 210 | Stage 220 | Stage 230 at 40 h | Click share at 200 |
+|---|---|---|---|---|---|
+| Compagnons, Champion (reference) | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 | no | 17% |
+| Compagnons, Instinct de meute | 8.0 h, day 5 | 12.0 h, day 7 | 34.0 h, day 18 | no | 18% |
+| Clic, Virtuose | 8.0 h, day 5 | 12.0 h, day 7 | 38.0 h, day 20 | no | 32% |
+| Clic, Sursis | 10.0 h, day 6 | 14.0 h, day 8 | no | no | 32% |
+| Économie, Moisson | 8.0 h, day 5 | 14.0 h, day 8 | 22.0 h, day 12 | no | 21% |
+| Économie, Rentier | 10.0 h, day 6 | 16.0 h, day 9 | 24.0 h, day 13 | no | 20% |
+
+### Before and after (reference profile, seed 1, cheapest)
+
+Active time at each stage, before / after; the day is in brackets where it changes.
+
+| Stage | 3 clicks/s, before | 3 clicks/s, after | 1 click/s, before | 1 click/s, after |
+|---|---|---|---|---|
+| 10 (boss reached) | 2.0 min | 2.2 min | 3.6 min | 3.9 min |
+| First boss killed | 8.1 min | 9.0 min | not noted | 13.0 min |
+| 50 | 44.9 min | 44.3 min | 53.8 min | 53.6 min |
+| 100 | 2.74 h | 2.55 h | 3.18 h | 2.77 h |
+| 150 | 3.96 h (day 2) | 3.87 h (day 2) | 4.48 h (day 3) | 4.01 h (day 3) |
+| 200 | 5.50 h (day 3) | 8.02 h (day 5) | 6.01 h (day 4) | 10.03 h (day 6) |
+| Best stage at 20 h | 240 | 210 | 240 | 210 |
+
+Levels after the change, 3 clicks/s, in roster order, and click share 3 / 1 clicks/s (before in
+brackets where it differs):
+
+| Stage | Levels | Click share 3 / 1 clicks/s |
+|---|---|---|
+| 10 | 6, then 0 | 30 / 13% |
+| 50 | 139, 95, 51, 7, 0, 0, 0, 0 | 23 / 9% |
+| 100 | 291, 247, 200, 158, 114, 70, 26, 0 | 20 / 7% (before 20 / 8%) |
+| 150 | 459, 405, 371, 317, 282, 238, 194, 150 | 18 / 7% |
+| 200 | 619, 575, 530, 486, 442, 398, 354, 309 | 17 / 7% (before 16 / 6%) |
+
+First awakening (level 200) of each companion, stage and active time at 3 clicks/s, before / after:
+Éclaireur 69 at 2.00 h / 69 at 2.00 h; Lancier 81 at 2.49 h / 81 at 2.31 h; Archer 99 at 3.04 h /
+99 at 2.79 h; Gardien 111 at 3.12 h / 111 at 2.87 h; Mage 129 at 3.39 h / 129 at 3.15 h;
+Chevalier 139 at 3.78 h / 139 at 3.63 h; Alchimiste 160 at 3.99 h / 149 at 4.00 h; Dragon 161 at
+4.16 h / 161 at 4.88 h. At 1 click/s after the change the Éclaireur awakens at stage 67 (2.00 h).
+
+### Other criteria of the story
+
+- First awakening (Éclaireur, level 200): stage 69 at 3 clicks/s, stage 67 at 1 click/s
+  (target 60 to 80).
+- Without talents: first boss killed at 8.6 min at 3 clicks/s and 12.4 min at 1 click/s, so it is
+  beatable without opening the Talents tab; stage 200 at 10.5 h on day 6 (3 clicks/s) and 12.0 h
+  on day 7 (1 click/s).
+- Click share without talents at 3 clicks/s: 24% from stage 50 to 150, 22% at 200. The target was
+  about 40% in the middle and 10 to 20% at 200: NOT met in the middle. A Clic build reaches 32% at
+  200 for a target of 40 to 60%: NOT met. The HP curves do not move the click share; it would take
+  a change of the Clic talents or of `click_companion_power_factor`.
 
 ## Reference before the economy rework (story 014)
 

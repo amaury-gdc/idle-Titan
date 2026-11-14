@@ -90,7 +90,8 @@ func test_v6_fields_survive_a_save_and_a_load() -> void:
 	# Assert
 	assert_int(loaded.talent_tree_seen).is_equal(TREE_VERSION)
 	assert_int(loaded.talent_reset_unix).is_equal(NOW)
-	assert_int(int(loaded.to_dict()["version"])).is_equal(6)
+	# 7 since story 020 (balance_seen); the version 6 fields above are unchanged.
+	assert_int(int(loaded.to_dict()["version"])).is_equal(7)
 
 
 func test_absurd_v6_values_load_as_none() -> void:

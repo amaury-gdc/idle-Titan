@@ -68,9 +68,9 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 |---|---|---|---|
 | `schema_version` | int | yes | Currently 3 (2 added the combat keys below; 3 added the `offline_*` keys). `Combat` reads 2 and 3 and refuses any other value, because 3 only added keys it does not read; `OfflineIncome` requires 3, so the game stops on a version 2 file. |
 | `cost_growth` | decimal string (unitless factor) | only if a companion has no own `cost_growth` | Default per-level cost multiplier (1.08 = +8% per level). Value in file: "1.08". |
-| `enemy_hp_base` | digit string (HP) | yes | HP of the stage-1 enemy. Value in file: "22". |
-| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. It is one segment from stage 1 (see `enemy_hp_segments`). Value in file: "1.325". |
-| `enemy_hp_segments` | array of object, not empty | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | HP growth by stages (story 015, `design/economy-rework.md` "PV par paliers"). Read with schema 2 or 3, no version bump. Both keys together, or neither, make `Combat` refuse the file. Not set in the file today. |
+| `enemy_hp_base` | digit string (HP) | yes | HP of the stage-1 enemy. Value in file: "24" (story 020). |
+| `enemy_hp_growth` | decimal string (unitless factor >= 1 recommended) | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | Per-stage HP multiplier. HP(stage) = floor(`enemy_hp_base` * growth^(stage-1)), exact, never below 1. It is one segment from stage 1 (see `enemy_hp_segments`). Not set in the file since story 020 (it was "1.325"); the test fixtures still use it. |
+| `enemy_hp_segments` | array of object, not empty | exactly one of `enemy_hp_growth` and `enemy_hp_segments` | HP growth by stages (story 015, `design/economy-rework.md` "PV par paliers"). Read with schema 2 or 3, no version bump. Both keys together, or neither, make `Combat` refuse the file. Value in file since story 020: 1.32 from stage 1, 1.345 from 100, 1.38 from 150, 1.40 from 190, 1.27 from 205, 1.6 from 211 (why: `balance_notes.md`, "Economy calibration"). |
 | `enemy_hp_segments[].from_stage` | integer, first entry 1, strictly increasing, at most 100000 | yes | First stage of the segment. The cap (`Combat.MAX_SEGMENT_FROM_STAGE`) is a load-time safety bound, not balance: each anchor is computed at load. |
 | `enemy_hp_segments[].growth` | decimal string (unitless factor) | yes | Per-stage HP multiplier of the segment. |
 | `gold_per_kill_base` | digit string (gold) | yes | Gold for killing the stage-1 enemy. Default in file: "3". |
@@ -81,6 +81,8 @@ Formulas (exact BigNumber, level L >= 1, level 0 = not bought, deals 0):
 | `offline_efficiency` | decimal string (unitless fraction) | yes | Share of what the companions would earn by farming the current stage that an absence pays. See the formula below. Value in file: "0.1". |
 | `offline_max_hours` | number (hours, > 0) | yes | Cap of the absence time counted (brief: 12 h). Value in file: 12. |
 | `offline_min_seconds` | number (seconds, >= 0) | yes | An absence shorter than this earns nothing and shows no message, so that reloading the page does not open it each time. Set it to 0 to see the message on any return. Value in file: 60. |
+| `balance_version` | integer >= 0 | no, default 0 | Version of the balance (story 020, read by `BalanceNotice`, not by `Combat`). When it differs from `PermanentState.balance_seen`, a player whose stage record is above `balance_notice_min_stage` sees the message "Équilibrage mis à jour" once, after the return message and the talent tree message; a record at or under it is recorded as seen without a message. 0 or absent: never a message. Raise it by 1 at the next rebalance that makes high stages harder. A present value that is not an integer >= 0 stops the game with an error. Value in file: 1. |
+| `balance_notice_min_stage` | integer >= 0 | no, default 0 | The message of `balance_version` is for stage records strictly above this stage. Value in file: 150. Saved field: `balance_seen` (int, default 0) in the permanent save, added in version 7; an older save has 0. |
 
 Offline gold (`OfflineIncome`, `src/core/offline_income.gd`), granted once at startup:
 

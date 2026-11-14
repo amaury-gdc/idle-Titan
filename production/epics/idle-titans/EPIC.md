@@ -53,3 +53,4 @@ Stories terminées 001 à 018 : fichiers dans `production/archive/idle-titans/` 
 | 020 | Calibrage unique de l'économie (hors brief MVP) | Config/Data | Ready | N/A |
 | 021 | Variété des monstres (hors brief MVP) | Visual/Feel | Ready | N/A |
 | 022 | Écran allumé et mode économie (hors brief MVP) | UI | Ready | N/A |
+| 023 | Valeur du jeu actif (hors brief MVP) | Config/Data | Not Started | N/A |

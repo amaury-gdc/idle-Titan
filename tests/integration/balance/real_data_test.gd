@@ -10,9 +10,17 @@ const SCOUT_DPS_AT_LEVEL: String = "20"
 ## 1 + floor(20 * 0.1).
 const CLICK_WITH_SCOUT: String = "3"
 const BOSS_STAGE: int = 10
-const BOSS_HP: String = "5520"
-## Exact floors of 22 * 1.325^(stage - 1), computed apart.
-const HP_BY_STAGE: Dictionary = {1: "22", 10: "276", 50: "21428941", 100: "27656335170372", 120: "7693291624962307"}
+const BOSS_HP: String = "5820"
+## Story 020: base 24, then the segments of core_curves.json (1.32 from stage 1, 1.345 from 100,
+## 1.38 from 150, 1.40 from 190, 1.27 from 205, 1.6 from 211; a growth applies to the steps that
+## leave its from_stage). Stages 1 to 100 are exact floors computed apart. From 120 on the numbers
+## are the game's own: BigNumber rounds the segmented product and drifts from the exact floor
+## around the 13th digit, so these pin what the game computes, one stage per segment.
+const HP_BY_STAGE: Dictionary = {
+	1: "24", 10: "291", 50: "19423785", 100: "20750589121039", 120: "7788899817008627",
+	150: "56642791457306789915", 205: "3469194420431333539102811299",
+	211: "14556298904478035549298434599", 220: "1000301243928540650152994757547",
+}
 ## Exact floors of 10 * 1.08^(level - 1), computed apart.
 const SCOUT_COST_BY_LEVEL: Dictionary = {1: "10", 2: "10", 100: "20368"}
 
@@ -62,6 +70,27 @@ func test_items_are_valid() -> void:
 func test_enemy_hp_is_pinned() -> void:
 	for stage: int in HP_BY_STAGE:
 		assert_str(_combat.enemy_max_hp(stage).to_decimal_string()).is_equal(HP_BY_STAGE[stage])
+
+
+## Story 020: the rebalance message of the real file, version 1, for records above stage 150.
+const BALANCE_VERSION: int = 1
+const BALANCE_NOTICE_ABOVE: int = 150
+
+
+func test_real_curves_announce_the_rebalance_above_stage_150_only() -> void:
+	# Arrange
+	var at_limit: PermanentState = PermanentState.new()
+	var above: PermanentState = PermanentState.new()
+
+	# Act
+	var silent: BalanceNotice = BalanceNotice.from_data(_curves, at_limit)
+	var shown: BalanceNotice = BalanceNotice.from_data(_curves, above)
+
+	# Assert
+	assert_str(shown.get_error()).is_empty()
+	assert_int(shown.version()).is_equal(BALANCE_VERSION)
+	assert_bool(silent.apply(BALANCE_NOTICE_ABOVE)).is_false()
+	assert_bool(shown.apply(BALANCE_NOTICE_ABOVE + 1)).is_true()
 
 
 func test_boss_hp_is_pinned() -> void:
