@@ -1,4 +1,4 @@
-# Balance notes (stories 003, 004, 004b, 005, 006, 007, 014, 020)
+# Balance notes (stories 003, 004, 004b, 005, 006, 007, 014, 020, 023)
 
 Measured with `tools/simulate_progress.gd`, on the real `Combat`, `FloorManager`
 and `CompanionManager` (and `BossFight` since story 004). All values are provisional.
@@ -10,9 +10,126 @@ Re-run:
 
     <godot console exe> --headless --path . -s res://tools/simulate_progress.gd -- --cps=3 --hours=24
 
+## Active play value (story 023)
+
+Measured on 2026-11-14 and 2026-11-15. These are the numbers that apply to the game today; the
+section "Economy calibration (story 020)" below keeps the rule, the reference command and the wall.
+
+### What was tuned
+
+- `companions_roster.json`: a `click_share` on every companion, in roster order 0.4, 0.34, 0.3,
+  0.26, 0.22, 0.18, 0.13, 0.08. The click is now 1 + floor(sum of share x damage per second of
+  each companion) instead of 1 + 0.1 x total power. The newest companion carries almost all the
+  power (the dragon is 96% of it from stage 150), so the click share is high early and low late,
+  and the dragon's share alone sets it from stage 150 on.
+- `core_curves.json`: `click_companion_power_factor` removed; `enemy_hp_base` 24 to 36; growth
+  1.32 to 1.3159 from stage 1 and 1.345 to 1.3424 from stage 100. HP against story 020: x1.5 at
+  stage 1, x1.46 at 10, x1.29 at 50, x1.10 at 100, and within 0.1% from stage 150 on: the wall is
+  not touched.
+- `balance_version` 2, with its own message and threshold (record above the first boss).
+
+Sets tried before this one, same method (HP from 150 unchanged, base retuned on the first boss):
+
+| Set (scout to dragon) | HP base | First boss 3 / 1 clicks/s | Stage 200, 3 clicks/s | Why not |
+|---|---|---|---|---|
+| Design: 1, 0.8, 0.6, 0.45, 0.35, 0.25, 0.15, 0.06 | 70 | 8.8 / 22.1 min | 10.0 h, day 6 | removes 9% of late damage, one day lost; 1 click/s boss at 22 min |
+| 0.7, 0.55, 0.42, 0.34, 0.27, 0.21, 0.14, 0.08 | 54 | 8.9 / 20.2 min | 8.0 h, day 5 | 1 click/s boss at 20 min |
+| 0.5, 0.4, 0.32, 0.27, 0.22, 0.18, 0.13, 0.08 | 42 | 7.9 / 16.7 min | not run | over the 16 min ceiling |
+| 0.3, 0.28, 0.26, 0.24, 0.21, 0.18, 0.13, 0.08 | 35 | 9.1 / 15.9 min | not run | 46% click share at stage 10, under the 55 to 60% wanted |
+| Kept: 0.4, 0.34, 0.3, 0.26, 0.22, 0.18, 0.13, 0.08 | 36 | 7.8 / 15.5 min | 8.0 h, day 5 | |
+
+Ceiling decided by Amaury: first boss at 1 click/s within 16 min for the reference build.
+
+### Click share at 3 clicks/s (seed 1, cheapest)
+
+| Build | Stage 10 | 50 | 100 | 150 | 200 |
+|---|---|---|---|---|---|
+| Without talents, before | 33% | 24% | 24% | 24% | 22% |
+| Without talents, after | 60% | 48% | 31% | 21% | 18% |
+| Compagnons (reference), before | 30% | 23% | 20% | 18% | 17% |
+| Compagnons (reference), after | 56% | 46% | 26% | 15% | 14% |
+
+After, Compagnons build: 30 / 22 / 10 / 6 / 5% at 1 click/s, 85 / 79 / 62 / 45 / 41% at
+13 clicks/s. "Without talents" is `--talents=2` (see the simulator header).
+
+### Calendar: 3 seeds, 2 buyers, 40 h, reference build
+
+Active hours, then day. "First return" is the stage at the start of day 2.
+
+| Clicks/s | First boss | First return | Stage 200 | Stage 210 | Stage 220 | 225 / 230 at 40 h |
+|---|---|---|---|---|---|---|
+| 3, before (story 020, 6 runs) | 9.0 min | 69 to 79 | day 5 (day 6 once) | day 7 to 9 | day 15 to 19 | no / no |
+| 3, after (6 runs) | 7.8 min | 79 (69 once) | 8.0 h, day 5, six times | day 7 to 9 | 28 to 34 h, day 15 to 18 | no / no |
+| 1, before (seed 1, cheapest) | 13.0 min | 66 | 10.0 h, day 6 | day 8 | day 20 | no / no |
+| 1, after (6 runs) | 15.1 to 15.5 min | 59 (67 once) | 10.0 h, day 6 (8.0 h, day 5 once) | day 7 to 10 | 30 to 38 h, day 16 to 20 | no / no |
+| 13, before (seed 1, cheapest) | 3.3 min | 129 | 6.0 h, day 4 | 10.0 h, day 6 | 22.0 h, day 12 | no / no |
+| 13, after (6 runs) | 2.5 min | 139 to 160 | 6.0 h, day 4 (4.0 h, day 3 once) | 8.0 or 10.0 h, day 5 or 6 | 22.0 or 24.0 h, day 12 or 13 | no / no |
+
+13 clicks/s, run by run (after):
+
+| Seed, buyer | Stage 200 | Stage 210 | Stage 220 |
+|---|---|---|---|
+| 1, cheapest | 6.0 h, day 4 | 8.0 h, day 5 | 24.0 h, day 13 |
+| 1, ratio | 6.0 h, day 4 | 8.0 h, day 5 | 24.0 h, day 13 |
+| 2, cheapest | 6.0 h, day 4 | 10.0 h, day 6 | 24.0 h, day 13 |
+| 2, ratio | 6.0 h, day 4 | 10.0 h, day 6 | 22.0 h, day 12 |
+| 3, cheapest | 6.0 h, day 4 | 8.0 h, day 5 | 22.0 h, day 12 |
+| 3, ratio | 4.0 h, day 3 | 8.0 h, day 5 | 22.0 h, day 12 |
+
+Without talents (`--talents=2`, seed 1, cheapest): first boss 10.2 min before and 8.3 min after at
+3 clicks/s, 14.4 min before and 17.1 min after at 1 click/s; stage 200 at 10.0 h on day 6 and 210
+at 18.0 h on day 10, before and after.
+
+### Known limits (accepted by Amaury)
+
+- 13 clicks/s, seed 3, ratio buyer: stage 200 on day 3 (4.0 h), outside the day 4 to 6 target.
+  Limit of the extreme profile; 225 is still not reached. The same run on the story 020 data:
+  stage 200 at 6.0 h on day 4, 210 at 8.0 h on day 5, 220 at 20.0 h on day 11 (after: 4.0 h day
+  3, 8.0 h day 5, 22.0 h day 12). So the day 3 comes from the click shares; 210 does not move.
+- Click share without talents in the middle: 31% at stage 100 for a target of 40%.
+- "80 to 100% at the very start" is out of reach: shares cannot exceed 1 and a stronger early
+  click pushes the 1 click/s first boss past the ceiling.
+- Without talents at 1 click/s the first boss takes 17.1 min: the 16 min ceiling is for the
+  reference build only.
+- The first return of a 1 click/s player is 7 stages lower (59 against 66): early HP rises and
+  offline gold divides by HP. The day of stage 200 does not move.
+- Clic build with the kept shares and today's talents (seed 1, cheapest, 3 clicks/s, 40 h):
+  click share 67 / 63 / 46 / 31 / 27.5% at stages 10 / 50 / 100 / 150 / 200, for a target of 40
+  to 60% at 200 (32% on the story 020 data: the dragon's share went from 0.1 to 0.08). First boss
+  7.1 min, stage 50 at 34.0 min. Summit Virtuose: stage 200 at 8.0 h on day 5, 210 at 14.0 h on
+  day 8. Summit Sursis: 200 at 10.0 h on day 6, 210 at 14.0 h on day 8. Neither reaches 220 at
+  40 h (Virtuose reached it at 38.0 h on the story 020 data). Its talents are not retuned yet.
+- The simulated player only challenges a boss when it can win without skills (auto challenge,
+  margin 1.2). Keeping the skills for boss fights (`--skills=2`) is slower, not faster (story 020
+  data: stage 200 at 10.0 h instead of 8.0 h): the skills are lost for the farm.
+- Stages 191 to 220 all fall within 4 minutes of a return, in every run and for every player
+  model: the "one boss tier between 191 and 210 reached mid-session" threshold is NOT met. The
+  player who keeps burst and buff and challenges bosses by hand (`--skills=3`, again after +10%
+  power; reference build, seed 1, cheapest, 40 h) does not change it and is slower:
+
+  | Player | Stage 200 | Stage 210 | Stage 220 | 225 / 230 | 191-200 reached | 201-210 reached |
+  |---|---|---|---|---|---|---|
+  | `--skills=1`, 3 clicks/s | 8.0 h, day 5 | 12.0 h, day 7 | 32.0 h, day 17 | no | 0.4 to 1.6 min after the 8 h return | 0.4 to 1.4 min after the 12 h return |
+  | `--skills=3`, 3 clicks/s | 10.0 h, day 6 | 14.0 h, day 8 | not at 40 h | no | 0.1 to 1.4 min after the 10 h return | 0.5 to 3.4 min after the 14 h return |
+  | `--skills=3`, 13 clicks/s | 6.0 h, day 4 | 8.0 h, day 5 | 26.0 h, day 14 | no | 0.1 to 0.9 min after the 6 h return | 0.3 to 2.3 min after the 8 h return |
+
+  What opens these stages is the offline gold of the return, not the play of the session.
+
+### Weight of the offline gold (story 020 data, reference profile)
+
+| `offline_efficiency` | Stage 200 | Stage 210 | Stage 220 |
+|---|---|---|---|
+| 0.1 (in file) | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 |
+| 0.05 | 8.0 h, day 5 | 14.0 h, day 8 | not at 40 h |
+| 0 | 14.9 h, day 8 | 30.4 h, day 16 | not at 40 h |
+
+Of stages 151 to 220, 40 of 70 are reached within 2 minutes of a return: 151 to 160 and every
+stage from 191 to 220. Not retuned in this step.
+
 ## Economy calibration (story 020)
 
-Measured on 2026-11-13 and 2026-11-14. These are the numbers that apply to the game today.
+Measured on 2026-11-13 and 2026-11-14. The wall and the rule below still apply; the early HP, the
+click formula and the click shares were changed by story 023 (section above).
 
 ### Rule: re-measure after any story that adds power
 
@@ -138,9 +255,13 @@ Chevalier 139 at 3.78 h / 139 at 3.63 h; Alchimiste 160 at 3.99 h / 149 at 4.00 
 
 - First awakening (Éclaireur, level 200): stage 69 at 3 clicks/s, stage 67 at 1 click/s
   (target 60 to 80).
-- Without talents: first boss killed at 8.6 min at 3 clicks/s and 12.4 min at 1 click/s, so it is
-  beatable without opening the Talents tab; stage 200 at 10.5 h on day 6 (3 clicks/s) and 12.0 h
-  on day 7 (1 click/s).
+- Without talents, corrected on 2026-11-14 (story 023): first boss killed at 10.2 min at
+  3 clicks/s and 14.4 min at 1 click/s, so it is beatable without opening the Talents tab; stage
+  200 at 10.0 h on day 6 and stage 210 at 18.0 h on day 10 (3 clicks/s), 230 not reached at 40 h.
+  These come from `--talents=2` (the tree exists, nothing is bought, Frénésie and Bonus d'or stay
+  locked as in the game). The first figures of this story (8.6 and 12.4 min, stage 200 at 10.5 h,
+  and 12.0 h on day 7 at 1 click/s) came from `--talents=0`, which has no tree and unlocks every
+  skill: they were optimistic. The 1 click/s run to stage 200 was not redone.
 - Click share without talents at 3 clicks/s: 24% from stage 50 to 150, 22% at 200. The target was
   about 40% in the middle and 10 to 20% at 200: NOT met in the middle. A Clic build reaches 32% at
   200 for a target of 40 to 60%: NOT met. The HP curves do not move the click share; it would take

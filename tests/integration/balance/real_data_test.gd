@@ -7,19 +7,22 @@ extends GdUnitTestSuite
 const COMPANION_COUNT: int = 8
 const SCOUT_LEVEL: int = 10
 const SCOUT_DPS_AT_LEVEL: String = "20"
-## 1 + floor(20 * 0.1).
-const CLICK_WITH_SCOUT: String = "3"
+## Story 023: the click takes a share of each companion, 1 + floor(20 * 0.4) with the scout's "0.4".
+const CLICK_WITH_SCOUT: String = "9"
+## Story 023: the shares of companions_roster.json, in roster order.
+const CLICK_SHARES: Array[String] = ["0.4", "0.34", "0.3", "0.26", "0.22", "0.18", "0.13", "0.08"]
 const BOSS_STAGE: int = 10
-const BOSS_HP: String = "5820"
-## Story 020: base 24, then the segments of core_curves.json (1.32 from stage 1, 1.345 from 100,
-## 1.38 from 150, 1.40 from 190, 1.27 from 205, 1.6 from 211; a growth applies to the steps that
-## leave its from_stage). Stages 1 to 100 are exact floors computed apart. From 120 on the numbers
-## are the game's own: BigNumber rounds the segmented product and drifts from the exact floor
-## around the 13th digit, so these pin what the game computes, one stage per segment.
+const BOSS_HP: String = "8500"
+## Story 023: base 36, then the segments of core_curves.json (1.3159 from stage 1, 1.3424 from 100,
+## and, unchanged since story 020, 1.38 from 150, 1.40 from 190, 1.27 from 205, 1.6 from 211; a
+## growth applies to the steps that leave its from_stage). Stages 1 to 100 are exact floors
+## computed apart. From 120 on the numbers are the game's own: BigNumber rounds the segmented
+## product and drifts from the exact floor around the 13th digit, so these pin what the game
+## computes, one stage per segment. From 150 on they are within 0.1% of the story 020 values.
 const HP_BY_STAGE: Dictionary = {
-	1: "24", 10: "291", 50: "19423785", 100: "20750589121039", 120: "7788899817008627",
-	150: "56642791457306789915", 205: "3469194420431333539102811299",
-	211: "14556298904478035549298434599", 220: "1000301243928540650152994757547",
+	1: "36", 10: "425", 50: "25016350", 100: "22875379421342", 120: "8260515984040074",
+	150: "56684651436830325503", 205: "3471758213699041330274587003",
+	211: "14567056255208872674704307264", 220: "1001040483441829404590128738707",
 }
 ## Exact floors of 10 * 1.08^(level - 1), computed apart.
 const SCOUT_COST_BY_LEVEL: Dictionary = {1: "10", 2: "10", 100: "20368"}
@@ -72,12 +75,41 @@ func test_enemy_hp_is_pinned() -> void:
 		assert_str(_combat.enemy_max_hp(stage).to_decimal_string()).is_equal(HP_BY_STAGE[stage])
 
 
-## Story 020: the rebalance message of the real file, version 1, for records above stage 150.
-const BALANCE_VERSION: int = 1
-const BALANCE_NOTICE_ABOVE: int = 150
+## Story 023: the rebalance message of the real file, version 2, for records above the first boss.
+const BALANCE_VERSION: int = 2
+const BALANCE_NOTICE_ABOVE: int = 10
+const BALANCE_TEXT: String = "L'équilibrage a changé : taper compte plus au début et certains monstres sont plus résistants. Tu ne perds rien."
 
 
-func test_real_curves_announce_the_rebalance_above_stage_150_only() -> void:
+func test_real_roster_holds_the_click_shares() -> void:
+	# Arrange
+	var roster: Dictionary = DataLoader.load_json("res://assets/data/companions_roster.json")
+
+	# Act
+	var shares: Array[String] = []
+	for entry: Dictionary in roster["companions"]:
+		shares.append(entry.get("click_share", ""))
+
+	# Assert: the shares, and no leftover of the former flat factor in the curves
+	assert_array(shares).is_equal(CLICK_SHARES)
+	assert_bool((_curves as Dictionary).has("click_companion_power_factor")).is_false()
+
+
+func test_real_curves_keep_the_entry_of_the_first_balance_version() -> void:
+	# Arrange
+	var notices: Array = (_curves as Dictionary)["balance_notices"]
+
+	# Act
+	var first: Dictionary = notices[0]
+
+	# Assert: story 020, records above stage 150
+	assert_int(notices.size()).is_equal(BALANCE_VERSION)
+	assert_int(int(first["version"])).is_equal(1)
+	assert_int(int(first["min_stage"])).is_equal(150)
+	assert_str(first["text"]).contains("étages élevés")
+
+
+func test_real_curves_announce_the_rebalance_above_the_first_boss_only() -> void:
 	# Arrange
 	var at_limit: PermanentState = PermanentState.new()
 	var above: PermanentState = PermanentState.new()
@@ -89,6 +121,8 @@ func test_real_curves_announce_the_rebalance_above_stage_150_only() -> void:
 	# Assert
 	assert_str(shown.get_error()).is_empty()
 	assert_int(shown.version()).is_equal(BALANCE_VERSION)
+	assert_str(shown.title()).is_equal("Équilibrage mis à jour")
+	assert_str(shown.text()).is_equal(BALANCE_TEXT)
 	assert_bool(silent.apply(BALANCE_NOTICE_ABOVE)).is_false()
 	assert_bool(shown.apply(BALANCE_NOTICE_ABOVE + 1)).is_true()
 

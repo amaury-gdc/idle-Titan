@@ -1,7 +1,7 @@
 # Story 023: Valeur du jeu actif
 
 > **Epic**: Idle Titans (MVP)
-> **Status**: Not Started
+> **Status**: In Progress
 > **Layer**: Feature
 > **Type**: Config/Data
 > **Estimate**: M
@@ -56,6 +56,35 @@ Les temps d'arrivée aux étages hauts se calent sur les retours d'absence : ét
 - [ ] Une session active de 2 h fait avancer le joueur de façon visible après l'étage 190, sans attendre le retour suivant (seuil à fixer avec Amaury).
 - [ ] La mesure de référence est relancée après chaque famille de valeurs changée (règle ci-dessous) : étage 200 aux jours 4 à 6, étage 230 non atteint à 40 h actives, pour les deux acheteurs.
 - [ ] Sensibilité et builds de sommet remesurés ; `balance_notes.md` et `real_data_test.gd` à jour ; tous les tests verts.
+
+---
+
+## Décisions d'Amaury et journal
+
+**2026-11-14, démarrage.**
+- Seuil 1 : au moins un palier de boss (10 étages) entre 191 et 210 atteint en cours de session, hors des 2 premières minutes après un retour. Départ mesuré : 0 étage sur 30 entre 191 et 220.
+- Seuil 2 (poids de l'or d'absence) : chiffre mesuré à chaque étape, pas une cible pour l'instant. Départ : étage 200 à 8,0 h avec l'or d'absence, 14,9 h sans.
+- Ordre des pistes : B (parts de clic par compagnon) d'abord ; A (facteur de clic plat) écartée, elle rendrait le mur dépendant de la vitesse de clic ; C (or d'absence) décidée après B.
+- Calendrier de la 020 à tenir : étage 200 aux jours 4 à 6, 230 non atteint à 40 h, premier boss vers 9 min. Les taux de PV après 190 ne sont pas touchés.
+
+**2026-11-14 et 15, piste B.**
+- Plafond : premier boss à 1 clic/s en 16 min au plus, pour le build de référence ; il passe avant la part du clic du début. 17,1 min sans talents à 1 clic/s : accepté.
+- Série retenue (« A3 ») : parts 0,4 / 0,34 / 0,3 / 0,26 / 0,22 / 0,18 / 0,13 / 0,08, base de PV 36, taux 1,3159 dès 1 et 1,3424 dès 100. Premier boss à 7,8 min à 3 clics/s : accepté.
+- Message au chargement : `balance_version` 2, texte et seuil par version dans les données, seuil au-dessus du premier boss.
+- Simulateur : `--talents=2` ajouté (arbre présent, rien acheté, compétences verrouillées comme dans le jeu). Le profil « sans talents » de la 020 débloquait toutes les compétences ; notes de la 020 corrigées (10,2 min et non 8,6 min à 3 clics/s).
+- Agents utilisés : `economy-designer` avant mesure (a contesté les parts du design, proposé une série plus douce, annoncé le recul du joueur à 1 clic/s) ; un agent indépendant après mesure (chiffres conformes aux sorties ; a trouvé le défaut du profil « sans talents », l'inadaptation du message de la version 1 et la baisse de l'or d'absence en début de partie).
+
+## Écarts connus (acceptés par Amaury)
+
+| Sujet | Mesuré | Cible ou référence |
+|---|---|---|
+| Part du clic sans talents, étage 100, 3 clics/s | 31 % | environ 40 % |
+| Part du clic sans talents, étage 10 | 60 % | 80 à 100 % dans le design, inatteignable avec le plafond du premier boss |
+| 13 clics/s, graine 3, acheteur ratio | étage 200 au jour 3 (4,0 h) | jours 4 à 6 ; limite du profil extrême |
+| Premier boss, sans talents, 1 clic/s | 17,1 min | plafond de 16 min, qui ne vaut que pour le build de référence |
+| Premier retour à 1 clic/s | étage 59 | étage 66 avant |
+
+Restent à traiter dans cette story : le mode « défi avec compétences » du simulateur (seuil 1), le build Clic et ses talents, puis la décision sur la piste C.
 
 ---
 

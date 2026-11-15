@@ -1,0 +1,4 @@
+Reviewed-Content-Hash: assets/data/core_curves.json 4762c9c1794126e4e59b3fc702ebf305af1ebf57
+Reviewed-Content-Hash: assets/data/companions_roster.json db429f2db589fd5d507fa382019e8e474c3e3e3a
+Reviewed-Content-Hash: src/core/balance_notice.gd 571ee01fc0d2dd28bf00f8be658594635e595cf2
+Reviewed-Content-Hash: src/ui/main_screen.gd 7804977c443ad2a55d0a1e978418a05dc6a6e653

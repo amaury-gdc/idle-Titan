@@ -6,8 +6,18 @@ extends GdUnitTestSuite
 
 const MAIN_SCRIPT: String = "res://src/ui/main_screen.gd"
 const SAVE_SCENE: String = "res://src/ui/save_screen.tscn"
-const CURVES: Dictionary = {"balance_version": 1, "balance_notice_min_stage": 150}
+const NOTICE_TITLE: String = "Équilibrage mis à jour"
+const NOTICE_TEXT: String = "Texte de la version 1."
+const CURVES: Dictionary = {"balance_version": 1, "balance_notices": [{"version": 1, "min_stage": 150, "title": NOTICE_TITLE, "text": NOTICE_TEXT}]}
 const RECORD_ABOVE: int = 215
+const TEST_GAME_PATH: String = "user://test_balance_notice_game.json"
+const TEST_PERMANENT_PATH: String = "user://test_balance_notice_permanent.json"
+const TEST_FILES: PackedStringArray = [
+	"test_balance_notice_game.json",
+	"test_balance_notice_game.json.bak",
+	"test_balance_notice_permanent.json",
+	"test_balance_notice_permanent.json.bak",
+]
 const TREE_VERSION: int = 1
 
 var _permanent: PermanentState
@@ -82,6 +92,19 @@ func before_test() -> void:
 	_main.set("_offline_close_button", close)
 
 
+func after_test() -> void:
+	_remove_test_saves()
+
+
+func _remove_test_saves() -> void:
+	var dir: DirAccess = DirAccess.open("user://")
+	if dir == null:
+		return
+	for file_name: String in TEST_FILES:
+		if dir.file_exists(file_name):
+			dir.remove(file_name)
+
+
 func test_balance_message_opens_with_its_title_and_text() -> void:
 	# Arrange: what _ready does after the load
 	assert_bool(_notice.apply(_tree.best_stage())).is_true()
@@ -89,10 +112,10 @@ func test_balance_message_opens_with_its_title_and_text() -> void:
 	# Act
 	_main.call("_show_balance_notice")
 
-	# Assert: a non-breaking space before the colon
+	# Assert: the title and text of the data, nothing recorded before Continuer
 	assert_bool(_panel.visible).is_true()
-	assert_str(_title.text).is_equal("Équilibrage mis à jour")
-	assert_str(_message.text).is_equal("L'équilibrage a changé : les monstres des étages élevés sont plus résistants. Tu ne perds rien.")
+	assert_str(_title.text).is_equal(NOTICE_TITLE)
+	assert_str(_message.text).is_equal(NOTICE_TEXT)
 	assert_int(_permanent.balance_seen).is_equal(0)
 
 
@@ -109,6 +132,44 @@ func test_closing_the_balance_message_records_it_and_closes_the_window() -> void
 	assert_bool(_notice.is_due()).is_false()
 	assert_bool(_panel.visible).is_false()
 	assert_bool(_tabs.focus_given).is_true()
+
+
+func test_closing_the_balance_message_writes_it_to_the_save_at_once() -> void:
+	# Arrange: a save manager on test-only files, as the main screen has after its load
+	_remove_test_saves()
+	var saves: SaveManager = SaveManager.new(TEST_GAME_PATH, TEST_PERMANENT_PATH)
+	_main.set("_saves", saves)
+	_main.set("_game", _state)
+	_main.set("_permanent", _permanent)
+	_notice.apply(_tree.best_stage())
+	_main.call("_show_balance_notice")
+
+	# Act: Continuer, then what a reload of the page reads
+	_main.call("_on_offline_closed")
+	var reloaded: PermanentState = saves.load_permanent()
+	_remove_test_saves()
+
+	# Assert: not waiting for the autosave
+	assert_int(reloaded.balance_seen).is_equal(1)
+	assert_bool(BalanceNotice.from_data(CURVES, reloaded).apply(RECORD_ABOVE)).is_false()
+
+
+func test_return_message_over_the_balance_message_brings_it_back_unacknowledged() -> void:
+	# Arrange: the balance message is open when the tab comes back with a return message
+	_notice.apply(_tree.best_stage())
+	_main.call("_show_balance_notice")
+	_main.call("_show_offline_gain", {"seconds": 3600, "gold": BigNumber.from_int(5), "capped": false})
+	assert_str(_title.text).is_equal("Bon retour !")
+
+	# Act: Continuer on the return message
+	_main.call("_on_offline_closed")
+
+	# Assert: the balance message again, still not recorded; one more Continuer records it
+	assert_str(_title.text).is_equal(NOTICE_TITLE)
+	assert_int(_permanent.balance_seen).is_equal(0)
+	_main.call("_on_offline_closed")
+	assert_int(_permanent.balance_seen).is_equal(1)
+	assert_bool(_panel.visible).is_false()
 
 
 func test_closing_the_return_message_brings_the_balance_message_next() -> void:

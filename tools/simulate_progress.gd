@@ -22,11 +22,19 @@ extends SceneTree
 ## applies the cap of the data; --eff=<decimal> replaces offline_efficiency.
 ## --skills=0|1|2 (story 005): 0 = no skills (default); 1 = each skill is activated as soon
 ## as it is ready; 2 = the gold bonus as soon as it is ready, the burst and the damage buff
-## only during a boss fight (the way a player who knows the game would use them).
+## only during a boss fight (the way a player who knows the game would use them); 3 (story 023) =
+## like 2, and the player also challenges the boss by hand, without waiting for the estimate of
+## the auto challenge (which ignores the skills): as soon as every boss skill is ready, and, after
+## a failed attempt, only once the companions' power grew by RETRY_GROWTH_PERCENT. Modes 1 and 2
+## only meet a boss the game thinks beatable without skills, so they never show what the skills
+## are worth against a boss; mode 3 does.
 ## --skillsdata=<path> replaces skills.json.
 ## --talents=1 (story 006) spends the points on the real [TalentTree] as soon as they are
 ## earned, greedily: the first buyable node in data order, checked once per simulated
-## second (default 0, no talents). --build=<branch>,<branch> looks at the nodes of these
+## second (default 0, no talents). --talents=2 (story 023) is the player who never opens the Talents
+## tab: the real tree exists and nothing is ever bought, so the skills behind a talent stay locked
+## as in the game. With --talents=0 there is no tree at all and EVERY skill is unlocked, which no
+## real player has: use 2, not 0, to measure "without talents". --build=<branch>,<branch> looks at the nodes of these
 ## branches first (ids of talents.json); --talentsdata=<path> replaces talents.json.
 ## --order=<node>,<node>,... (story 018) replaces that greedy policy by a strict per-node order:
 ## each node is bought as soon as it can be, the next one waits for it, a node excluded by its
@@ -81,6 +89,15 @@ const INCOME_SAMPLE_SECONDS: float = 60.0
 const INCOME_WINDOW_SAMPLES: int = 10
 ## Any positive Unix time: only the difference with the return time matters.
 const AWAY_START_UNIX: int = 1
+## --talents=2 (story 023): the tree exists and the player never buys a node.
+const TALENTS_NEVER_BOUGHT: float = 2.0
+## --skills=3 (story 023): the player challenges the boss with the skills ready.
+const SKILLS_CHALLENGE: int = 3
+## --skills=3: growth of the companions' power that makes the player try a failed boss again
+## (player model, not a balance value).
+const RETRY_GROWTH_PERCENT: int = 10
+
+var _talents_never_bought: bool = false
 
 
 func _init() -> void:
@@ -103,6 +120,7 @@ func _init() -> void:
 		printerr("simulate_progress: " + offline.get_error())
 		quit(1)
 		return
+	_talents_never_bought = args["talents"] >= TALENTS_NEVER_BOUGHT
 	if not SimMeasures.is_known_buyer(args["buyer"]):
 		printerr("simulate_progress: unknown buyer " + args["buyer"])
 		quit(1)
@@ -177,9 +195,17 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 	# second so a long farm stays cheap to simulate (GrowthCurve, BigNumber sums).
 	var check_every: int = maxi(int(1.0 / dt), 1)
 	var cps_factor: String = "%.3f" % cps
-	var skill_text: String = ["none", "each skill as soon as it is ready", "gold bonus when ready, burst and damage buff in boss fights only"][clampi(skill_mode, 0, 2)]
+	var skill_text: String = ["none", "each skill as soon as it is ready", "gold bonus when ready, burst and damage buff in boss fights only", "gold bonus when ready, burst and damage buff in boss fights only, boss challenged by hand when they are ready (again after +%d%% power)" % RETRY_GROWTH_PERCENT][clampi(skill_mode, 0, SKILLS_CHALLENGE)]
+	# --skills=3: [power of the companions at the last failed boss, or null], [challenges by hand].
+	var failed_power: Array = [null]
+	var hand_challenges: Array[int] = [0]
+	if skill_mode >= SKILLS_CHALLENGE:
+		floors.boss_failed.connect(func(_failed: int, _fallback: int) -> void: failed_power[0] = companions.total_power())
+		floors.boss_killed.connect(func(_stage: int) -> void: failed_power[0] = null)
 	print("Player model: %.2f clicks/s without pause, cheapest affordable level bought after every %.2f s step; boss countdown %.0f s; farm mode exit: %s; skills: %s" % [cps, dt, boss.timer_seconds(), "auto challenge setting" if auto else "challenge when expected damage covers the boss HP", skill_text])
-	if talents != null and not strict_order.is_empty():
+	if talents != null and _talents_never_bought:
+		print("Talents: the tree exists, nothing is ever bought (skills behind a talent stay locked, as in the game)")
+	elif talents != null and not strict_order.is_empty():
 		print("Talents: strict order %s, nothing else" % str(strict_order))
 	elif talents != null:
 		print("Talents: greedy, order %s" % str(talent_order))
@@ -226,12 +252,15 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 			_awaken_all(companions)
 		while _buy_next(companions, buyer):
 			pass
-		if talents != null and step % check_every == 0 and talents.available_points() > 0:
+		if talents != null and not _talents_never_bought and step % check_every == 0 and talents.available_points() > 0:
 			SimMeasures.spend_talents(talents, talent_order, strict_order)
 		if floors.is_farming() and step % check_every == 0:
 			floors.set_click_dps(floors.click_damage().multiply_decimal(cps_factor))
 			if not auto and floors.can_beat_next_boss():
 				floors.challenge_boss()
+			elif skills != null and skill_mode >= SKILLS_CHALLENGE and SimMeasures.boss_skills_ready(skills) and SimMeasures.grown_enough(companions.total_power(), failed_power[0], RETRY_GROWTH_PERCENT):
+				if floors.challenge_boss():
+					hand_challenges[0] += 1
 		while next_milestone < milestones.size() and state.max_stage_reached >= milestones[next_milestone]:
 			var seconds: float = float(step + 1) * dt
 			var note: String = ""
@@ -264,6 +293,8 @@ func _simulate(combat: Combat, boss: BossFight, offline: OfflineIncome, cps: flo
 		print("Item totals: %s; critical chance %d%%, bonus %d%%" % [str(inventory.totals()), hub.crit_chance_percent(), hub.crit_bonus_percent()])
 	if skills != null:
 		print("Skill activations: %d big hits, %d damage buffs, %d gold bonuses" % [skill_uses[0], skill_uses[1], skill_uses[2]])
+		if skill_mode >= SKILLS_CHALLENGE:
+			print("Boss challenges by hand: %d" % hand_challenges[0])
 	print("Real time: %.1f s" % (float(Time.get_ticks_msec() - started_ms) / 1000.0))
 	return true
 
@@ -292,7 +323,7 @@ func _use_skills(skills: SkillManager, floors: FloorManager, mode: int, uses: Ar
 	for skill: Skill in skills.skills():
 		if skill.state() != Skill.State.READY:
 			continue
-		if mode == 2 and skill.effect != Skill.Effect.GOLD_MULTIPLIER and not floors.is_boss_fight():
+		if mode >= 2 and skill.effect != Skill.Effect.GOLD_MULTIPLIER and not floors.is_boss_fight():
 			continue
 		# A skill the talents lock is refused: not counted.
 		if skills.activate(skill.id):

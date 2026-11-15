@@ -115,6 +115,29 @@ static func next_ordered_talent(talents: TalentTree, order: PackedStringArray) -
 	return ""
 
 
+## True when the player of --skills=3 (story 023) has every boss skill in hand: each skill that is
+## not the gold bonus, that the talents neither lock nor make passive, is ready. False when the
+## player has no such skill: there is nothing to keep for a boss.
+static func boss_skills_ready(skills: SkillManager) -> bool:
+	var kept: int = 0
+	for skill: Skill in skills.skills():
+		if skill.effect == Skill.Effect.GOLD_MULTIPLIER or not skills.is_unlocked(skill.id) or skills.is_passive(skill.id):
+			continue
+		if skill.state() != Skill.State.READY:
+			return false
+		kept += 1
+	return kept > 0
+
+
+## True when the player of --skills=3 tries the boss again: never failed since the last boss killed
+## ([param power_at_failure] null), or the companions' power grew by at least [param percent]
+## since the failed attempt. Exact, on [BigNumber].
+static func grown_enough(power: BigNumber, power_at_failure: BigNumber, percent: int) -> bool:
+	if power_at_failure == null:
+		return true
+	return power.multiply(BigNumber.from_int(100)).compare(power_at_failure.multiply(BigNumber.from_int(100 + percent))) >= 0
+
+
 ## One line on the story 019 effects in play (simulator end of run): rhythm, boss countdown, synergy,
 ## champion, attack speed, cost discount, offline cap, the passive skills of [param skills] (null
 ## allowed) and the bought tops.

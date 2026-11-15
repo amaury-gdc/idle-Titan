@@ -71,3 +71,82 @@ func test_best_ratio_takes_the_most_damage_per_gold() -> void:
 	var manager: CompanionManager = _manager()
 	_state.gold = BigNumber.from_int(100)
 	assert_str(SimMeasures.best_ratio_id(manager)).is_equal("strong")
+
+
+# --skills=3 (story 023): the player who challenges the boss with the skills ready.
+
+const SKILLS_DATA: Dictionary = {"schema_version": 1, "skills": [
+	{"id": "big_hit", "name": "Gros coup", "effect": "burst", "dps_seconds": "6", "cooldown_seconds": 60},
+	{"id": "damage_buff", "name": "Frénésie", "effect": "damage_multiplier", "multiplier": "1.5", "duration_seconds": 15, "cooldown_seconds": 90},
+	{"id": "gold_bonus", "name": "Bonus d'or", "effect": "gold_multiplier", "multiplier": "1.5", "duration_seconds": 20, "cooldown_seconds": 120},
+]}
+const RETRY_PERCENT: int = 10
+
+
+## Skills on the fixture of [method _manager]; with [param locked_by_talents] the real talent tree
+## is there and nothing is bought, so the skills behind a node are locked as in the game.
+func _skills(data: Dictionary, locked_by_talents: bool = false) -> SkillManager:
+	var manager: CompanionManager = _manager()
+	var curves: Variant = DataLoader.load_json("res://assets/data/core_curves.json")
+	var combat: Combat = Combat.from_data(curves, DataLoader.load_json("res://assets/data/companions_roster.json"))
+	var floors: FloorManager = FloorManager.new(_state, combat)
+	var hub: ModifierHub = null
+	if locked_by_talents:
+		var tree: TalentTree = SimMeasures.simulated_tree(DataLoader.load_json("res://assets/data/talents.json"), PermanentState.new(), _state)
+		assert_str(tree.get_error()).is_empty()
+		hub = ModifierHub.new(floors, OfflineIncome.from_data(curves, combat), tree, null)
+	var skills: SkillManager = SkillManager.from_data(data, _state, combat, floors, hub)
+	assert_str(skills.get_error()).is_empty()
+	assert_object(manager).is_not_null()
+	return skills
+
+
+func test_boss_skills_ready_when_burst_and_buff_are_ready() -> void:
+	assert_bool(SimMeasures.boss_skills_ready(_skills(SKILLS_DATA))).is_true()
+
+
+func test_boss_skills_not_ready_while_one_of_them_recharges() -> void:
+	# Arrange
+	var skills: SkillManager = _skills(SKILLS_DATA)
+
+	# Act
+	assert_bool(skills.activate("big_hit")).is_true()
+
+	# Assert
+	assert_bool(SimMeasures.boss_skills_ready(skills)).is_false()
+
+
+func test_boss_skills_ready_ignores_the_gold_bonus() -> void:
+	# Arrange
+	var skills: SkillManager = _skills(SKILLS_DATA)
+
+	# Act: the gold bonus is used as soon as it is ready, never kept for a boss
+	assert_bool(skills.activate("gold_bonus")).is_true()
+
+	# Assert
+	assert_bool(SimMeasures.boss_skills_ready(skills)).is_true()
+
+
+func test_boss_skills_ready_ignores_a_skill_the_talents_lock() -> void:
+	# Arrange: no node bought, so the damage buff is locked and only the burst counts
+	var skills: SkillManager = _skills(SKILLS_DATA, true)
+	assert_bool(skills.is_unlocked("damage_buff")).is_false()
+	assert_bool(skills.is_unlocked("big_hit")).is_true()
+
+	# Act and assert
+	assert_bool(SimMeasures.boss_skills_ready(skills)).is_true()
+	assert_bool(skills.activate("big_hit")).is_true()
+	assert_bool(SimMeasures.boss_skills_ready(skills)).is_false()
+
+
+func test_grown_enough_without_a_failed_attempt() -> void:
+	assert_bool(SimMeasures.grown_enough(BigNumber.from_int(1), null, RETRY_PERCENT)).is_true()
+
+
+func test_grown_enough_only_from_the_growth_asked() -> void:
+	# Arrange
+	var at_failure: BigNumber = BigNumber.from_int(100)
+
+	# Act and assert: +9% is not enough, +10% is
+	assert_bool(SimMeasures.grown_enough(BigNumber.from_int(109), at_failure, RETRY_PERCENT)).is_false()
+	assert_bool(SimMeasures.grown_enough(BigNumber.from_int(110), at_failure, RETRY_PERCENT)).is_true()

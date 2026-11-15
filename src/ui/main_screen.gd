@@ -242,7 +242,8 @@ func _ready() -> void:
 	var offline_gain: Dictionary = _grant_offline_gold()
 	# After the absence is paid with the bonuses the player had (design/talent-tree-v2.md, Données).
 	_talents.apply_tree_version()
-	# Story 020: a record at or under the stage of the data is recorded as seen, without a message.
+	# Stories 020 and 023: a record at or under the stage threshold of the current balance version
+	# is recorded as seen, without a message.
 	_balance_notice.apply(_talents.best_stage())
 	_floors.enemy_damaged.connect(_on_enemy_damaged)
 	_floors.stage_started.connect(_on_stage_started)
@@ -632,16 +633,17 @@ func _close_balance_notice() -> bool:
 	return _balance_notice != null and _balance_notice.is_due()
 
 
-## The one-time message of a rebalance (story 020), for a player whose record is above the stage of
-## the data: the high stages changed, nothing was taken. It uses the window of the return message
-## and comes after the return message and the talent tree message.
+## The one-time message of a rebalance (stories 020 and 023), for a player whose record is above the
+## stage threshold of the current balance version: what changed, and that nothing was taken. It
+## uses the window of the return message and comes after the return message and the talent tree
+## message.
 func _show_balance_notice() -> void:
 	_bubble.cancel()
 	_save_screen.close()
 	_balance_notice_open = true
-	_offline_title.text = tr("Équilibrage mis à jour")
-	# A non-breaking space ( ) before the colon: it never starts a line.
-	_offline_message.text = tr("L'équilibrage a changé : les monstres des étages élevés sont plus résistants. Tu ne perds rien.")
+	# Title and text of the current balance version come from core_curves.json ("balance_notices").
+	_offline_title.text = tr(_balance_notice.title())
+	_offline_message.text = tr(_balance_notice.text())
 	_open_message_window()
 
 

@@ -1,10 +1,10 @@
 {
 	"schema_version": 3,
 	"cost_growth": "1.08",
-	"enemy_hp_base": "24",
+	"enemy_hp_base": "36",
 	"enemy_hp_segments": [
-		{ "from_stage": 1, "growth": "1.32" },
-		{ "from_stage": 100, "growth": "1.345" },
+		{ "from_stage": 1, "growth": "1.3159" },
+		{ "from_stage": 100, "growth": "1.3424" },
 		{ "from_stage": 150, "growth": "1.38" },
 		{ "from_stage": 190, "growth": "1.40" },
 		{ "from_stage": 205, "growth": "1.27" },
@@ -13,11 +13,23 @@
 	"gold_per_kill_base": "3",
 	"gold_per_kill_growth": "1.28",
 	"click_damage_base": "1",
-	"click_companion_power_factor": "0.1",
 	"autosave_interval_seconds": 5,
 	"offline_efficiency": "0.1",
 	"offline_max_hours": 12,
 	"offline_min_seconds": 60,
-	"balance_version": 1,
-	"balance_notice_min_stage": 150
+	"balance_version": 2,
+	"balance_notices": [
+		{
+			"version": 1,
+			"min_stage": 150,
+			"title": "Équilibrage mis à jour",
+			"text": "L'équilibrage a changé : les monstres des étages élevés sont plus résistants. Tu ne perds rien."
+		},
+		{
+			"version": 2,
+			"min_stage": 10,
+			"title": "Équilibrage mis à jour",
+			"text": "L'équilibrage a changé : taper compte plus au début et certains monstres sont plus résistants. Tu ne perds rien."
+		}
+	]
 }

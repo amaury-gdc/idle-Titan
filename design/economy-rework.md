@@ -1,6 +1,6 @@
 # Refonte de l'économie et éveil des compagnons
 
-> **Status**: Approuvée par Amaury le 2026-11-02 ; PV recalés à la story 020 (2026-11-14), part du clic reportée à la story 023
+> **Status**: Approuvée par Amaury le 2026-11-02 ; PV recalés à la story 020 (2026-11-14) ; parts de clic par compagnon activées à la story 023 (2026-11-15)
 > **Stories**: 015, 016, 017, 020
 > **Référence**: `assets/data/balance_notes.md`, section « Reference before the economy rework »
 
@@ -22,14 +22,16 @@ Les cibles « premier boss en 2 à 3 min » et « étage 50 vers 1 h » du brief
 
 Valeurs recalées à la story 020 (mesures et raisons : `assets/data/balance_notes.md`, « Economy calibration »). `enemy_hp_base` passe de 22 à 24. Le taux de croissance dépend de l'étage :
 
-| À partir de l'étage | Taux retenu (story 020) | Taux proposé avant mesure |
-|---|---|---|
-| 1 | 1,32 | 1,32 |
-| 100 | 1,345 | 1,33 |
-| 150 | 1,38 | 1,345 |
-| 190 | 1,40 | 1,40 |
-| 205 | 1,27 | 1,6 |
-| 211 | 1,6 | — |
+| À partir de l'étage | Taux en vigueur (story 023) | Taux de la story 020 | Taux proposé avant mesure |
+|---|---|---|---|
+| 1 | 1,3159 | 1,32 | 1,32 |
+| 100 | 1,3424 | 1,345 | 1,33 |
+| 150 | 1,38 | 1,38 | 1,345 |
+| 190 | 1,40 | 1,40 | 1,40 |
+| 205 | 1,27 | 1,27 | 1,6 |
+| 211 | 1,6 | 1,6 | — |
+
+Story 023 : `enemy_hp_base` passe de 24 à 36 avec les parts de clic par compagnon (voir « Clic ») ; les deux premiers taux baissent pour que les PV à partir de l'étage 150 restent ceux de la story 020, à 0,1 % près.
 
 La base proposée avant mesure était 30 : elle mettait le premier boss à 11,8 min, d'où 24 (9,0 min). Le mur est en deux marches parce que l'or ne monte qu'avec l'étage : avec 1,6 dès 205, le joueur reste bloqué devant le boss de 210 pendant les 40 h.
 
@@ -45,7 +47,10 @@ Données : `enemy_hp_segments` dans `core_curves.json`, champ optionnel lu sans 
 
 | Compagnon | Éclaireur | Lancier | Archer | Gardien | Mage | Chevalier | Alchimiste | Dragon |
 |---|---|---|---|---|---|---|---|---|
-| `click_share` | 1 | 0,8 | 0,6 | 0,45 | 0,35 | 0,25 | 0,15 | 0,06 |
+| `click_share` proposé avant mesure | 1 | 0,8 | 0,6 | 0,45 | 0,35 | 0,25 | 0,15 | 0,06 |
+| `click_share` retenu (story 023) | 0,4 | 0,34 | 0,3 | 0,26 | 0,22 | 0,18 | 0,13 | 0,08 |
+
+Valeurs retenues à la story 023 (mesures et raisons : `assets/data/balance_notes.md`, « Active play value »). Les parts proposées avant mesure mettaient le premier boss à 22 min à 1 clic/s et retiraient 9 % de dégâts en fin de partie, face à un mur réglé à 3 % près. Avec les parts retenues, la base de PV passe de 24 à 36 et les taux des deux premiers paliers à 1,3159 et 1,3424 ; les PV à partir de l'étage 150 ne bougent pas. Cibles tenues, profil sans talents à 3 clics/s : 60 % à l'étage 10, 18 % à l'étage 200 (56 % et 14 % pour le build Compagnons de référence). Cibles non tenues : « 80 à 100 % au tout début » (inatteignable avec des parts plafonnées à 1 et un premier boss sous 16 min à 1 clic/s), « 40 % au milieu » (31 % à l'étage 100), et le build Clic (traité à part).
 
 La mesure de `click_companion_power_factor` montre qu'il pèse peu sur le rythme : à 0, l'étage 100 ne bouge presque pas.
 
