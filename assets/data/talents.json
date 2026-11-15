@@ -14,7 +14,7 @@
 	"nodes": [
 		{ "id": "click_grip", "branch": "click", "tier": 1, "name": "Poigne ferme", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "click_damage", "percent": 8 }] },
 		{ "id": "click_crit", "branch": "click", "tier": 1, "name": "Œil vif", "cost": 1, "requires": [], "effects": [{ "type": "stat", "stat": "crit_chance", "percent": 8 }] },
-		{ "id": "click_ally", "branch": "click", "tier": 2, "name": "Frappe alliée", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "click_share", "percent": 50 }] },
+		{ "id": "click_ally", "branch": "click", "tier": 2, "name": "Frappe alliée", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "click_share", "percent": 70 }] },
 		{ "id": "bighit_power", "branch": "click", "tier": 2, "name": "Gros coup puissant", "cost": 2, "requires": [], "effects": [{ "type": "skill_mod", "skill": "big_hit", "field": "amount", "value": "8" }] },
 		{ "id": "click_rhythm", "branch": "click", "tier": 3, "name": "Rythme", "cost": 3, "requires": [], "effects": [{ "type": "rhythm", "clicks": 40, "dps_seconds": "1", "min_gap_seconds": 5 }] },
 		{ "id": "click_heavy", "branch": "click", "tier": 3, "name": "Coup lourd", "cost": 2, "requires": [], "effects": [{ "type": "stat", "stat": "click_damage", "percent": 15 }] },

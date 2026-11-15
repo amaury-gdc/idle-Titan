@@ -26,7 +26,7 @@ Plafonds à 25 points : dégâts ×2 et or ×1,4 par rapport à l'arbre actuel, 
 |---|---|---|---|---|---|---|---|
 | click_grip | Clic | 1 | Poigne ferme | 1 | - | Clic +8 % | stat |
 | click_crit | Clic | 1 | Œil vif | 1 | - | 8 % de critique sur clic | stat, code |
-| click_ally | Clic | 2 | Frappe alliée | 2 | - | Parts de clic ×1,5 | code |
+| click_ally | Clic | 2 | Frappe alliée | 2 | - | Parts de clic ×1,7 (×1,5 avant la story 023) | code |
 | bighit_power | Clic | 2 | Gros coup puissant | 2 | - | 6 → 8 s de dégâts | compétence |
 | click_rhythm | Clic | 3 | Rythme | 3 | - | Tous les 40 clics, Gros coup gratuit de 1 s, 5 s minimum entre deux | code |
 | click_heavy | Clic | 3 | Coup lourd | 2 | - | Clic +15 % | stat |

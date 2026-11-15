@@ -27,6 +27,8 @@ section "Economy calibration (story 020)" below keeps the rule, the reference co
   stage 1, x1.46 at 10, x1.29 at 50, x1.10 at 100, and within 0.1% from stage 150 on: the wall is
   not touched.
 - `balance_version` 2, with its own message and threshold (record above the first boss).
+- `talents.json`: "Frappe alliée" (`click_ally`) 50 to 70: the share of the companions in a click
+  is x1.7 instead of x1.5 (see "Clic build" below). No other talent changed.
 
 Sets tried before this one, same method (HP from 150 unchanged, base retuned on the first boss):
 
@@ -80,6 +82,103 @@ Without talents (`--talents=2`, seed 1, cheapest): first boss 10.2 min before an
 3 clicks/s, 14.4 min before and 17.1 min after at 1 click/s; stage 200 at 10.0 h on day 6 and 210
 at 18.0 h on day 10, before and after.
 
+### Clic build: "Frappe alliée" 50 to 70
+
+Goal set by Amaury: the Clic build gets the calendar of the Compagnons build (200 on day 5, 210 on
+day 7, 220 around day 17, 225 closed), whatever click share comes out. Order of the build:
+`click_grip, click_crit, click_ally, bighit_power, click_heavy, click_rhythm, boss_hunter,
+bighit_cd, <summit>, comp_camaraderie, frenzy_unlock, comp_cadence, eco_purse`. Variants run with
+`--talentsdata=<copy of talents.json with one value changed>`.
+
+Summit Virtuose, 3 clicks/s, seed 1, cheapest, 40 h, by value of `click_ally`:
+
+| `click_ally` | Stage 200 | Stage 210 | Stage 220 | 225 | Click share at 200 |
+|---|---|---|---|---|---|
+| 50 (before) | 8.0 h, day 5 | 14.0 h, day 8 | not at 40 h | no | 27.5% |
+| 60 | 8.0 h, day 5 | 12.0 h, day 7 | 38.0 h, day 20 | no | 28.8% |
+| 70 (kept) | 8.0 h, day 5 | 12.0 h, day 7 | 38.0 h, day 20 | no | 30.0% |
+| 85 | 8.0 h, day 5 | 12.0 h, day 7 | not at 40 h | no | 31.8% |
+| 100 | 8.0 h, day 5 | 12.0 h, day 7 | not at 40 h | no | 33.5% |
+| 120 | 8.0 h, day 5 | 12.0 h, day 7 | not at 40 h | no | 35.7% |
+| Compagnons build (goal) | 8.0 h, day 5 | 12.0 h, day 7 | 32.0 h, day 17 | no | 14% |
+
+Before and after, seed 1 and cheapest unless said:
+
+| Case | Stage 200 | Stage 210 | Stage 220 | 225 | Click share at 200 |
+|---|---|---|---|---|---|
+| Virtuose, 3 clicks/s, before | 8.0 h, day 5 | 14.0 h, day 8 | not at 40 h | no | 27.5% |
+| Virtuose, 3 clicks/s, after | 8.0 h, day 5 | 12.0 h, day 7 | 38.0 h, day 20 | no | 30.0% |
+| Virtuose, 3 clicks/s, after, seed 2 | 8.0 h, day 5 | 16.0 h, day 9 | 36.0 h, day 19 | no | 32.0% |
+| Sursis, 3 clicks/s, before | 10.0 h, day 6 | 14.0 h, day 8 | not at 40 h | no | 27.5% |
+| Sursis, 3 clicks/s, after | 8.0 h, day 5 | 12.0 h, day 7 | not at 40 h | no | 30.0% |
+| Virtuose, 1 click/s, after | 10.0 h, day 6 | 18.0 h, day 10 | not at 40 h | no | 12.5% |
+| Virtuose, 13 clicks/s, after | 4.0 h, day 3 | 6.3 h, day 4 | 28.0 h, day 15 | no | 65.0% |
+
+The Clic build at 1 and 13 clicks/s was not measured before the change. After, at 3 clicks/s,
+seed 1: first boss 7.1 min (unchanged, the node is bought later), click share 67 / 66 / 43 / 34 /
+30% at stages 10 / 50 / 100 / 150 / 200.
+
+What the measures say:
+
+- 200 and 210 match the Compagnons build from 60 on (seed 1; at 70 also on seed 2, where both
+  builds have 210 at 16.0 h on day 9). Stage 200 already matched at 50; only 210 moved. 60 and 70
+  give the same milestones: 70 was chosen between the two without a measured difference, only the
+  share differs (28.8 against 30.0%).
+- Stage 220 does not follow the multiplier on seed 1: 60 and 70 pass at 38.0 h, 50, 85, 100 and
+  120 do not at 40 h. What separates them is NOT identified. After 210 the player waits at stage
+  209 for the third awakening of the dragon; the runs that miss 220 end with the dragon at level
+  400, not awakened, perhaps one return short of the horizon (not measured beyond 40 h). The
+  helmets differ between the two groups only because the boss of 210 drops one: it is a
+  consequence of passing 210, not a cause.
+- The offline gold per return does not explain the gap with the Compagnons build either. While
+  waiting at 209 the Clic build gets 28 Sp per return and the Compagnons build 35 Sp (42 Sp only
+  after 220). The Clic build with `eco_purse, gold_unlock, economy_offline` as its off-branch
+  nodes (70, Virtuose, 3 clicks/s, one run) also gets 35 Sp per return and still reaches 220 at
+  38.0 h on day 20, not at 32.0 h (200 at 8.0 h, 210 at 12.0 h, click share 31.6% at 200). That
+  run drops `comp_camaraderie`, `frenzy_unlock` and `comp_cadence` and leaves 2 points unspent,
+  so it is not a pure "plus Rentes" comparison.
+- 13 clicks/s: stage 200 on day 3, outside the day 4 to 6 target. It is the only 13 clicks/s run
+  of the Clic build, so day 3 is probably its normal case (for the Compagnons build it was 1 run
+  in 6).
+- Not measured for the Clic build: the ratio buyer, seed 3, Sursis at 1 and 13 clicks/s or on
+  seed 2, a seed 2 "before", and 60, 85, 100, 120 on any seed but 1.
+
+### Sensitivity on the story 023 data (reference build, seed 1, cheapest, 3 clicks/s, 40 h)
+
+Same cases and commands as "Sensitivity" in the story 020 section.
+
+| Case | Stage 200 | Stage 210 | Stage 220 | 225 / 230 at 40 h |
+|---|---|---|---|---|
+| Reference | 8.0 h, day 5 | 12.0 h, day 7 | 32.0 h, day 17 | no / no |
+| Squad +3% (`squad_multiplier` 2.163) | 8.0 h, day 5 | 10.0 h, day 6 | 16.0 h, day 9 | no / no |
+| Squad -3% (`squad_multiplier` 2.037) | 12.0 h, day 7 | 22.0 h, day 12 | no | no / no |
+| Awakening cost x0.8 (`cost_level_multiplier` 8) | 8.0 h, day 5 | 12.0 h, day 7 | 22.0 h, day 12 | no / no |
+| Awakening cost x1.2 (`cost_level_multiplier` 12) | 10.0 h, day 6 | 14.0 h, day 8 | no | no / no |
+| 1 click/s | 10.0 h, day 6 | 14.0 h, day 8 | 36.0 h, day 19 | no / no |
+| 13 clicks/s | 6.0 h, day 4 | 8.0 h, day 5 | 24.0 h, day 13 | no / no |
+| 4 h active per day, 20 h away | 12.0 h, day 4 | 16.0 h, day 5 | no | no / no |
+
+Squad -3% is still the only case outside the day 4 to 6 target (day 7); 225 is reached in no case.
+Against the story 020 data, 210 moves in two cases: squad -3% (22.0 h against 20.0 h) and
+13 clicks/s (8.0 h on day 5 against 10.0 h on day 6). All of this table is seed 1 only. Not
+measured: 1 h per day, a player who returns every other day, without items.
+
+### Builds on the story 023 data (seed 1, cheapest, 3 clicks/s, 40 h)
+
+Same orders as "Builds" in the story 020 section; the Clic rows are with "Frappe alliée" at 70.
+
+| Build, summit | Stage 200 | Stage 210 | Stage 220 | 225 / 230 at 40 h | Click share at 200 |
+|---|---|---|---|---|---|
+| Compagnons, Champion (reference) | 8.0 h, day 5 | 12.0 h, day 7 | 32.0 h, day 17 | no / no | 14% |
+| Compagnons, Instinct de meute | 8.0 h, day 5 | 12.0 h, day 7 | 36.0 h, day 19 | no / no | 15% |
+| Clic, Virtuose | 8.0 h, day 5 | 12.0 h, day 7 | 38.0 h, day 20 | no / no | 30% |
+| Clic, Sursis | 8.0 h, day 5 | 12.0 h, day 7 | no | no / no | 30% |
+| Économie, Moisson | 8.0 h, day 5 | 14.0 h, day 8 | 24.0 h, day 13 | no / no | 17% |
+| Économie, Rentier | 10.0 h, day 6 | 16.0 h, day 9 | 24.0 h, day 13 | no / no | 17% |
+
+Every build reaches stage 200 on day 5 or 6 and none reaches 225. The Économie builds are still
+the first at 220 (day 13, against day 12 and 13 on the story 020 data).
+
 ### Known limits (accepted by Amaury)
 
 - 13 clicks/s, seed 3, ratio buyer: stage 200 on day 3 (4.0 h), outside the day 4 to 6 target.
@@ -93,12 +192,11 @@ at 18.0 h on day 10, before and after.
   reference build only.
 - The first return of a 1 click/s player is 7 stages lower (59 against 66): early HP rises and
   offline gold divides by HP. The day of stage 200 does not move.
-- Clic build with the kept shares and today's talents (seed 1, cheapest, 3 clicks/s, 40 h):
-  click share 67 / 63 / 46 / 31 / 27.5% at stages 10 / 50 / 100 / 150 / 200, for a target of 40
-  to 60% at 200 (32% on the story 020 data: the dragon's share went from 0.1 to 0.08). First boss
-  7.1 min, stage 50 at 34.0 min. Summit Virtuose: stage 200 at 8.0 h on day 5, 210 at 14.0 h on
-  day 8. Summit Sursis: 200 at 10.0 h on day 6, 210 at 14.0 h on day 8. Neither reaches 220 at
-  40 h (Virtuose reached it at 38.0 h on the story 020 data). Its talents are not retuned yet.
+- Clic build: click share 30% at stage 200 for a target of 40 to 60%, and stage 220 on day 19 or
+  20, or not at 40 h, against day 17 for the Compagnons build. Both accepted with "Frappe alliée"
+  at 70: see "Clic build" above. The goal was the calendar of the Compagnons build, not the share.
+- Threshold 1 stays an accepted gap; track C (offline gold) was not done (decision of 2026-11-15,
+  to be judged again after the friends' playtest).
 - The simulated player only challenges a boss when it can win without skills (auto challenge,
   margin 1.2). Keeping the skills for boss fights (`--skills=2`) is slower, not faster (story 020
   data: stage 200 at 10.0 h instead of 8.0 h): the skills are lost for the farm.

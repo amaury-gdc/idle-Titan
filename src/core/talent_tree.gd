@@ -116,7 +116,7 @@ const TIERED_SCHEMA: int = 2
 ## Stat names an effect may have. click_damage: damage of a click; companion_damage: damage
 ## of the companions' attacks; gold: gold of every kill; offline_gold: gold of an absence;
 ## boss_damage: every hit during a boss fight; crit_chance: chance of a critical click, in points;
-## click_share: percent added to the share of the companions in a click (50 gives x1.5);
+## click_share: percent added to the share of the companions in a click (70 gives x1.7);
 ## attack_speed: percent of attack speed of the companions; cost_discount: percent off every
 ## companion level and awakening; farm_gold: percent of gold added to the kills of farm mode.
 const STAT_CLICK_DAMAGE: String = "click_damage"

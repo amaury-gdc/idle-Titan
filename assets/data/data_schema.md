@@ -310,7 +310,7 @@ plus four talent-only stats:
 
 | Stat | Effect |
 |---|---|
-| `click_share` | The share of the companions in a click (the part above `click_damage_base`) times 1 + percent / 100: 50 gives x1.5 ("Frappe alliée"). The base is untouched. |
+| `click_share` | The share of the companions in a click (the part above `click_damage_base`) times 1 + percent / 100: 70 gives x1.7 ("Frappe alliée", 50 before story 023). The base is untouched. |
 | `attack_speed` | The attack timers of the companions run 1 + percent / 100 times faster, and their dps shown and counted is raised by the same factor ("Cadence"). |
 | `cost_discount` | Each companion level costs floor(cost x (100 - percent) / 100), at least 1, level by level, so "Max" and single purchases agree and "Max" still stops at the awakening threshold. Awakening costs are NOT discounted: no node touches them (spec Règles, confirmed by Amaury for story 019) ("Négociation"). |
 | `farm_gold` | The gold of a kill in farm mode is multiplied by 1 + percent / 100, after `gold` and before the gold bonus of the skills ("Moisson"). |

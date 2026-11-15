@@ -319,7 +319,7 @@ func set_item_modifiers(global_damage: String, boss_damage: String, boss_gold: S
 
 ## Sets the talent effects that [ModifierHub] pushes (story 019, design/talent-tree-v2.md), each
 ## replacing the previous call:
-## [param click_share] factor on the share of the companions in a click, a decimal string ("1.50");
+## [param click_share] factor on the share of the companions in a click, a decimal string ("1.70");
 ## [param farm_gold] factor on the gold of the kills of farm mode ("1.12"); [param cost_discount_percent]
 ## percent off every companion level, awakenings excluded (see [method discounted_cost]);
 ## [param attack_speed_percent] percent of attack speed of the companions (see [method attack_speed_factor]);

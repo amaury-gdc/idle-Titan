@@ -95,6 +95,25 @@ func test_real_roster_holds_the_click_shares() -> void:
 	assert_bool((_curves as Dictionary).has("click_companion_power_factor")).is_false()
 
 
+## Story 023: "Frappe alliée" multiplies the share of the companions in a click by 1.7 (50 before).
+const CLICK_ALLY_PERCENT: int = 70
+
+
+func test_real_talents_hold_the_click_ally_percent() -> void:
+	# Arrange
+	var talents: Dictionary = DataLoader.load_json("res://assets/data/talents.json")
+
+	# Act
+	var percents: Array[int] = []
+	for node: Dictionary in talents["nodes"]:
+		if node["id"] == "click_ally":
+			for effect: Dictionary in node["effects"]:
+				percents.append(int(effect["percent"]))
+
+	# Assert: one node, one effect, on the click share
+	assert_array(percents).is_equal([CLICK_ALLY_PERCENT])
+
+
 func test_real_curves_keep_the_entry_of_the_first_balance_version() -> void:
 	# Arrange
 	var notices: Array = (_curves as Dictionary)["balance_notices"]
